@@ -28,7 +28,7 @@ def backup(panel, source, config_root='/etc', backup_root='/var/backups/arma-pan
     # Include files that the new installer may create, so rollback removes them.
     names = {p.name for folder in (panel, source) for p in folder.glob('*.py')}
     names.update(p.name for folder in (panel, source) for p in folder.glob('*.html'))
-    names.update(('config.env', '.panel-secret'))
+    names.update(('config.env', '.panel-secret', 'LICENSE', 'ATTRIBUTION.md'))
     for folder in (panel, source):
         for name in ('static','docs'):
             assets=folder/name

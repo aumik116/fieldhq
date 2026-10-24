@@ -1,4 +1,4 @@
-# Operations guide
+# FIELDHQ operations guide
 
 For everyday browser tasks, see the [FIELDHQ user manual](user-manual.md).
 
@@ -6,7 +6,7 @@ For everyday browser tasks, see the [FIELDHQ user manual](user-manual.md).
 
 ## All servers dashboard
 
-The totals and rows cover servers your account can access. Search and status filters narrow the rows without changing totals. Click a server row to open that server's dashboard; Start, Stop and Restart use that row's server and permissions. Stop and Restart ask for confirmation. Open and server controls stay on each row; Startup and Remove are in its More menu.
+The totals and rows cover servers your account can access. Search and status filters narrow the rows without changing totals. Click a server row to open that server's dashboard; Start, Stop and Restart use that row's server and permissions. Stop and Restart ask for confirmation. Open, server controls, Startup, Clone and Remove appear directly on each row when permitted.
 
 Player activity is the combined count from available rosters. A `+` on the total means some readings are missing; the chart leaves a gap rather than treating those servers as empty. Host CPU and memory cover the whole VM, while rows show individual game-process usage. Host CPU needs two samples after the panel starts.
 
@@ -131,7 +131,7 @@ Monitoring distinguishes panel-controlled stops from unexpected process changes.
 
 **Account settings** changes your password and color theme. All accounts use the same layout. The eight palettes are Slate (the default), Field Desk, Operations, Tactical, Original, Field, Forest and Light. Field keeps olive chrome and parchment content with contrasting navigation text. Former Ocean preferences move to Slate. Login uses the last palette remembered by the browser; signed-in pages load the account preference.
 
-The compact reference layout uses local SVG icons, bundled Barlow fonts (SIL Open Font License, included under `static/fonts`), and a contour header. The Dashboard places player and resource charts above the live console and roster; additional performance readings are under More performance details. Its player chart retains 60 roster readings in browser memory, with unavailable readings shown as gaps. The Mods table includes Workshop thumbnails and shortcuts to existing saved presets. Maintenance retains the actual server software and configuration-backup controls.
+The compact reference layout uses local SVG icons, bundled Barlow fonts (SIL Open Font License, included under `static/fonts`), and shared FIELDHQ navigation. The Dashboard places population counters above CPU/memory and network/simulation-FPS chart rows, followed by a full-width console and storage/disk readings. Player details remain expandable. Its player chart retains 60 roster readings in browser memory, with unavailable readings shown as gaps. Mods include Workshop thumbnails and one Presets page, with a shared review of saved configurations. Maintenance retains the actual server software and configuration-backup controls.
 
 The interface before the field-layout refresh is saved at Git tag `backup/pre-field-operations-fb3c1d2`. Reverting the refresh commit restores that interface without changing server files or account data. Changing color themes does not revert the layout.
 

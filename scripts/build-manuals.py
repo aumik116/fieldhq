@@ -31,7 +31,7 @@ def inline(nodes):
         elif kind=='Code':out+='<font face="Courier">'+escape(value[1])+'</font>'
         elif kind=='Link':
             target=value[2][0]
-            if target.endswith('operations.md'):target='https://github.com/aumik116/arma-reforger-panel-aumik-edition/blob/main/docs/operations.md'
+            if target.endswith('operations.md'):target='https://github.com/aumik116/fieldhq/blob/main/docs/operations.md'
             elif target.endswith('.md'):target=target[:-3]+'.pdf'
             out+='<link href='+quoteattr(target)+' color="#176a7d">'+inline(value[1])+'</link>'
         elif kind=='Quoted':out+='“'+inline(value[1])+'”'
@@ -104,7 +104,7 @@ toc='\n'.join(f'{index}. [{heading.split(". ",1)[1]}](#'+re.sub(r'[^a-z0-9 -]','
 for name in ('user-manual','unit-staff-manual','server-management-manual'):
     ast=json.loads(subprocess.check_output(['pandoc',str(root/(name+'.md')),'--from=gfm','--to=json']))
     html=subprocess.check_output(['pandoc',str(root/(name+'.md')),'--from=gfm','--to=html5'],text=True)
-    html=html.replace('href="user-manual.md"','href="/help/manual/full"').replace('href="unit-staff-manual.md"','href="/help/manual/staff"').replace('href="server-management-manual.md"','href="/help/manual/server"').replace('href="operations.md"','href="https://github.com/aumik116/arma-reforger-panel-aumik-edition/blob/main/docs/operations.md"')
+    html=html.replace('href="user-manual.md"','href="/help/manual/full"').replace('href="unit-staff-manual.md"','href="/help/manual/staff"').replace('href="server-management-manual.md"','href="/help/manual/server"').replace('href="operations.md"','href="https://github.com/aumik116/fieldhq/blob/main/docs/operations.md"')
     (root/(name+'.html')).write_text(html)
     title={'user-manual':'FIELDHQ Full User Manual','unit-staff-manual':'FIELDHQ Unit Staff Manual','server-management-manual':'FIELDHQ Server Management Manual'}[name]
     doc=Manual(str(root/(name+'.pdf')),pagesize=A4,leftMargin=17*mm,rightMargin=17*mm,topMargin=18*mm,bottomMargin=20*mm,title=title,author='FIELDHQ',allowSplitting=True)

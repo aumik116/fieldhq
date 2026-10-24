@@ -1,87 +1,74 @@
-# Arma Reforger Server Management Panel
+# FIELDHQ
 
-Manage multiple Arma Reforger dedicated servers on one Ubuntu VM: mods, performance, players, configuration, files and scheduled operations.
+**Self-hosted Arma Reforger server management and unit administration.**
 
-The default branch is **`main`**, including the multi-server manager. Fresh Ubuntu installation, Steam downloads and systemd game startup still need real VM verification. Remote nodes are not supported yet.
+FIELDHQ brings hosting operations and personnel records into one web panel. Run multiple Reforger servers on one Ubuntu host, and manage separate units with their own rosters, events, attendance, qualifications and promotion rules.
 
-## Documentation
+The project grew from [Mateusz Gołębiewski's Arma Reforger panel](https://github.com/mateuszgolebiewski-code/arma-reforger-panel). FIELDHQ keeps that history and attribution while developing its own interface and workflows. See [credits and project history](ATTRIBUTION.md).
 
-- **[Server management manual (PDF)](docs/server-management-manual.pdf)** · [Markdown](docs/server-management-manual.md) — hosting, server controls, mods, presets, schedules and maintenance.
-- **[Unit staff manual (PDF)](docs/unit-staff-manual.pdf)** · [Markdown](docs/unit-staff-manual.md) — a focused guide for rosters, member records, events, attendance and unit staff tasks.
-- **[Full manual (PDF)](docs/user-manual.pdf)** · [Markdown](docs/user-manual.md) — everyday tasks, permissions, servers, mods, units, rosters and attendance.
-- **[Operations guide](docs/operations.md)** — installation, host administration and recovery.
+## Two workspaces
 
-Use **Help** in the panel header for guidance on the current server tab or unit page. All three manuals are available inside the panel at `/help`, with a section sidebar, text search and PDF downloads. The contents sidebar stays visible on desktop, highlights the current section and collapses on smaller screens.
+### Server management
 
-## Fresh installation
+- **All servers:** fleet counters, server search/filtering, resource charts and visible server actions.
+- **Server dashboard:** players/AI/vehicles, CPU, memory, host network traffic, simulation FPS, console and storage.
+- **Creation and cloning:** separate installations, configuration, ports and saves; reusable local game downloads.
+- **Workshop mods:** browsing, dependencies, version pins, bulk removal, downloaded-file inventory and list comparisons.
+- **Addition queue:** review pending additions and size estimates before saving. Latest is the default, with a choice when an accessible running server has a matching pin.
+- **Automatic local reuse:** independent mod copies using copy-on-write where supported, with normal copies/downloads as fallback.
+- **Presets:** mods only, scenario + mods, or a full supported gameplay setup, with a change review.
+- **Player tools:** live roster, recorded identities, observed sessions, moderation and announcements.
+- **Operations:** scheduled controls, warned restarts, software updates, configuration backups, files and persistence tools.
+- **Storage:** measured usage, free-space counters and cleanup of recognized retained server folders.
 
-Use **Ubuntu 24.04, x86_64**, a sudo account and enough disk space for each server's game files, mods and saves. The installer installs Python dependencies and prepares SteamCMD.
+### Unit management
+
+- Independent units, linked servers and staff assignments.
+- Flat rosters or groups/sections/billets, with open-slot counts and one primary billet per member.
+- Member records, staff notes, game names, Discord handles, recorded UUIDs and optional linked panel accounts.
+- Active, Reserve and LOA statuses, joined dates, archiving and CSV export.
+- Qualifications with dates/issuers, separate rank structures and promotion eligibility notices. Promotions require staff approval.
+- Timezone-aware events, recurring occurrences, UUID-based event attendance, corrections and finalization.
+- SOPs/loadouts, awards, campaigns, personnel timelines and recorded analytics.
+- Unit icons, banners and descriptions.
+
+Roster members do not need panel logins. Unit records remain separate even when the same person belongs to several units.
+
+## Manuals and in-panel Help
+
+| Guide | Read online | Download |
+| --- | --- | --- |
+| Server management | [Markdown](docs/server-management-manual.md) | [PDF](docs/server-management-manual.pdf) |
+| Unit staff | [Markdown](docs/unit-staff-manual.md) | [PDF](docs/unit-staff-manual.pdf) |
+| Full manual | [Markdown](docs/user-manual.md) | [PDF](docs/user-manual.pdf) |
+| Installation, networking and recovery | [Operations guide](docs/operations.md) | — |
+
+Choose **Help** in the panel header for guidance on the current server tab or unit page. All three manuals are available at `/help`, with a contents sidebar, section highlighting, text search and PDF downloads.
+
+## Install
+
+Use **Ubuntu 24.04, x86_64**, a sudo account and sufficient storage for each server's game files, mods and saves. The installer prepares the panel, dependencies, SteamCMD and server services.
+
+Clone FIELDHQ into a new checkout for a fresh installation:
 
 ```bash
-git clone https://github.com/aumik116/arma-reforger-panel-aumik-edition.git
-cd arma-reforger-panel-aumik-edition
+git clone https://github.com/aumik116/fieldhq.git fieldhq
+cd fieldhq
 sudo bash install.sh
 ```
 
-1. Choose the service user, panel password and panel TCP port. The defaults are `arma` and port `8888`.
-2. Open `http://YOUR_VM_IP:8888` and sign in as **admin** with that password.
-3. From **All servers**, choose **Create server**. Review the name, permanent server ID, player limit, FPS cap and ports.
-4. Watch provisioning finish. SteamCMD downloads and validates the game; the new server then starts automatically.
+1. Choose the service user, initial panel password and panel TCP port. Defaults are `arma` and `8888`.
+2. Open `http://YOUR_VM_IP:8888` and sign in as **admin** using the chosen password.
+3. Choose **All servers → New server**, review the settings and select **Create and start server**.
+4. Follow installation/startup output, then confirm the mission loads and players can join.
 
-The installer creates the panel first. It does not download a game server until you create one in the browser. `--panel-only` is an alias for this fresh installation flow.
+The initial installer sets up the panel. Game software is downloaded when you create a server. `--panel-only` is an alias for this panel-first flow.
 
-Additional servers can start from defaults or copy a managed server's settings and mod selections. Passwords and saves are not copied. Existing local game files can be reused before Steam validation; each server still has its own files, ports, profile and service.
-
-**Public IPv4 address:** leave blank for automatic detection, or enter the address players should use. For LAN-only testing, use the VM's private IPv4 address. Advertising an address does not configure NAT or prove internet connectivity.
-
-## Units and rosters
-
-Unit administrators can use **Administration → Customization** to upload an icon and page banner, or set a short description. Images are private to authorized unit staff, stored in the panel database (include that database in your backups). PNG, JPEG and WebP images up to 4 MB each are supported; uploads can be previewed, replaced or removed. Personal color themes remain independent.
-
-The unit workspace groups pages under **Overview**, **Roster**, **Operations**, **Resources** and **Administration**. Administration appears only when you have permission. The selected unit and page stay in the URL for reloads and bookmarks. Each page loads its data when opened; long tables scroll sideways on smaller screens.
-
-Open **Units & rosters** from the navigation. Panel administrators create units, link servers and create staff accounts. Use **Staff access → Add staff** inside a unit to create a login and choose Staff or Unit administrator in one popup (panel administrators), or assign an existing account (unit administrators). An optional roster link sets their name for unit notes and history. New logins have no server access. Unit administrators manage their own staff and rosters. Other staff see only their assigned units; hosting roles remain separate.
-
-Create the unit's qualifications, position suggestions and independent rank structures in **Resources → Rank rules & catalogs**, then add roster members manually. Members need no login account. Game name, Discord handle, Active/Reserve/LOA status, optional rank, qualifications and promotion dates stay separate for each unit. Marine, Medical and Officer structures can each define their own ranks, advancement times and required qualifications; paygrade is only an optional label. Promotion eligibility is a staff notice, never an automatic promotion. Define groups, sections and billet slots, then place each member in one primary billet. Empty slots and staffing counts remain visible. UUIDs can be selected from recorded players on linked servers.
-
-Promotion readiness shows a calculated date and missing qualifications, with a notice when someone is eligible for staff review. It never promotes anyone automatically. Link a panel account to its roster member to use that unit’s name when writing notes. Open a member record to read or add dated staff notes with author history. Unit administrators can archive members or permanently delete a record and its notes after confirmation. Former members retain their records, and CSV export is available. The unit **Dashboard** shows staffing, promotion readiness, upcoming events and attendance awaiting review. **Events** provides a monthly calendar with timezone-aware weekly, biweekly and monthly recurrence. **Attendance** provides a monthly member/event grid and CSV export.
-
-
-### Qualifications and promotion review
-
-The **Qualifications** tab shows a member-by-qualification matrix. Search members, filter by status/group/section, show who holds or lacks a qualification, and compare filtered coverage with the whole unit. Open a cell to see its award date, issuer and notes. Roster editors can grant, correct details or revoke an award. Existing qualifications retain unknown original dates/issuers until staff enter those details. The timeline separately records who entered or corrected them.
-
-The **Promotions** tab lists eligible members and unmet requirements. **Review promotion** shows the proposed rank and date; a staff note and explicit confirmation are required. The server rechecks eligibility and the unit revision before changing the rank. Promotions are never automatic.
-
-Member records include a filterable, paginated timeline for ranks/promotion dates, primary billets, qualifications and membership status. Changes made in the regular member editor, assignment controls, Structure, promotion review and bulk editor all use this history. Earlier records receive an upgrade baseline; past changes are not reconstructed. Archiving preserves history; permanent member deletion removes their timeline and award records along with their notes, while existing event attendance snapshots remain.
-
-Choose **Bulk edit…** on the Roster tab to select up to 500 current members and grant/revoke a qualification, change status, move to open billets in a section, or remove primary assignments. Review the server-generated before/after list and confirm before applying. A section move keeps members already in that section in place and allocates its open billets to others. Insufficient vacancies or a stale roster reject the whole change. Existing awards keep their dates and issuers when a bulk grant includes someone who already holds the qualification.
-
-### Analytics, SOPs, loadouts, awards and campaigns
-
-- **Analytics:** choose a date range and timezone for recorded strength, roster additions/archive/removal/restoration counts, cohort retention and finalized attendance trends. Daily chart data is also available as a table. Strength and retention start when this feature is installed; earlier history is not invented. Rank distribution shows the current roster.
-- **SOPs & loadouts:** search references by category, role or content. SOPs support full text and external reference links. Loadouts add an image URL and editable kit slots with standard items, alternatives and notes. References can be archived/restored; edits retain an audit history.
-- **Awards:** create a unit medal/badge catalog, then issue awards with a date and citation. Each issue records the staff member’s unit name. Repeated medals require explicit confirmation; revocations require a reason and retain the original issue. Member records show medals and campaign awards. Award names/images are preserved at issue time when the catalog later changes.
-- **Campaigns:** group this unit’s events by a timezone-aware date window or explicit event selection. Set a participation threshold and optionally link a catalog award. Progress uses confirmed Present outcomes divided by eligible finalized events: Reserve events count, LOA and Excused events are exempt, and Unknown means unconfirmed rather than absent. This differs from normal attendance percentages, which only count required Present/Absent decisions. Complete the campaign and finalize its tracked events before individually approving awards. Date-window campaigns must also reach the end of their window. Nothing grants or revokes campaign awards automatically.
-
-All unit staff can view these areas. Staff can manage SOPs/loadouts, awards and campaigns as part of their standard role. These permissions grant no hosting access. Recruiting remains deferred.
-
-### Events and attendance
-
-1. Link each member’s recorded UUID in their roster record.
-2. Open **Events**, choose **New event**, select the unit’s server, local start time/timezone and duration, and enable attendance tracking. Recurring events create separate occurrences; staff can edit one or the remaining series.
-3. During the event, the panel observes the server’s live RCON player list automatically. Seeing a linked UUID once is enough for Present; connections outside events do not count.
-4. Open the event to review UUID evidence and collector gaps, save corrections with a reason, then finalize after it ends. Finalized records can be reopened with a reason. Cancelled events are excluded from reports.
-5. Open **Attendance** to view a month, filter by server, or export CSV. Member records also show their latest 50 event records.
-
-Event lists follow roster changes until the start, then preserve the member’s name, UUID and attendance expectation. Active members are expected; Reserve members are optional and LOA members are excused. Joined dates exclude events before membership. Only finalized, expected Present/Absent decisions enter the percentage; Unknown, Excused and pending outcomes are excluded.
-
-RCON must be configured and reachable. Background player sampling runs about every 30 seconds while the panel service is running; very brief connections between samples can be missed and require staff confirmation. Unlinked UUIDs and collector gaps are visible. Missing evidence **never automatically marks a member absent**. Staff can receive separate **Manage events** and **Review attendance** permissions without roster editing or server control access.
-
+Creation can copy an accessible server's settings and mod selections. Credentials, game administrator assignments and saves are excluded. Blank custom ports use automatic allocation. A public IPv4 address advertises an endpoint; it does not configure firewall rules or NAT.
 
 ## Update an existing installation
 
-Run these commands inside your repository checkout:
+Run from your existing checkout; there is no need to move installed servers or rename their folders:
 
 ```bash
 git fetch origin
@@ -90,175 +77,83 @@ git pull --ff-only
 sudo bash install.sh --update
 ```
 
-The former `multi-server-manager` work is now on `main`. If Git says it is already up to date, check `git status --short --branch` and `git log -1 --oneline`.
+Updates preserve accounts, settings and registered servers, including supported legacy installations. The panel service restarts; game servers are not deliberately restarted by the panel update. Wait for provisioning and software jobs to finish first.
 
-The update preserves accounts, settings, existing servers and legacy server access. It restarts the panel service; it does not deliberately restart the game servers. Wait for provisioning and software jobs to finish before updating.
+Updates create recovery snapshots under `/var/backups/arma-panel/`. Failed updates attempt to restore panel files and service settings. Automatic rollback does not rewind the live database or game saves. See [backup and recovery](docs/operations.md#backup-and-recovery).
 
-Updates create recovery snapshots under `/var/backups/arma-panel/`. A failed update attempts to restore panel files and service settings. Automatic rollback does not rewind the live database or game saves. Take a VM backup before production updates; see [backup and recovery](docs/operations.md#backup-and-recovery).
+The main development branch is **`main`**; it includes the former multi-server work.
 
-## Find your tools
+### Switch an existing production checkout to FIELDHQ
 
-**All servers** uses the FieldHQ layout: Hosting/Units navigation, seven full-width summary counters (servers, online, players, host CPU/memory, panel-volume disk free and needs attention), a filter/action toolbar below them, compact server rows with visible actions and usage bars, separate host CPU and memory charts, and recent activity. Player trends are available below the resource charts. Live charts cover up to 30 minutes collected while the page is open; they reset on reload. Start, Stop and Restart are available on each row when your role permits them, with confirmation before Stop or Restart. Open a server or use the selector at the **top of the sidebar** to switch. Switching reloads the workspace and clears its previous drafts and console cursor.
+Keep your current checkout and installed paths. After `aumik116/fieldhq` has been
+published with the preserved history, follow the [production migration guide](docs/migrate-to-fieldhq.md).
+Do not run the fresh installer or create replacement server instances just to switch repositories.
 
-| Workspace | What you use it for |
+## Access and roles
+
+**Hosting access** is assigned separately for each server, or explicitly for all servers. Server roles remain Viewer, Operator, Manager and Administrator. Panel administration controls accounts and panel-wide setup; the original owner remains protected.
+
+**Unit access has only two roles:**
+
+| Unit role | Access within assigned units |
 | --- | --- |
-| Dashboard | Start, stop, restart, separate process CPU/memory charts, players and notifications |
-| Console | Search/filter logs, export output and send RCON commands |
-| Startup | FPS cap, launch options, CPU/memory limits and diagnostics |
-| Players | Live roster, observed player history, game admins and moderation |
-| Scheduler | Starts, warned stops/restarts, updates, broadcasts and config backups |
-| Persistence | Save settings, detected save points and named backups |
-| Server config | Validated settings, scenario selection and a raw JSON draft |
-| Mods | Workshop browsing, dependencies, version pins, presets, list comparisons and automatic reuse of local downloads |
-| Files | Profile uploads, text editing, downloads and recoverable Trash |
-| Network | Listeners, ports, network settings and host traffic |
-| Administration | Staff access, activity, Discord notifications and maintenance |
+| Staff | Rosters, notes, primary assignments, qualifications, promotion reviews, events, attendance, references, awards and campaigns |
+| Unit administrator | All Staff functions, plus staff access, rank rules/catalogs, structure, branding and permanent member deletion |
 
-**Account settings** changes your password and color theme. All accounts use the same layout. The eight themes are Slate (the default), Field Desk, Operations, Tactical, Original, Field, Forest and Light. Original adds square corners and firmer borders to the classic amber palette, while keeping the shared layout. Field keeps olive chrome and parchment content with contrasting navigation text. Former Ocean preferences move to Slate. Login uses the last palette remembered by the browser; signed-in pages load the account preference.
+There are no individual unit permission checkboxes. Existing Staff assignments receive the standard Staff role on upgrade. Unit membership, server linking and roster/account linking do not grant hosting access.
 
-Stop and restart ask for confirmation. Controls block repeated clicks while an action runs and show failures. Unavailable status is distinct from a stopped server.
+Accounts use the same login page. Unit-only staff land in the unit workspace. Panel administrators create login accounts; unit administrators can assign existing accounts to their units.
 
-For limits, advanced settings and workflow details, use the [operations guide](docs/operations.md).
+## Appearance
 
-## Staff access and networking
+The eight themes are **Slate** (default), **Field Desk**, **Operations**, **Tactical**, **Original**, **Field**, **Forest** and **Light**. All share the same page layout and features. Original adds square corners and firmer borders to its classic amber palette. Field uses dark olive navigation and light parchment content. Former Ocean preferences move to Slate.
 
-New staff accounts have no server access until assigned. In **Administration → Accounts**, grant Viewer, Operator, Manager or Server administrator separately for each server. Panel administrator access controls account management and is separate from server roles. Existing accounts retain their prior access on upgrade. The original Owner account remains protected.
+Theme preferences are saved per account. Unit branding is configured separately under **Administration → Customization**.
 
-Set up RCON in **Server config → Remote console**. Use a unique password and keep it on loopback or a private network. Admin RCON is required for panel commands and moderation; scheduled warnings and broadcasts also require the Server Admin Tools mod. **Do not forward RCON publicly.**
+## Operational limits
 
-The panel does not configure UFW, firewall rules, router forwarding or NAT. Configure the panel's TCP port and each server's game/query UDP ports yourself. For remote panel access, use an HTTPS reverse proxy. Check your current forwarding targets when troubleshooting a join failure.
+- Hosting currently supports **Arma Reforger on one local host**. Remote nodes, Arma 3 and DayZ hosting are not implemented.
+- The panel does not configure UFW, router forwarding or NAT. Use an HTTPS reverse proxy for remote panel access. Keep RCON on loopback/private networking; do not expose it publicly.
+- Broadcasts and scheduled player warnings need working admin RCON and Server Admin Tools `#message` support. Failed/missed required warnings skip scheduled disruptive operations.
+- The Linux panel service must remain running for schedules, player-history collection and automatic attendance; the browser need not remain open.
+- Attendance counts a linked UUID observed during a tracked event. Sampling can miss brief connections. Collector gaps remain visible and missing evidence does not automatically mark someone absent.
+- Player-session times are observed estimates, not exact connection logs. Older first/last-seen data cannot reconstruct past sessions.
+- Fleet chart history covers up to 30 minutes while the page is open and resets on reload. Storage scans are bounded and cached; logical file sizes can differ from physical disk use with copy-on-write.
+- Configuration backups are not full server, save or database backups. Persistence save selection/named backups and fresh-install/Steam/systemd behavior still need real-server validation before relying on them in production.
+- Recruiting, Discord account integration, shared-server reservations and joint-unit attendance workflows are not implemented. Server notification webhooks are a separate existing feature.
 
-## Service checks and Owner recovery
+## Service checks and owner recovery
 
-For the panel and a managed server with ID `training`:
+The existing service names are retained for compatibility:
 
 ```bash
 sudo systemctl status arma-panel.service
 sudo journalctl -u arma-panel.service -n 50 --no-pager
 sudo systemctl status arma-server@training.service
-sudo journalctl -u arma-server@training.service -n 50 --no-pager
 ```
 
-Replace `training` with your server ID. An upgraded unmanaged installation uses `arma-server.service` instead.
+Replace `training` with your server ID. Supported unmanaged installations use `arma-server.service`.
 
-To recover a forgotten Owner password, run this from an up-to-date checkout on the VM:
+To reset the owner's password from an updated checkout on the host:
 
 ```bash
 sudo bash install.sh --reset-owner-password
 ```
 
-It prompts for a new password and invalidates the Owner's existing sessions. It requires local sudo access; the old password is not needed.
+This requires local sudo access and invalidates existing owner sessions. See the [operations guide](docs/operations.md) for troubleshooting and recovery.
 
-## Development and VM validation
+## Development and documentation
 
-Automated checks require Python with Flask/bcrypt, plus Node.js for the frontend tests:
+This is a Flask/Python application with browser JavaScript and CSS. Existing automated checks are documented in the [operations guide](docs/operations.md); they do not establish Steam download success, systemd startup or public connectivity.
+
+Markdown in `docs/` is the manual source. The server-management manual is derived from the full manual's hosting chapters to keep shared guidance consistent. Regenerate in-panel HTML and PDFs with:
 
 ```bash
-python3 -m unittest discover -s tests
-node tests/frontend_regressions.cjs
-bash -n install.sh
+python3 scripts/build-manuals.py
 ```
 
-Configuration tests bind temporary UDP ports, so run them where socket binding is permitted. Automated checks do not establish Steam download success, systemd startup, mission readiness or public connectivity. Follow the [Ubuntu VM checklist](docs/operations.md#ubuntu-vm-checklist) before production deployment. Persistence save selection and named backups remain WIP pending real-server verification.
+The documentation builder needs Pandoc, ReportLab and DejaVu fonts in the development environment. Commit the generated HTML/PDF files. Deployed panels do not require those build tools; the installer copies the manuals and includes them in recovery snapshots.
 
-## License and credits
+## License and attribution
 
-MIT, as described by the [upstream project](https://github.com/mateuszgolebiewski-code/arma-reforger-panel).
-
-Based on Mateusz Gołębiewski's original panel, including upstream contributions by [YoussefKababe](https://github.com/YoussefKababe). This fork is developed with AI assistance using OpenAI Codex. Bundled Chart.js retains its [MIT license](static/chart.LICENSE.txt).
-
-### Automatic local mod reuse
-
-Adding or changing mods on a stopped server automatically looks for compatible downloads on other servers you can access and copies missing files locally. On a running server, reuse waits until the next start/restart. Imports, presets, config edits and first launch use the same mechanism; no extra checkbox or popup is needed. Known dependencies are included. Pinned mods require the matching local version; unpinned mods use the newest detected local version and Reforger handles any further updates/downloads. Existing destination downloads are never replaced.
-
-Copies use Linux reflinks (copy-on-write, independent files) where supported, with ordinary local copies as fallback. No hardlinks or shared writable Workshop folder are used. Sources can remain running; busy, incomplete, linked or changing downloads are skipped. Missing/unsuitable copies fall back to Reforger’s normal downloader. A host-wide `mod_download_index` table in the existing panel database records mod IDs, versions and locations. The index is refreshed as servers are checked, and source metadata/files are checked again before publishing each copy. Server removal clears that server’s index entry. Per-server `.mod-reuse.json` records copy results for diagnostics.
-
-### Mod drafts and host storage
-
-On **Mods → Review queue**, see only pending additions, remove individual queued
-mods, and review their estimated size in a storage counter. **Cancel** closes the
-review and keeps the queue; **Add queued mods** merges additions into the current
-configuration without removing existing mods or restarting the server. Local
-copies are reused when available; running servers load additions on their next
-restart. Older full-list drafts are read as additions only.
-
-Latest is the default. If an addition is pinned on another accessible running
-server, a dialog offers Latest or each available pin and names its source servers.
-Explicit choices are kept with the queue. Add now uses the same version prompt.
-
-Panel administrators can open **All servers → Storage** for a background
-measurement of server installations, mods, logs, profiles, backups and recognized
-retained server folders. Measurements are cached for ten minutes and bounded to
-30 seconds / 500,000 filesystem entries; partial results are labeled. Category
-sizes are logical bytes, not unique allocated disk blocks: reflinks can share
-physical space. Filesystem usage/free space includes other files on the host.
-
-Workshop cards offer **Add now** (the existing preview/save flow) and **Add to queue**.
-Queueing includes known dependencies and leaves the active configuration untouched.
-Review queue lists additions with available Workshop size estimates, totals them
-once per mod, and flags unknown sizes. Estimates exclude temporary download space
-and are not a measurement of physical disk use or network traffic.
-
-### Scenarios, operations and player tools
-
-- **Server config → Browse maps & scenarios** (also in Workshop): search installed
-  scenarios and filter built-in/Workshop content. Workshop thumbnails appear when
-  metadata is available. Selecting a locally identified mod scenario can also add
-  its owning mod, with mod permission; it does not restart the server. Rescan after
-  installing new content. Unidentified Workshop ownership is shown explicitly.
-- **Mods → Presets**: one page for mods only, scenario + mods, or a full gameplay
-  setup (player limit, crossplay, visibility, gameplay and AI settings). New presets
-  belong to the selected server. Existing shared presets are migrated and labeled
-  Shared legacy. Full setups require a stopped server; review differences before
-  applying. Ports, passwords, admins, persistence configuration and saves are excluded.
-- **Players → Player sessions**: searchable visits with observed join/last-seen
-  times and approximate duration. Successful samples normally run every 30 seconds
-  in the Linux panel service (more often while viewed). Brief connections can be
-  missed. Query errors never mean a confirmed disconnect; observation gaps over
-  90 seconds and changed server processes split visits. Earlier aggregate history
-  cannot reconstruct past sessions.
-- **All servers → Clone**: opens creation with the source selected, a suggested
-  name/ID, player limit and FPS cap. Fresh ports are allocated by the existing
-  provisioning flow. Credentials, game admins and saves are excluded. Review the
-  form, then use **Create and start server**. Only panel administrators can clone
-  servers they can access.
-- **Players / Scheduler → Player announcement / warned restart**: send a message
-  now, schedule one for later, or queue a restart with 5-minute and 1-minute warnings.
-  Uses existing admin RCON and Server Admin Tools `#message` support. Delayed work
-  requires the Linux scheduler; permission and warning checks still apply at run
-  time. Review or cancel pending announcements/restarts in Scheduler.
-
-### Interface consolidation
-
-Presets now use one store and one editor. Existing shared presets are migrated
-once into the active store; the original table is retained for recovery. Deleting
-a migrated preset also deletes its recovery row so it cannot reappear at startup.
-The preset contents selector controls whether gameplay/scenario fields are saved.
-
-**All servers → Storage** combines measurements, free-space counters and retained
-server cleanup. Panel administrators see host measurements; other staff see only
-servers they can access. Cleanup remains restricted to panel administrators.
-
-Shared dialog controls, confirmations and mod change rows keep queue, Workshop,
-comparison and preset reviews consistent. Routine polling pauses in hidden browser
-tabs, charts update only in their visible workspace, and concurrent roster/status
-reads are coalesced. Durable player-history collection and scheduled jobs continue
-in the service independently of browser visibility. Theme palettes remain available.
-
-### Two unit roles
-
-Unit access uses **Staff** and **Unit administrator**, with no individual permission
-checkboxes. Staff manage rosters, notes, primary assignments, qualifications,
-promotion reviews, events, attendance, references, awards and campaigns in assigned
-units. Unit administrators additionally manage staff access, rank rules/catalogs,
-structure, branding and permanent member deletion. Owner/panel administrator access
-remains intact; neither unit role grants hosting access. Existing Staff assignments
-receive the standard Staff access automatically when the updated panel starts.
-
-### Rebuilding manuals
-
-The Markdown files in `docs/` are the source for in-panel HTML and PDF manuals.
-For documentation changes, run `python3 scripts/build-manuals.py` in a development
-environment with Pandoc, ReportLab and DejaVu fonts installed, and commit the
-regenerated HTML/PDF files. The deployed panel reads these files without requiring
-those build tools. Installer updates copy manuals and include them in recovery snapshots.
+FIELDHQ is distributed under the [MIT License](LICENSE). Upstream authorship and contribution history are retained; rebranding does not remove them. See [ATTRIBUTION.md](ATTRIBUTION.md) for upstream and bundled-asset credits.

@@ -1,7 +1,7 @@
 {
-  "name": "Arma Reforger Panel",
-  "short_name": "Arma Panel",
-  "description": "Arma Reforger server management panel",
+  "name": "FIELDHQ",
+  "short_name": "FIELDHQ",
+  "description": "Arma Reforger server management and unit administration",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
