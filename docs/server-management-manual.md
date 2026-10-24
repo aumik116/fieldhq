@@ -200,6 +200,7 @@ Use **Rescan installed scenarios** after installing new content. If ownership ca
 - Blank CPU ranges mean all CPUs; resource presets fill the draft for review.
 - A soft memory target encourages memory reclamation under pressure.
 - A hard memory cap can terminate the game if exceeded.
+- Sound processing is disabled by default (`-noSound`); clients still play their own audio. Existing explicit saved choices are preserved. Uncheck Disable sound processing if server-side audio initialization is needed.
 - Saving startup settings does not restart the game.
 
 Use **Startup diagnostics** and recent output when a server fails to start. Avoid changing advanced AI or single-threaded options without a specific reason.

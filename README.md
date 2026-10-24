@@ -110,6 +110,8 @@ The eight themes are **Slate** (default), **Field Desk**, **Operations**, **Tact
 
 Theme preferences are saved per account. Unit branding is configured separately under **Administration → Customization**.
 
+Startup defaults disable dedicated-server sound processing (`-noSound`). Existing saved choices are preserved; changes apply on the next start/restart.
+
 ## Operational limits
 
 - Hosting currently supports **Arma Reforger on one local host**. Remote nodes, Arma 3 and DayZ hosting are not implemented.

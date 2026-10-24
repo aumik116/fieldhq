@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import sys
 
-DEFAULTS = dict(no_sound=False, no_throw=False, force_update=False, single_threaded=False,
+DEFAULTS = dict(no_sound=True, no_throw=False, force_update=False, single_threaded=False,
                 ai_limit=None, ai_partial_sim=None, log_stats_ms=1000)
 
 

@@ -74,7 +74,7 @@ FPS and AI/vehicle readings come from game logs. Network rates describe the host
 
 ## Startup and resources
 
-Startup settings apply on the next server start. The FPS cap accepts `0` for no cap. Advanced launch controls include noSound, forceUpdate, noThrow, singleThreadedUpdate, optional AI population/batch limits and a 1–10 second statistics interval. Defaults preserve the existing launch command.
+Startup settings apply on the next server start. The FPS cap accepts `0` for no cap. Advanced launch controls include noSound, forceUpdate, noThrow, singleThreadedUpdate, optional AI population/batch limits and a 1–10 second statistics interval. Sound processing is disabled by default through `-noSound`. Explicit saved choices remain in effect; enabling/disabling the option takes effect on the next server start. Other advanced options retain their defaults.
 
 CPU selection accepts logical CPU checkboxes or ranges. **Use all CPUs** removes the restriction. Memory uses decimal MB; `0` means unlimited. The soft target requests memory reclamation under pressure. The hard cap can terminate the game process.
 
