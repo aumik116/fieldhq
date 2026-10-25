@@ -16,12 +16,16 @@
   const link=url=>url?`<a class="manager-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open reference link ↗</a>`:'';
   const field=(label,name,value='',type='text')=>`<label class="unit-field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}"></label>`;
   const textArea=(label,name,value='',max=4000)=>`<label class="unit-field wide">${esc(label)}<textarea name="${name}" maxlength="${max}">${esc(value)}</textarea></label>`;
-  const signature=()=>JSON.stringify([...new FormData(form)]);
+  let editorFiles=[];
+  const signature=()=>JSON.stringify({fields:[...new FormData(form)],files:editorFiles.map(f=>f.token)});
+  const clearEditorFiles=()=>{editorFiles.forEach(f=>URL.revokeObjectURL(f.url));editorFiles=[];};
+  dialog.addEventListener('close',()=>{if(!dialog.open)clearEditorFiles();});
   UnitUX.registerDraft({dirty:()=>dialog.open&&signature()!==baseline,busy:()=>dialog.open&&saving,discard:()=>dialog.close()});
   function close(){if(!UnitUX.canLeave())return;dialog.close();modalRequest++;}
   el('resource-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
   function open(title,html,save=null,button='Save changes'){
     modalRequest++;
+    clearEditorFiles();
     if(dialog.open)dialog.close();el('resource-title').textContent=title;el('resource-body').innerHTML=html;el('resource-error').textContent='';
     handler=save;el('resource-save').hidden=!save;el('resource-save').textContent=button;dialog.showModal();baseline=signature();
     UnitUX.open(dialog);
@@ -35,7 +39,7 @@
 
   async function loadReferences(append=false){
     if(!context)return;const current=epoch, request=++referenceRequest;
-    const query=new URLSearchParams({kind,q:el('reference-search').value,category:el('reference-category').value,archived:el('reference-archived').value,offset:append?nextReference||0:0});
+    const query=new URLSearchParams({kind,q:el('reference-search').value,category:el('reference-category').value,sort:el('reference-sort').value,archived:el('reference-archived').value,offset:append?nextReference||0:0});
     const data=await read(`${base()}/library?${query}`);if(current!==epoch||request!==referenceRequest)return;referenceData=data;
     const selected=el('reference-category').value;el('reference-category').replaceChildren(new Option('All categories',''));
     data.categories.forEach(c=>el('reference-category').add(new Option(c,c)));el('reference-category').value=selected;
@@ -45,24 +49,106 @@
     nextReference=data.next_offset;el('reference-more').hidden=nextReference===null;
     el('reference-grid').querySelectorAll('[data-reference]').forEach(b=>b.onclick=()=>showReference(Number(b.dataset.reference)));
   }
-  async function showReference(id){
-    if(saving)return;const current=epoch, request=++modalRequest;
-    try{const data=await read(`${base()}/library/${id}`);if(current!==epoch||request!==modalRequest)return;
+  function referenceInline(value,files=[]){
+    const pattern=/!\[([^\]\n]*)\]\(attachment:([a-f0-9]{32})\)|\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
+    let result='',start=0;
+    for(const match of value.matchAll(pattern)){
+      result+=esc(value.slice(start,match.index));start=match.index+match[0].length;
+      if(match[2]){
+        const file=files.find(f=>f.token===match[2]);
+        result+=file?.mime.startsWith('image/')?`<img class="sop-inline-image" src="${esc(file.url||`${base()}/library/files/${file.token}`)}" alt="${esc(match[1])}" loading="lazy">`:esc(match[0]);
+      }else if(match[4]){
+        result+=`<a href="${esc(match[4])}" target="_blank" rel="noopener noreferrer">${esc(match[3])}</a>`;
+      }else if(match[5])result+=`<strong>${esc(match[5])}</strong>`;
+      else result+=`<em>${esc(match[6])}</em>`;
+    }
+    return result+esc(value.slice(start));
+  }
+  function referenceContent(item,files=[]){
+    if(item.kind!=='sop')return item.body?`<div class="reference-prose">${esc(item.body)}</div>`:'';
+    const headings=[];
+    let listing=false;
+    let content=item.body.split('\n').map(line=>{
+      if(/^[-*]\s+/.test(line)){const prefix=listing?'':'<ul>';listing=true;return prefix+`<li>${referenceInline(line.slice(2),files)}</li>`;}
+      const prefix=listing?'</ul>':'';listing=false;
+      const match=line.match(/^(#{1,3})\s+(.+)$/);
+      if(!match)return prefix+referenceInline(line,files);
+      const id=`sop-section-${headings.length}`;
+      headings.push({id,title:match[2],level:match[1].length});
+      return prefix+`<h${match[1].length+1} id="${id}" tabindex="-1">${esc(match[2])}</h${match[1].length+1}>`;
+    }).join('\n');
+    if(listing)content+='</ul>';
+    return `<div class="sop-reader">${headings.length?`<nav aria-label="Document sections"><strong>Contents</strong>${headings.map(h=>`<a href="#${h.id}" data-sop-section="${h.id}" class="sop-level-${h.level}">${esc(h.title)}</a>`).join('')}</nav>`:''}<article class="reference-prose">${content}</article></div>`;
+  }
+  function wireReference(item){
+    form.querySelectorAll('[data-sop-section]').forEach(a=>a.onclick=e=>{e.preventDefault();const heading=el(a.dataset.sopSection);heading.scrollIntoView({block:'start'});heading.focus({preventScroll:true});});
+    el('reference-download')?.addEventListener('click',()=>{
+      const blob=new Blob([`${item.title}\n${item.category}\nUpdated ${dateTime(item.updated_at)} · ${item.updated_by}\n\n${item.body}\n${item.url||''}\n`],{type:'text/plain;charset=utf-8'});
+      const address=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=address;a.download=(item.title.replace(/[^a-z0-9 _-]/gi,'').trim()||'SOP')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(address),1000);
+    });
+  }
+  async function showReference(id,versionId=null){
+    if(saving)return;const current=epoch, request=++modalRequest, unitBase=base();
+    try{const data=await read(`${unitBase}/library/${id}${versionId?`/versions/${versionId}`:''}`);if(current!==epoch||request!==modalRequest)return;
       const item=data.item;
-      open(item.title,`${image(item.image_url,item.title)}<p class="feature-note">${esc(item.category)}${item.role?' · '+esc(item.role):''}${item.archived?' · Archived':''}</p>${item.body?`<div class="reference-prose">${esc(item.body)}</div>`:''}${item.slots.length?`<div class="unit-table loadout-table"><table><thead><tr><th>Slot</th><th>Standard item</th><th>Alternatives</th><th>Notes</th></tr></thead><tbody>${item.slots.map(s=>`<tr><td>${esc(s.slot)}</td><td>${esc(s.standard)}</td><td>${esc(s.alternatives)}</td><td>${esc(s.notes)}</td></tr>`).join('')}</tbody></table></div>`:''}${link(item.url)}${data.permissions.references?'<button type="button" id="reference-edit">Edit reference</button>':''}<details class="unit-block"><summary>Change history · latest 50</summary>${data.history.map(h=>`<p><strong>${esc(h.actor)}</strong> · ${esc(h.action)}<small>${esc(dateTime(h.created_at))}</small></p>`).join('')}</details>`);
-      el('reference-edit')?.addEventListener('click',()=>referenceEditor(item,data.revision));
+      open(item.title,`${versionId?`<p class="unit-warn">Historical revision · ${esc(dateTime(data.created_at))} · ${esc(data.actor)}</p><button type="button" id="reference-current">Back to current document</button>`:''}${image(item.image_url,item.title)}<p class="feature-note">${esc(item.category)}${item.role?' · '+esc(item.role):''}${item.archived?' · Archived':''} · Updated ${esc(dateTime(item.updated_at))} · ${esc(item.updated_by)}</p>${referenceContent(item,data.files||[])}${item.slots.length?`<div class="unit-table loadout-table"><table><thead><tr><th>Slot</th><th>Standard item</th><th>Alternatives</th><th>Notes</th></tr></thead><tbody>${item.slots.map(s=>`<tr><td>${esc(s.slot)}</td><td>${esc(s.standard)}</td><td>${esc(s.alternatives)}</td><td>${esc(s.notes)}</td></tr>`).join('')}</tbody></table></div>`:''}${link(item.url)}${data.files?.length?`<section class="unit-block"><h3>Attachments</h3>${data.files.map(f=>`<p><a href="${base()}/library/files/${f.token}" target="_blank" rel="noopener noreferrer">${esc(f.filename)}</a> <small>${(f.size/1024/1024).toFixed(2)} MB${f.mime.startsWith('image/')?' · Image':' · Download'}</small></p>`).join('')}</section>`:''}<div class="unit-toolbar">${item.kind==='sop'?'<button type="button" id="reference-download">Download text</button>':''}${data.permissions?.references?'<button type="button" id="reference-edit">Edit reference</button>':''}</div>${data.history?`<details class="unit-block"><summary>Revision history · latest 50</summary>${data.history.map(h=>`<p><strong>${esc(h.actor)}</strong> · ${esc(h.action)}<small>${esc(dateTime(h.created_at))}</small><button type="button" data-reference-version="${h.id}">View revision</button></p>`).join('')}</details>`:''}`);
+      wireReference(item);
+      el('reference-edit')?.addEventListener('click',()=>referenceEditor(item,data.revision,data.files||[]));
+      el('reference-current')?.addEventListener('click',()=>showReference(id));
+      form.querySelectorAll('[data-reference-version]').forEach(b=>b.onclick=()=>showReference(id,Number(b.dataset.referenceVersion)));
     }catch(error){message(error.message);}
   }
-  function referenceEditor(item=null,revision=referenceData?.revision){
+  function referenceEditor(item=null,revision=referenceData?.revision,files=[]){
     if(saving)return;const itemKind=item?.kind||kind;
-    open(item?'Edit '+item.title:itemKind==='sop'?'New SOP':'New loadout',`<div class="unit-form-grid">${field('Title','title',item?.title||'')}${field('Category','category',item?.category||'General')}${itemKind==='loadout'?field('Role / position','role',item?.role||''):''}${field('Reference link (optional)','url',item?.url||'','url')}${itemKind==='loadout'?field('Image URL (optional)','image_url',item?.image_url||'','url'):''}${textArea(itemKind==='sop'?'SOP content':'Description / guidance','body',item?.body||'',20000)}</div>${itemKind==='loadout'?'<h3>Kit slots</h3><div id="loadout-slot-rows"></div><button type="button" id="loadout-add-slot">Add slot</button><p class="feature-note">For example: Helmet, Primary weapon, Vest, Backpack or Medical supplies.</p>':''}${item?`<label><input type="checkbox" name="archived" ${item.archived?'checked':''}> Archive this reference (can be restored)</label>`:''}`,async()=>{
+    open(item?'Edit '+item.title:itemKind==='sop'?'New SOP':'New loadout',`<div class="unit-form-grid">${field('Title','title',item?.title||'')}${field('Category','category',item?.category||'General')}${itemKind==='loadout'?field('Role / position','role',item?.role||''):''}${field('Reference link (optional)','url',item?.url||'','url')}${itemKind==='loadout'?field('Image URL (optional)','image_url',item?.image_url||'','url'):''}${textArea(itemKind==='sop'?'Write SOP':'Description / guidance','body',item?.body||'',itemKind==='sop'?100000:20000)}</div>${itemKind==='sop'?`<div id="sop-editor-tools" class="unit-toolbar" role="group" aria-label="Document formatting"><button type="button" data-sop-format="heading">Heading</button><button type="button" data-sop-format="bold">Bold</button><button type="button" data-sop-format="italic">Italic</button><button type="button" data-sop-format="list">List</button><button type="button" data-sop-format="link">Link</button><button type="button" id="sop-attach">Add images / documents</button><button type="button" id="sop-preview-toggle" aria-pressed="false">Preview</button></div><input type="file" id="sop-files" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp" multiple hidden><p class="feature-note">Select text, then use the formatting buttons. Images are inserted at the cursor. PDF and Word files are downloadable attachments. Images: up to 4 MB; documents: up to 20 MB each. Up to 10 uploads / 50 MB per save.</p><div id="sop-pending-files"></div><div id="sop-preview" class="unit-block" hidden></div>${files.length?`<details class="unit-block"><summary>Saved attachments (${files.length})</summary>${files.map(f=>`<p>${esc(f.filename)}${f.mime.startsWith('image/')?` <button type="button" data-sop-insert="${f.token}">Insert image</button>`:''}</p>`).join('')}<small>Saved files are retained for document history.</small></details>`:''}`:''}${itemKind==='loadout'?'<h3>Kit slots</h3><div id="loadout-slot-rows"></div><button type="button" id="loadout-add-slot">Add slot</button><p class="feature-note">For example: Helmet, Primary weapon, Vest, Backpack or Medical supplies.</p>':''}${item?`<label><input type="checkbox" name="archived" ${item.archived?'checked':''}> Archive this reference (can be restored)</label>`:''}`,async()=>{
       const values=Object.fromEntries(new FormData(form));const slots=[...form.querySelectorAll('[data-loadout-slot]')].map(row=>Object.fromEntries(['slot','standard','alternatives','notes'].map(key=>[key,row.querySelector(`[name="slot_${key}"]`).value])));
-      await write(`${base()}/library`,{kind:itemKind,title:values.title,category:values.category,role:values.role||'',body:values.body,url:values.url,image_url:values.image_url||'',slots,archived:!!values.archived,revision,...(item?{id:item.id}:{})});
+      const data={kind:itemKind,title:values.title,category:values.category,role:values.role||'',body:values.body,url:values.url,image_url:values.image_url||'',slots,archived:!!values.archived,revision,...(item?{id:item.id}:{})};
+      if(editorFiles.length){
+        const payload=new FormData();payload.set('data',JSON.stringify(data));editorFiles.forEach(f=>payload.append(f.token,f.file));
+        await readJson(await postForm(`${base()}/library`,payload));
+      }else await write(`${base()}/library`,data);
     });
     form.elements.title.required=true;form.elements.title.maxLength=120;form.elements.category.required=true;form.elements.category.maxLength=80;
     function addSlot(slot={}){const row=document.createElement('div');row.className='loadout-slot-editor';row.dataset.loadoutSlot='';row.innerHTML=field('Slot','slot_slot',slot.slot||'')+field('Standard item','slot_standard',slot.standard||'')+textArea('Alternatives','slot_alternatives',slot.alternatives||'',2000)+textArea('Notes','slot_notes',slot.notes||'',2000)+'<button type="button">Remove slot</button>';row.querySelector('[name="slot_slot"]').required=true;row.querySelector('button').onclick=()=>row.remove();el('loadout-slot-rows').append(row);}
     if(itemKind==='loadout'){(item?.slots||[]).forEach(addSlot);el('loadout-add-slot').onclick=()=>addSlot();}
+    if(itemKind==='sop')setupSopEditor(files);
     baseline=signature();
+  }
+
+  function setupSopEditor(files){
+    const body=form.elements.body,preview=el('sop-preview');
+    el('sop-editor-tools').classList.add('wide');body.closest('label').before(el('sop-editor-tools'));
+    function render(){preview.innerHTML=referenceContent({kind:'sop',body:body.value},[...files,...editorFiles]);preview.querySelectorAll('[data-sop-section]').forEach(a=>a.onclick=e=>{e.preventDefault();preview.querySelector(`[id="${a.dataset.sopSection}"]`)?.scrollIntoView({block:'nearest'});});}
+    function insert(text){body.setRangeText(text,body.selectionStart,body.selectionEnd,'end');body.focus();body.dispatchEvent(new Event('input'));}
+    const insertImage=file=>insert(`![${file.filename.replace(/[\]\n]/g,'')}](attachment:${file.token})`);
+    form.querySelectorAll('[data-sop-format]').forEach(button=>button.onclick=()=>{
+      if(saving)return;const selected=body.value.slice(body.selectionStart,body.selectionEnd),type=button.dataset.sopFormat;
+      insert(type==='heading'?`\n# ${selected||'Section heading'}\n`:type==='bold'?`**${selected||'Bold text'}**`:type==='italic'?`*${selected||'Italic text'}*`:type==='list'?`\n${(selected||'List item').split('\n').map(line=>'- '+line).join('\n')}\n`:`[${selected||'Link text'}](https://example.com)`);
+    });
+    el('sop-preview-toggle').onclick=()=>{preview.hidden=!preview.hidden;el('sop-preview-toggle').setAttribute('aria-pressed',String(!preview.hidden));if(!preview.hidden)render();};
+    body.addEventListener('input',()=>{if(!preview.hidden)render();});
+    form.querySelectorAll('[data-sop-insert]').forEach(button=>button.onclick=()=>insertImage(files.find(f=>f.token===button.dataset.sopInsert)));
+    el('sop-attach').onclick=()=>{if(!saving)el('sop-files').click();};
+    function pending(){
+      el('sop-pending-files').innerHTML=editorFiles.map(f=>`<p>${esc(f.filename)} · ${(f.file.size/1024/1024).toFixed(2)} MB <button type="button" data-sop-remove="${f.token}">Remove upload</button></p>`).join('');
+      el('sop-pending-files').querySelectorAll('[data-sop-remove]').forEach(button=>button.onclick=()=>{
+        if(saving)return;const file=editorFiles.find(f=>f.token===button.dataset.sopRemove);
+        body.value=body.value.replace(new RegExp('!\\[[^\\]\\n]*\\]\\(attachment:'+file.token+'\\)','g'),'');
+        URL.revokeObjectURL(file.url);editorFiles=editorFiles.filter(f=>f!==file);pending();if(!preview.hidden)render();
+      });
+    }
+    el('sop-files').onchange=()=>{
+      if(saving)return;const chosen=[...el('sop-files').files];el('sop-files').value='';
+      if(editorFiles.length+chosen.length>10||[...editorFiles.map(f=>f.file),...chosen].reduce((sum,f)=>sum+f.size,0)>50*1024*1024){el('resource-error').textContent='Keep each save to 10 files and 50 MB total.';return;}
+      for(const file of chosen){
+        const extension=file.name.split('.').at(-1).toLowerCase(),isImage=['png','jpg','jpeg','webp'].includes(extension);
+        if(!['pdf','doc','docx','png','jpg','jpeg','webp'].includes(extension)||!file.size||file.size>(isImage?4:20)*1024*1024){el('resource-error').textContent='Use PDF, Word, PNG, JPEG or WebP files within the size limits.';continue;}
+        const entry={token:crypto.randomUUID().replaceAll('-',''),filename:file.name,mime:isImage?'image/'+extension:file.type,file,url:URL.createObjectURL(file)};
+        editorFiles.push(entry);if(isImage)insertImage(entry);
+      }
+      pending();if(!preview.hidden)render();
+    };
   }
 
   function grantCard(grant,allowRevoke=false){return `<article class="unit-block award-grant">${image(grant.image_url,grant.award_name,'award-image')}<div><strong>${esc(grant.award_name)}</strong>${grant.game_name?`<button type="button" class="member-record-link" data-resource-member="${grant.member_id}">${esc(grant.game_name)}</button>`:''}<small>${esc(grant.awarded_on)} · Issued by ${esc(grant.issuer)}${grant.campaign_id?' · Campaign #'+grant.campaign_id:''}</small><p class="reference-prose">${esc(grant.citation)}</p>${grant.state==='revoked'?`<p class="unit-warn">Revoked by ${esc(grant.revoked_by)} · ${esc(dateTime(grant.revoked_on))}</p><p>${esc(grant.revoke_reason)}</p>`:allowRevoke?`<button type="button" data-revoke-award="${grant.id}">Revoke…</button>`:''}</div></article>`;}
@@ -144,7 +230,7 @@
   el('reference-sops').onclick=()=>{kind='sop';el('reference-sops').setAttribute('aria-pressed','true');el('reference-loadouts').setAttribute('aria-pressed','false');el('reference-category').value='';loadReferences().catch(e=>UnitUX.error(el('reference-grid'),e,loadReferences));};
   el('reference-loadouts').onclick=()=>{kind='loadout';el('reference-sops').setAttribute('aria-pressed','false');el('reference-loadouts').setAttribute('aria-pressed','true');el('reference-category').value='';loadReferences().catch(e=>UnitUX.error(el('reference-grid'),e,loadReferences));};
   let searchTimer;el('reference-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadReferences().catch(e=>UnitUX.error(el('reference-grid'),e,loadReferences)),250);};
-  for(const id of ['reference-category','reference-archived'])el(id).onchange=()=>loadReferences().catch(e=>UnitUX.error(el('reference-grid'),e,loadReferences));
+  for(const id of ['reference-category','reference-archived','reference-sort'])el(id).onchange=()=>loadReferences().catch(e=>UnitUX.error(el('reference-grid'),e,loadReferences));
   el('reference-more').onclick=()=>loadReferences(true).catch(e=>UnitUX.error(el('reference-grid'),e,()=>loadReferences(true)));el('reference-new').onclick=()=>referenceEditor();
   el('award-new').onclick=()=>awardEditor();el('award-issue').onclick=()=>issueAward();el('award-member').onchange=()=>loadAwards().catch(e=>UnitUX.error(el('award-history'),e,loadAwards));el('awards-refresh').onclick=()=>loadAwards().catch(e=>UnitUX.error(el('award-history'),e,loadAwards));el('award-more').onclick=()=>loadAwards(true).catch(e=>UnitUX.error(el('award-history'),e,()=>loadAwards(true)));
   el('campaign-new').onclick=()=>campaignEditor();el('campaign-state').onchange=()=>loadCampaigns().catch(e=>UnitUX.error(el('campaign-list'),e,loadCampaigns));el('campaign-refresh').onclick=()=>loadCampaigns().catch(e=>UnitUX.error(el('campaign-list'),e,loadCampaigns));

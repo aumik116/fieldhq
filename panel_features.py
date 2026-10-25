@@ -214,7 +214,7 @@ def install(api):
         if request.method == "POST":
             if request.endpoint == "unit_branding_save":
                 request.max_content_length = 9 * 1024 * 1024
-            if request.endpoint == "files_upload":
+            if request.endpoint in ("files_upload", "unit_reference_save"):
                 request.max_content_length = 51 * 1024 * 1024
             if request.is_json and not isinstance(request.get_json(silent=True), dict):
                 return jsonify(ok=False, error="Request body must be a JSON object"), 400

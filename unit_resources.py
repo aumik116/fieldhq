@@ -1,12 +1,15 @@
 """Unit reference libraries, awards, campaign participation and measured analytics."""
 from datetime import date, datetime, timedelta, timezone
+import io
 import json
+import re
+import zipfile
 import sqlite3
 import time
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import abort, g, jsonify, request
+from flask import abort, g, jsonify, request, send_file
 from units import text, unit_role_capabilities
 
 
@@ -21,6 +24,11 @@ def install(api, db, access, revision, panel_admin, endpoints):
                 slots TEXT NOT NULL DEFAULT '[]', archived INTEGER NOT NULL DEFAULT 0,
                 updated_by TEXT NOT NULL, updated_at REAL NOT NULL);
             CREATE INDEX IF NOT EXISTS unit_references_unit ON unit_references(unit_id,kind,archived,id);
+            CREATE TABLE IF NOT EXISTS unit_reference_files (
+                token TEXT PRIMARY KEY, unit_id INTEGER NOT NULL, reference_id INTEGER NOT NULL,
+                filename TEXT NOT NULL, mime TEXT NOT NULL, content BLOB NOT NULL,
+                created_by TEXT NOT NULL, created_at REAL NOT NULL);
+            CREATE INDEX IF NOT EXISTS unit_reference_files_reference ON unit_reference_files(unit_id,reference_id);
             CREATE TABLE IF NOT EXISTS unit_award_catalog (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, unit_id INTEGER NOT NULL,
                 name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
@@ -146,7 +154,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
                 baseline_time=conn.execute('SELECT observed FROM unit_strength_history WHERE unit_id=? ORDER BY id LIMIT 1',(unit['id'],)).fetchone()[0]
                 conn.executemany("INSERT INTO unit_membership_spans(unit_id,member_id,starts,source) VALUES(?,?,?,'baseline')", [(unit['id'], m['id'], baseline_time) for m in conn.execute('SELECT id FROM unit_roster WHERE unit_id=? AND archived=0', (unit['id'],)).fetchall()])
 
-    names = {'unit_library', 'unit_reference', 'unit_reference_save', 'unit_awards', 'unit_award_save', 'unit_award_grant', 'unit_award_revoke', 'unit_campaigns', 'unit_campaign', 'unit_campaign_save', 'unit_analytics', 'unit_member_awards'}
+    names = {'unit_library', 'unit_reference', 'unit_reference_save', 'unit_reference_version', 'unit_reference_file', 'unit_awards', 'unit_award_save', 'unit_award_grant', 'unit_award_revoke', 'unit_campaigns', 'unit_campaign', 'unit_campaign_save', 'unit_analytics', 'unit_member_awards'}
     endpoints.update(names); api.PANEL_WIDE_ENDPOINTS.update(names)
     from panel_features import MUTATIONS
     MUTATIONS.update({name: 'view' for name in ('unit_reference_save', 'unit_award_save', 'unit_award_grant', 'unit_award_revoke', 'unit_campaign_save')})
@@ -159,13 +167,73 @@ def install(api, db, access, revision, panel_admin, endpoints):
             if kind not in ('sop', 'loadout'):
                 raise ValueError('Choose SOPs or loadouts')
             offset = number(int(request.args.get('offset', '0')), 'Offset', 0, 1000000)
+            ordering = {'title': 'title COLLATE NOCASE,id', 'updated': 'updated_at DESC,id DESC', 'oldest': 'updated_at,id'}.get(request.args.get('sort', 'title'))
+            if ordering is None:
+                raise ValueError('Choose a valid sort order')
             with db() as conn:
                 unit = access(conn, unit_id)
-                rows = [dict(r) for r in conn.execute("SELECT id,kind,title,category,role,substr(body,1,200) AS excerpt,url,image_url,archived,updated_by,updated_at FROM unit_references WHERE unit_id=? AND kind=? AND archived=? AND (?='' OR category=?) AND (title LIKE ? OR body LIKE ? OR role LIKE ? OR category LIKE ?) ORDER BY title COLLATE NOCASE,id LIMIT 51 OFFSET ?", (unit_id, kind, int(request.args.get('archived') == '1'), category, category, *['%'+search+'%']*4, offset))]
+                rows = [dict(r) for r in conn.execute(f"SELECT id,kind,title,category,role,substr(body,1,200) AS excerpt,url,image_url,archived,updated_by,updated_at FROM unit_references WHERE unit_id=? AND kind=? AND archived=? AND (?='' OR category=?) AND (title LIKE ? OR body LIKE ? OR role LIKE ? OR category LIKE ?) ORDER BY {ordering} LIMIT 51 OFFSET ?", (unit_id, kind, int(request.args.get('archived') == '1'), category, category, *['%'+search+'%']*4, offset))]
                 categories = [r[0] for r in conn.execute('SELECT DISTINCT category FROM unit_references WHERE unit_id=? AND kind=? ORDER BY category COLLATE NOCASE', (unit_id, kind))]
                 return jsonify(items=rows[:50], next_offset=offset+50 if len(rows)>50 else None, categories=categories, revision=unit['revision'], permissions=permissions(conn, unit_id))
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
+
+    def reference_files(conn, unit_id, reference_id):
+        return [dict(r) for r in conn.execute('SELECT token,filename,mime,length(content) AS size FROM unit_reference_files WHERE unit_id=? AND reference_id=? ORDER BY created_at,token', (unit_id, reference_id))]
+
+    @api.app.get('/api/units/<int:unit_id>/library/files/<token>')
+    def unit_reference_file(unit_id, token):
+        with db() as conn:
+            access(conn, unit_id)
+            row = conn.execute('SELECT * FROM unit_reference_files WHERE unit_id=? AND token=?', (unit_id, token)).fetchone()
+            if not row:
+                abort(404, description='File not found in this unit')
+        response = send_file(io.BytesIO(row['content']), mimetype=row['mime'], download_name=row['filename'], as_attachment=not row['mime'].startswith('image/'), max_age=0)
+        response.headers['Cache-Control'] = 'private, no-store'
+        response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox"
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+    def uploaded_files():
+        files = list(request.files.items(multi=True))
+        if len(files) > 10:
+            raise ValueError('Upload at most 10 files at a time')
+        result = []
+        for token, upload in files:
+            if not re.fullmatch(r'[a-f0-9]{32}', token) or any(f[0] == token for f in result):
+                raise ValueError('Invalid attachment identifier')
+            filename = text(upload.filename, 'Filename', 200, True).replace('\\', '/').rsplit('/', 1)[-1]
+            content = upload.stream.read(20 * 1024 * 1024 + 1)
+            if not content or len(content) > 20 * 1024 * 1024:
+                raise ValueError('Each file must be between 1 byte and 20 MB')
+            extension = filename.rsplit('.', 1)[-1].lower()
+            mime = None
+            if extension == 'pdf' and content.startswith(b'%PDF-'):
+                mime = 'application/pdf'
+            elif extension == 'doc' and content.startswith(bytes.fromhex('d0cf11e0a1b11ae1')):
+                mime = 'application/msword'
+            elif extension == 'docx':
+                try:
+                    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                        names = set(archive.namelist())
+                        if {'[Content_Types].xml', 'word/document.xml'} <= names and not any(name.lower().endswith('vbaproject.bin') for name in names):
+                            mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                except zipfile.BadZipFile:
+                    pass
+            elif extension == 'png' and content.startswith(b'\x89PNG\r\n\x1a\n'):
+                mime = 'image/png'
+            elif extension in ('jpg', 'jpeg') and content.startswith(b'\xff\xd8\xff'):
+                mime = 'image/jpeg'
+            elif extension == 'webp' and content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+                mime = 'image/webp'
+            if mime is None:
+                raise ValueError('Upload a PDF, Word (.doc/.docx), PNG, JPEG or WebP file')
+            if mime.startswith('image/') and len(content) > 4 * 1024 * 1024:
+                raise ValueError('Images must be 4 MB or smaller')
+            result.append((token, filename, mime, content))
+        if sum(len(f[3]) for f in result) > 50 * 1024 * 1024:
+            raise ValueError('Upload at most 50 MB per save')
+        return result
 
     @api.app.get('/api/units/<int:unit_id>/library/<int:reference_id>')
     def unit_reference(unit_id, reference_id):
@@ -173,17 +241,33 @@ def install(api, db, access, revision, panel_admin, endpoints):
             unit = access(conn, unit_id); row = get_row(conn, 'unit_references', unit_id, reference_id)
             row['slots'] = json.loads(row['slots'])
             history = [dict(r) for r in conn.execute("SELECT id,actor,created_at,action,reason FROM unit_resource_audit WHERE unit_id=? AND object_kind='reference' AND object_id=? ORDER BY id DESC LIMIT 50", (unit_id, reference_id))]
-            return jsonify(item=row, history=history, revision=unit['revision'], permissions=permissions(conn, unit_id))
+            return jsonify(item=row, files=reference_files(conn, unit_id, reference_id), history=history, revision=unit['revision'], permissions=permissions(conn, unit_id))
+
+    @api.app.get('/api/units/<int:unit_id>/library/<int:reference_id>/versions/<int:version_id>')
+    def unit_reference_version(unit_id, reference_id, version_id):
+        with db() as conn:
+            access(conn, unit_id)
+            get_row(conn, 'unit_references', unit_id, reference_id)
+            row = conn.execute("SELECT actor,created_at,after_value FROM unit_resource_audit WHERE unit_id=? AND object_kind='reference' AND object_id=? AND id=?", (unit_id, reference_id, version_id)).fetchone()
+            if not row:
+                abort(404, description='Revision not found in this unit')
+            item = json.loads(row['after_value'])
+            item['slots'] = json.loads(item['slots'])
+            files = [f for f in reference_files(conn, unit_id, reference_id) if f['token'] in item.get('file_tokens', [])]
+            return jsonify(item=item, files=files, actor=row['actor'], created_at=row['created_at'])
 
     @api.app.post('/api/units/<int:unit_id>/library')
     def unit_reference_save(unit_id):
-        data = request.get_json()
         try:
+            data = request.get_json() if request.is_json else json.loads(request.form.get('data', '{}'))
+            if not isinstance(data, dict):
+                raise ValueError('Choose valid SOP details')
+            files = uploaded_files()
             kind = data.get('kind')
             if kind not in ('sop', 'loadout'):
                 raise ValueError('Choose SOP or loadout')
             title = text(data.get('title'), 'Title', 120, True); category = text(data.get('category', 'General'), 'Category', 80, True)
-            role = text(data.get('role', ''), 'Role', 120); body = text(data.get('body', ''), 'Content', 20000)
+            role = text(data.get('role', ''), 'Role', 120); body = text(data.get('body', ''), 'Content', 100000 if kind == 'sop' else 20000)
             link = url(data.get('url', ''), 'Reference link'); image = url(data.get('image_url', ''), 'Image URL')
             slots = data.get('slots', [])
             if not isinstance(slots, list) or len(slots)>40:
@@ -193,10 +277,12 @@ def install(api, db, access, revision, panel_admin, endpoints):
                 if not isinstance(slot, dict):
                     raise ValueError('Choose valid loadout slots')
                 clean.append({key: text(slot.get(key, ''), key, 120 if key=='slot' else 2000, key=='slot') for key in ('slot','standard','alternatives','notes')})
+            if files and kind != 'sop':
+                raise ValueError('Attachments are available for SOPs')
             if kind == 'sop':
                 clean = []
-                if not body and not link:
-                    raise ValueError('Enter SOP content or a reference link')
+                if not body and not link and not files and not data.get('id'):
+                    raise ValueError('Enter SOP content, a reference link or an attachment')
             elif not body and not clean and not link and not image:
                 raise ValueError('Enter loadout slots, notes or a reference link')
             with db() as conn:
@@ -212,7 +298,20 @@ def install(api, db, access, revision, panel_admin, endpoints):
                     reference_id = old['id']
                 else:
                     reference_id = conn.execute('INSERT INTO unit_references(unit_id,kind,title,category,role,body,url,image_url,slots,archived,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', (unit_id,*values)).lastrowid
-                audit(conn, unit_id, 'reference', reference_id, 'updated' if old else 'created', old, get_row(conn,'unit_references',unit_id,reference_id))
+                if files:
+                    used = conn.execute('SELECT coalesce(sum(length(content)),0) FROM unit_reference_files WHERE unit_id=?', (unit_id,)).fetchone()[0]
+                    count = conn.execute('SELECT count(*) FROM unit_reference_files WHERE unit_id=? AND reference_id=?', (unit_id, reference_id)).fetchone()[0]
+                    if used + sum(len(f[3]) for f in files) > 200 * 1024 * 1024 or count + len(files) > 50:
+                        raise ValueError('Keep attachments below 200 MB per unit and 50 files per document')
+                    for token, filename, mime, content in files:
+                        if conn.execute('SELECT 1 FROM unit_reference_files WHERE token=?', (token,)).fetchone():
+                            raise ValueError('Attachment already exists; reload before saving')
+                        conn.execute('INSERT INTO unit_reference_files VALUES(?,?,?,?,?,?,?,?)', (token, unit_id, reference_id, filename, mime, content, actor(conn, unit_id), time.time()))
+                saved = get_row(conn, 'unit_references', unit_id, reference_id)
+                saved['file_tokens'] = [f['token'] for f in reference_files(conn, unit_id, reference_id)]
+                if kind == 'sop' and not body and not link and not saved['file_tokens']:
+                    raise ValueError('Enter SOP content, a reference link or an attachment')
+                audit(conn, unit_id, 'reference', reference_id, 'updated' if old else 'created', old, saved)
             g.audit_details = dict(unit_id=unit_id, reference_id=reference_id, change='reference saved')
             return jsonify(ok=True, id=reference_id)
         except ValueError as exc:

@@ -254,6 +254,18 @@ Member records show recent attendance, but the Attendance page is the place to i
 
 Under **Resources → SOPs & loadouts**, search by category, role or text. Permitted staff can maintain SOP text and external links, or loadouts with an image URL, kit slots, alternatives and notes. Archive obsolete references to retain editing history.
 
+
+The unit’s SOP repository includes category filtering, full-text search and sorting by title or update date. Staff and unit administrators can create and edit documents in their own units; panel administrators can access all units.
+
+To create a document:
+
+1. Choose **SOPs → New SOP**, then enter a title and category.
+2. Write the procedure in **Write SOP**, add an external reference link, attach a PDF or Word document, or combine these. Use **Heading**, **Bold**, **Italic**, **List** and **Link** to format selected text, and **Preview** to see the rendered document.
+3. Start a line with `#`, `##` or `###` followed by a space to create a section heading. The reader builds a clickable contents sidebar from these headings. Bold, italic, links and uploaded images are rendered; arbitrary HTML is not rendered.
+4. Save, then open the SOP to read it or choose **Download text** for a `.txt` copy.
+
+**Revision history** shows the latest 50 saved changes with the editor’s unit name and time. Choose **View revision** to read a previous saved version, then **Back to current document** to return. Viewing history does not change the current SOP. Use **Edit reference → Archive this reference** to retire a document, and switch the library to **Archived** to find or restore it. **Add images / documents** accepts PDF, Word (`.doc`/`.docx`), PNG, JPEG and WebP files. Images are inserted at the cursor; PDF and Word attachments download for viewing in your own application. Images are limited to 4 MB, documents to 20 MB, with up to 10 files and 50 MB per save. Each unit can retain 200 MB of attachments, with up to 50 files per document. Files are private to the unit and stored in the panel database, so database backups include them. Pending uploads can be removed before saving. Saved attachments remain available for document history, including after archiving. New revisions record their attachment list; older revisions created before attachment support have no attachments.
+
 ### Awards
 
 Under **Roster → Awards**, permitted staff maintain the medal/badge catalog and issue awards with a date and citation. These awards are separate from promotion qualifications.

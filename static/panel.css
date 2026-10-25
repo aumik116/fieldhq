@@ -642,3 +642,10 @@ html[data-theme="original"] .sidebar .panel-tab{border:1px solid var(--border);b
 html[data-theme="original"] .sidebar :is(.panel-tab.active,.panel-tab[aria-selected="true"],.panel-tab[aria-current]){border-color:var(--accent-border);border-left-color:var(--accent);background:var(--accent-soft);color:var(--accent2)}
 html[data-theme="original"] .section-tabs button{border:1px solid var(--border)}
 html[data-theme="original"] .fieldhq-search{border-color:var(--border)}
+
+/* Unit SOP repository reader. Content is escaped before headings are rendered. */
+.sop-reader{display:flex;gap:24px;align-items:flex-start}.sop-reader nav{flex:0 0 190px;position:sticky;top:0;max-height:50vh;overflow:auto;padding:12px;border:1px solid var(--border);overflow-wrap:anywhere}.sop-reader nav a{display:block;color:var(--accent);padding:7px 0}.sop-reader nav .sop-level-2{padding-left:10px}.sop-reader nav .sop-level-3{padding-left:20px}.sop-reader article{flex:1;min-width:0;margin-top:0}.sop-reader h2,.sop-reader h3,.sop-reader h4{white-space:normal;scroll-margin-top:16px;margin:20px 0 8px}.sop-reader h2:first-child{margin-top:0}@media(max-width:700px){.sop-reader{flex-direction:column}.sop-reader nav{position:static;flex:auto;width:100%;max-height:180px}}
+
+.sop-inline-image{display:block;max-width:100%;max-height:650px;object-fit:contain;margin:16px auto}#sop-editor-tools{margin:12px 0}#sop-preview{margin-top:14px}#sop-preview .sop-reader nav{position:static}.resource-dialog:has(#sop-editor-tools){width:min(1100px,95vw)}.resource-dialog textarea[name="body"]{min-height:320px;font-family:inherit;line-height:1.6}#sop-pending-files p{display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow-wrap:anywhere}
+
+.sop-reader ul{white-space:normal;padding-left:24px}.sop-reader li{margin:6px 0}
