@@ -187,6 +187,7 @@
     const token = ++generation;
     if (dialog.open && !saving) dialog.close();
     context = event.detail; metadata = null;
+    if(context.detail.role==='member')return;
     el('roster-bulk').hidden = !context.detail.can_edit; el('roster-bulk').disabled = true;
     for (const [id, options] of [['matrix-section', ['all', 'All groups / sections']], ['matrix-certificate', ['', 'All qualifications']]]) {
       const previous = el(id).value;

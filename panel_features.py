@@ -212,10 +212,6 @@ def install(api):
         if hasattr(g, 'instance_selection_error'):
             return g.instance_selection_error
         if request.method == "POST":
-            if request.endpoint == "unit_branding_save":
-                request.max_content_length = 9 * 1024 * 1024
-            if request.endpoint in ("files_upload", "unit_reference_save"):
-                request.max_content_length = 51 * 1024 * 1024
             if request.is_json and not isinstance(request.get_json(silent=True), dict):
                 return jsonify(ok=False, error="Request body must be a JSON object"), 400
             data = request.get_json(silent=True) or {}
@@ -343,11 +339,15 @@ def install(api):
             raise ValueError("Passwords must contain at least 10 characters and at most 72 UTF-8 bytes")
         return bcrypt.hashpw(value.encode(), bcrypt.gensalt()).decode()
 
-    def create_unit_login(conn, username, password):
+    def create_unit_login(conn, username, password, unit_id=None):
         if 'users' not in g.panel_permissions:
-            abort(403, description='Only panel administrators can create login accounts')
+            membership = conn.execute('SELECT role FROM unit_staff WHERE unit_id=? AND user_id=?', (unit_id, g.user['id'])).fetchone()
+            if not membership or membership['role'] != 'admin':
+                abort(403, description='Only panel or unit administrators can create login accounts')
         if not isinstance(username, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{3,32}', username):
             raise ValueError('Use a 3–32 character username: letters, numbers, _, . or -')
+        if conn.execute('SELECT 1 FROM users WHERE username=? COLLATE NOCASE',(username,)).fetchone():
+            raise ValueError('That username is already in use; choose another or assign the existing account')
         return conn.execute("INSERT INTO users(username,password,role,enabled,access_all,panel_admin) VALUES(?,?,'viewer',1,0,0)",
                             (username, password_hash(password))).lastrowid
 
@@ -526,7 +526,7 @@ def install(api):
                 if not api.manager_mode and server_permissions(g.user,''):
                     visible.append(None)
                 marks = ','.join('?' for _ in visible) or 'NULL'
-                visible_units = [row['unit_id'] for row in conn.execute('SELECT unit_id FROM unit_staff WHERE user_id=?',(g.user['id'],))]
+                visible_units = [row['unit_id'] for row in conn.execute('SELECT unit_id FROM unit_staff WHERE user_id=? AND role IN ("staff","admin")',(g.user['id'],))]
                 unit_marks = ','.join('?' for _ in visible_units) or 'NULL'
                 rows = conn.execute(f"SELECT * FROM activity WHERE (?=0 OR id<?) AND (json_extract(details,'$.unit_id') IS NULL OR json_extract(details,'$.unit_id') IN ({unit_marks})) AND (actor=? OR json_extract(details,'$.server_id') IN ({marks}) OR (? AND json_extract(details,'$.server_id') IS NULL AND action NOT IN ('users_save','users_delete','account_password'))) ORDER BY id DESC LIMIT 51",
                     (before,before,*visible_units,g.user['username'],*visible,None in visible)).fetchall()

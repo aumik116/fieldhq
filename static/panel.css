@@ -649,3 +649,10 @@ html[data-theme="original"] .fieldhq-search{border-color:var(--border)}
 .sop-inline-image{display:block;max-width:100%;max-height:650px;object-fit:contain;margin:16px auto}#sop-editor-tools{margin:12px 0}#sop-preview{margin-top:14px}#sop-preview .sop-reader nav{position:static}.resource-dialog:has(#sop-editor-tools){width:min(1100px,95vw)}.resource-dialog textarea[name="body"]{min-height:320px;font-family:inherit;line-height:1.6}#sop-pending-files p{display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow-wrap:anywhere}
 
 .sop-reader ul{white-space:normal;padding-left:24px}.sop-reader li{margin:6px 0}
+
+/* SOP folders, pages and revision comparison. */
+.sop-library-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;margin-top:16px}#reference-folders{border:1px solid var(--border);padding:12px;align-self:start;max-height:65vh;overflow:auto}#reference-folders strong{display:block;margin:8px 0}#reference-folders button{display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;margin:4px 0}#reference-folders button[aria-current="page"]{background:var(--accent-soft);border-color:var(--accent)}.sop-comparison{table-layout:fixed;min-width:550px}.sop-comparison th:first-child{width:55px}.sop-comparison td{white-space:pre-wrap;overflow-wrap:anywhere;vertical-align:top}.sop-line-changed{background:var(--accent-soft)}@media(max-width:700px){.sop-library-layout{grid-template-columns:1fr}#reference-folders{max-height:240px}}
+
+#reference-folders details{padding-left:10px;margin:8px 0}#reference-folders summary{cursor:pointer;overflow-wrap:anywhere;color:var(--text)}
+
+.member-reading-row,.member-announcement{padding:14px 0;border-bottom:1px solid var(--border)}.member-reading-row small,.member-announcement small,.member-event small,#member-profile-content small{display:block;color:var(--muted);margin:6px 0}.member-event{min-width:0}.member-event select{width:100%}#member-action-error{color:var(--offline);white-space:pre-wrap}.member-announcement:last-of-type{border-bottom:0}#member-home-content .unit-summary{margin-bottom:18px}

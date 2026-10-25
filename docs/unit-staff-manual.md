@@ -36,14 +36,15 @@ Choose **Help** in the panel header for guidance on the current unit page. Follo
 
 ## 2. Your access and workspace
 
-Ordinary staff see only their assigned units. Panel administrators have broader access. There are just two unit roles:
+Ordinary staff see only their assigned units. Panel administrators have broader access. There are three unit roles:
 
 | Role | Access |
 | --- | --- |
 | **Staff** | Manage rosters, notes, assignments, qualifications, promotion reviews, events, attendance, SOPs/loadouts, awards and campaigns in assigned units |
+| **Member** | Read published resources, acknowledge reading, RSVP and view their own profile; no staff notes or hosting controls |
 | **Unit administrator** | All Staff functions, plus staff access, rank rules/catalogs, structure, branding and permanent member deletion |
 
-There are no individual permission checkboxes. Existing Staff assignments receive the standard Staff access automatically after the update. A unit role does not grant permission to start, stop, configure or update game servers; hosting access is assigned separately.
+There are no individual permission checkboxes. Existing Staff assignments keep the standard Staff permissions after the update. A unit role does not grant permission to start, stop, configure or update game servers; hosting access is assigned separately.
 
 ### Where to find things
 
@@ -53,11 +54,26 @@ There are no individual permission checkboxes. Existing Staff assignments receiv
 | Roster | Roster, Qualifications, Promotions, Awards |
 | Operations | Events, Attendance, Campaigns, Linked servers |
 | Resources | SOPs & loadouts, Rank rules & catalogs |
-| Administration | Structure, Staff access, Customization; available when permitted |
+| Administration | Structure, Accounts & access, Customization; available when permitted |
 
 The unit Dashboard summarizes staffing, upcoming events and work awaiting review. Analytics summarizes recorded trends. **Linked servers** provides basic health for the unit's servers; opening their hosting workspace needs separate access.
 
 If a button is missing or disabled, ask an administrator to check your unit role. Linking a server to the unit or linking your account to a member does not grant that permission.
+
+
+### Member home and self-service
+
+Members use the same `/login` page as staff. A unit administrator creates the account under **Administration → Accounts & access** and links it to the correct roster member. Members land on **Overview → My unit**. Staff can open the same page to manage announcements, see document review reminders, and inspect event RSVPs.
+
+- **Required reading:** staff open an SOP and choose **Reading & review**. Assign everyone with a unit login, selected positions / primary billet names, selected qualifications, or a combination. Audiences are combined as “matches any.” A reading deadline is optional. Position and qualification targeting requires an active linked roster record; “everyone” includes unlinked logins. The progress list shows who has acknowledged the current published version.
+- **Acknowledging a document:** open it from **My unit → Required reading**, read the published copy, then choose **I have read this version**. This records a personal acknowledgement, not proof of comprehension. Republishing creates a new version and requires a fresh acknowledgement. An old open document cannot acknowledge a newer publication.
+- **SOP review reminders:** in **Reading & review**, assign an active unit staff owner, last-reviewed date and next-review date. Staff see due and overdue reviews on **My unit**. Review dates are reminders and never automatically unpublish or change a document. After reviewing, update the dates; publish separately if the content changed.
+- **Announcements:** Staff use **My unit → New announcement**. Enter a title and message, optionally pin it or set a show-through date. **Manage latest 100 announcements** includes expired and archived entries for editing or restoration. These are messages inside the panel; no Discord or email delivery is involved.
+- **RSVPs:** under upcoming events, choose Attending, Tentative or Unavailable, or clear your response. An active roster link is required. Responses close when the event starts. Staff see names and totals; ordinary members see only their own response. Editing an event invalidates responses to the previous event version, so members must respond again. An RSVP never changes UUID attendance, attendance expectations, LOA or an excuse decision. Upcoming event briefings and locations are visible to members.
+- **My profile:** members see their own game name, Discord handle, status, rank, primary billet, join date, last promotion date, qualification award dates and the latest 100 finalized tracked attendance results. The displayed attendance rate includes expected Present / Absent decisions only. Staff notes, qualification notes, attendance reasons, UUID evidence and administrative history are excluded. Ask staff for corrections; this page does not edit the roster.
+
+Published reading and announcements work without a roster link. Personal profiles, targeted reading and RSVPs require the login-to-member link. Unit and hosting permissions remain separate.
+
 
 ## 3. Daily staff workflow
 
@@ -264,7 +280,16 @@ To create a document:
 3. Start a line with `#`, `##` or `###` followed by a space to create a section heading. The reader builds a clickable contents sidebar from these headings. Bold, italic, links and uploaded images are rendered; arbitrary HTML is not rendered.
 4. Save, then open the SOP to read it or choose **Download text** for a `.txt` copy.
 
-**Revision history** shows the latest 50 saved changes with the editor’s unit name and time. Choose **View revision** to read a previous saved version, then **Back to current document** to return. Viewing history does not change the current SOP. Use **Edit reference → Archive this reference** to retire a document, and switch the library to **Archived** to find or restore it. **Add images / documents** accepts PDF, Word (`.doc`/`.docx`), PNG, JPEG and WebP files. Images are inserted at the cursor; PDF and Word attachments download for viewing in your own application. Images are limited to 4 MB, documents to 20 MB, with up to 10 files and 50 MB per save. Each unit can retain 200 MB of attachments, with up to 50 files per document. Files are private to the unit and stored in the panel database, so database backups include them. Pending uploads can be removed before saving. Saved attachments remain available for document history, including after archiving. New revisions record their attachment list; older revisions created before attachment support have no attachments.
+**Revision history** shows the latest 50 saved changes with the editor’s unit name and time. Choose **View revision** to read a previous saved version, then **Back to current document** to return. Viewing history does not change the current SOP; restoring a revision explicitly replaces the working draft. Use **Edit reference → Archive this reference** to retire a document, and switch the library to **Archived** to find or restore it. **Add images / documents** accepts PDF, Word (`.doc`/`.docx`), PNG, JPEG and WebP files. Images are inserted at the cursor; PDF and Word attachments download for viewing in your own application. Images are limited to 4 MB, documents to 20 MB, with up to 10 files and 50 MB per save. Each unit can retain 200 MB of attachments, with up to 50 files per document. Files are private to the unit and stored in the panel database, so database backups include them. Pending uploads can be removed before saving. Saved attachments remain available for document history, including after archiving. New revisions record their attachment list; older revisions created before attachment support have no attachments.
+
+
+#### Folders, publishing and templates
+
+- Use **Folder path** to organize pages, for example `Operations/Infantry`. The folder sidebar shows the hierarchy and page links. Editing a page’s path moves it; folders appear when pages use them.
+- New SOPs and edits to published SOPs default to **Draft**. Drafts are visible to staff only. If a document already has a published copy, members continue reading that copy while staff edit. Choose **Published** when saving to replace the member copy. Existing references are preserved as published during upgrade. Archiving hides a document from members.
+- Choose **Template** to save a reusable outline for staff. Templates are excluded from member views. In a new SOP, **Start from a template** offers built-in procedure, communications, training and medical outlines, plus your unit’s saved templates. The template reader also offers **Create SOP from template**. Template attachments are copied into the new SOP when saved and count toward the unit storage limit. Converting an existing published SOP to Template removes its published copy.
+- In **Revision history → View revision**, expand **Compare with current document** to see changed metadata and body lines side by side. Highlighted rows differ at that line number. **Restore as draft** restores the selected revision’s contents and attachment selection; staff must publish it separately. Saved files remain retained for historical versions.
+- Under **Related SOPs, qualifications, positions and events**, select relevant items from this unit. Related SOPs open directly from the reader. Qualification, position and event associations appear as reference labels. Members see only published related SOPs and qualification / position labels; staff event records stay private; upcoming briefings and locations appear on My unit.
 
 ### Awards
 
@@ -290,14 +315,14 @@ Collection starts when the feature is installed; earlier history is not reconstr
 
 This section is for staff who also hold unit administrator authority.
 
-### Staff access
+### Accounts & access
 
-1. Open **Administration → Staff access → Add staff**.
-2. Select an existing panel account and choose Staff or Unit administrator.
+1. Open **Administration → Accounts & access → Add account**.
+2. Choose **Create new login** and enter a username and initial password, or use an existing account. Choose Member, Staff or Unit administrator.
 3. Optionally link the account to its member record in this unit.
 4. Save and confirm the assignment.
 
-Panel administrators can create a new login through this flow; unit administrators assign existing accounts. Ask a panel administrator for new credentials when needed.
+Panel and unit administrators can create new unit logins through this flow. Give the credentials and the panel’s `/login` address to the person. Member logins land on My unit and can view their own linked profile. They cannot open other members’ records, staff notes, drafts or server controls. Link the login to a roster member when applicable. Hosting permissions are assigned separately by panel administrators.
 
 Removing unit staff access does not delete the login, remove the roster record or revoke separately assigned server roles. Review those separately when someone leaves.
 
@@ -349,7 +374,7 @@ When asking for help, include the unit, page, member/event concerned, time and e
 | Find unit SOPs or kits | Resources → SOPs & loadouts |
 | Issue a medal | Roster → Awards |
 | Check campaign participation | Operations → Campaigns |
-| Assign unit staff access | Administration → Staff access; administrator permission required |
+| Assign unit staff access | Administration → Accounts & access; administrator permission required |
 | Edit icon or banner | Administration → Customization; administrator permission required |
 
 **Before saving:** check the unit, person/event, dates and proposed change. **After saving:** wait for success and confirm the record reflects the intended result.

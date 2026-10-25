@@ -183,18 +183,75 @@ credentials. Disabling an account prevents it from being used to sign
 in. Deleting an account has additional membership and ownership
 checks.</p>
 <h3 id="unit-staff">Unit staff</h3>
-<p>There are two unit roles. <strong>Staff</strong> manage rosters,
-notes, assignments, qualifications, promotion reviews, events,
-attendance, SOPs/loadouts, awards and campaigns. <strong>Unit
-administrators</strong> additionally manage staff access, rank
-rules/catalogs, structure, branding and permanent member deletion. There
-are no individual permission switches. Unit authority grants no
-automatic hosting control.</p>
-<p>Inside a unit, <strong>Administration → Staff access → Add
-staff</strong> lets permitted administrators assign an existing account.
-Panel administrators can also create a new staff login there. Link the
-account to its roster member when applicable; this provides the person's
-unit-specific name for notes and history.</p>
+<p>There are three unit roles. <strong>Members</strong> use My unit for
+published guidance, required reading, announcements and RSVPs, and My
+profile for their own record. They cannot access other members’ staff
+records, drafts, revision history or hosting controls.
+<strong>Staff</strong> manage rosters, notes, assignments,
+qualifications, promotion reviews, events, attendance, SOPs/loadouts,
+awards and campaigns. <strong>Unit administrators</strong> additionally
+manage staff access, rank rules/catalogs, structure, branding and
+permanent member deletion. There are no individual permission switches.
+Unit authority grants no automatic hosting control.</p>
+<p>Inside a unit, <strong>Administration → Accounts &amp; access → Add
+account</strong> lets panel and unit administrators create a new login
+or assign an existing account. Choose Member, Staff or Unit
+administrator. Link the account to its roster member when applicable;
+this provides the person's unit-specific name for notes and history.</p>
+<h3 id="member-home-and-self-service">Member home and self-service</h3>
+<p>Members use the same <code>/login</code> page as staff. A unit
+administrator creates the account under <strong>Administration →
+Accounts &amp; access</strong> and links it to the correct roster
+member. Members land on <strong>Overview → My unit</strong>. Staff can
+open the same page to manage announcements, see document review
+reminders, and inspect event RSVPs.</p>
+<ul>
+<li><strong>Required reading:</strong> staff open an SOP and choose
+<strong>Reading &amp; review</strong>. Assign everyone with a unit
+login, selected positions / primary billet names, selected
+qualifications, or a combination. Audiences are combined as “matches
+any.” A reading deadline is optional. Position and qualification
+targeting requires an active linked roster record; “everyone” includes
+unlinked logins. The progress list shows who has acknowledged the
+current published version.</li>
+<li><strong>Acknowledging a document:</strong> open it from <strong>My
+unit → Required reading</strong>, read the published copy, then choose
+<strong>I have read this version</strong>. This records a personal
+acknowledgement, not proof of comprehension. Republishing creates a new
+version and requires a fresh acknowledgement. An old open document
+cannot acknowledge a newer publication.</li>
+<li><strong>SOP review reminders:</strong> in <strong>Reading &amp;
+review</strong>, assign an active unit staff owner, last-reviewed date
+and next-review date. Staff see due and overdue reviews on <strong>My
+unit</strong>. Review dates are reminders and never automatically
+unpublish or change a document. After reviewing, update the dates;
+publish separately if the content changed.</li>
+<li><strong>Announcements:</strong> Staff use <strong>My unit → New
+announcement</strong>. Enter a title and message, optionally pin it or
+set a show-through date. <strong>Manage latest 100
+announcements</strong> includes expired and archived entries for editing
+or restoration. These are messages inside the panel; no Discord or email
+delivery is involved.</li>
+<li><strong>RSVPs:</strong> under upcoming events, choose Attending,
+Tentative or Unavailable, or clear your response. An active roster link
+is required. Responses close when the event starts. Staff see names and
+totals; ordinary members see only their own response. Editing an event
+invalidates responses to the previous event version, so members must
+respond again. An RSVP never changes UUID attendance, attendance
+expectations, LOA or an excuse decision. Upcoming event briefings and
+locations are visible to members.</li>
+<li><strong>My profile:</strong> members see their own game name,
+Discord handle, status, rank, primary billet, join date, last promotion
+date, qualification award dates and the latest 100 finalized tracked
+attendance results. The displayed attendance rate includes expected
+Present / Absent decisions only. Staff notes, qualification notes,
+attendance reasons, UUID evidence and administrative history are
+excluded. Ask staff for corrections; this page does not edit the
+roster.</li>
+</ul>
+<p>Published reading and announcements work without a roster link.
+Personal profiles, targeted reading and RSVPs require the
+login-to-member link. Unit and hosting permissions remain separate.</p>
 <h2 id="3-all-servers">3. All servers</h2>
 <p><strong>All servers</strong> is the hosting overview. Its counters
 summarize the fleet and host; rows show individual servers. Use search,
@@ -936,10 +993,10 @@ text</strong> for a <code>.txt</code> copy.</li>
 with the editor’s unit name and time. Choose <strong>View
 revision</strong> to read a previous saved version, then <strong>Back to
 current document</strong> to return. Viewing history does not change the
-current SOP. Use <strong>Edit reference → Archive this
-reference</strong> to retire a document, and switch the library to
-<strong>Archived</strong> to find or restore it. <strong>Add images /
-documents</strong> accepts PDF, Word
+current SOP; restoring a revision explicitly replaces the working draft.
+Use <strong>Edit reference → Archive this reference</strong> to retire a
+document, and switch the library to <strong>Archived</strong> to find or
+restore it. <strong>Add images / documents</strong> accepts PDF, Word
 (<code>.doc</code>/<code>.docx</code>), PNG, JPEG and WebP files. Images
 are inserted at the cursor; PDF and Word attachments download for
 viewing in your own application. Images are limited to 4 MB, documents
@@ -950,6 +1007,40 @@ backups include them. Pending uploads can be removed before saving.
 Saved attachments remain available for document history, including after
 archiving. New revisions record their attachment list; older revisions
 created before attachment support have no attachments.</p>
+<h4 id="folders-publishing-and-templates">Folders, publishing and
+templates</h4>
+<ul>
+<li>Use <strong>Folder path</strong> to organize pages, for example
+<code>Operations/Infantry</code>. The folder sidebar shows the hierarchy
+and page links. Editing a page’s path moves it; folders appear when
+pages use them.</li>
+<li>New SOPs and edits to published SOPs default to
+<strong>Draft</strong>. Drafts are visible to staff only. If a document
+already has a published copy, members continue reading that copy while
+staff edit. Choose <strong>Published</strong> when saving to replace the
+member copy. Existing references are preserved as published during
+upgrade. Archiving hides a document from members.</li>
+<li>Choose <strong>Template</strong> to save a reusable outline for
+staff. Templates are excluded from member views. In a new SOP,
+<strong>Start from a template</strong> offers built-in procedure,
+communications, training and medical outlines, plus your unit’s saved
+templates. The template reader also offers <strong>Create SOP from
+template</strong>. Template attachments are copied into the new SOP when
+saved and count toward the unit storage limit. Converting an existing
+published SOP to Template removes its published copy.</li>
+<li>In <strong>Revision history → View revision</strong>, expand
+<strong>Compare with current document</strong> to see changed metadata
+and body lines side by side. Highlighted rows differ at that line
+number. <strong>Restore as draft</strong> restores the selected
+revision’s contents and attachment selection; staff must publish it
+separately. Saved files remain retained for historical versions.</li>
+<li>Under <strong>Related SOPs, qualifications, positions and
+events</strong>, select relevant items from this unit. Related SOPs open
+directly from the reader. Qualification, position and event associations
+appear as reference labels. Members see only published related SOPs and
+qualification / position labels; staff event records stay private;
+upcoming briefings and locations appear on My unit.</li>
+</ul>
 <h3 id="awards">Awards</h3>
 <p>Create medals/badges in the unit award catalog, then issue them to
 members with a date and citation. Repeated issues require explicit

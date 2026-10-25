@@ -12,7 +12,7 @@ Developed with AI assistance using OpenAI Codex. Fork modifications:
   - Auto-discovery of scenarios from addon metadata and resource databases
 """
 
-from flask import Flask, request, jsonify, session, redirect, Response, send_from_directory, g
+from flask import Flask, Request, request, jsonify, session, redirect, Response, send_from_directory, g
 import bcrypt
 from pathlib import Path
 from mod_validation import normalize_mod_entry
@@ -97,7 +97,21 @@ def _load_or_create_secret():
         print(f"[panel] WARNING: could not persist session secret ({e}); using ephemeral one.", flush=True)
     return data
 
+class PanelRequest(Request):
+    @property
+    def max_content_length(self):
+        # Ubuntu's Flask 2.x/3.0 exposes a read-only property. Choose the limit
+        # here instead of assigning it in middleware or changing global config.
+        limits = {
+            'unit_branding_save': 9 * 1024 * 1024,
+            'files_upload': 51 * 1024 * 1024,
+            'unit_reference_save': 51 * 1024 * 1024,
+        }
+        return limits.get(self.endpoint, super().max_content_length)
+
+
 app = Flask(__name__, static_folder='static')
+app.request_class = PanelRequest
 app.secret_key = _load_or_create_secret()
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,

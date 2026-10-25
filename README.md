@@ -93,16 +93,17 @@ Do not run the fresh installer or create replacement server instances just to sw
 
 **Hosting access** is assigned separately for each server, or explicitly for all servers. Server roles remain Viewer, Operator, Manager and Administrator. Panel administration controls accounts and panel-wide setup; the original owner remains protected.
 
-**Unit access has only two roles:**
+**Unit access has three roles:**
 
 | Unit role | Access within assigned units |
 | --- | --- |
 | Staff | Rosters, notes, primary assignments, qualifications, promotion reviews, events, attendance, references, awards and campaigns |
+| Member | Read published resources, acknowledge required reading, RSVP, and view their own profile; no staff notes or hosting controls |
 | Unit administrator | All Staff functions, plus staff access, rank rules/catalogs, structure, branding and permanent member deletion |
 
 There are no individual unit permission checkboxes. Existing Staff assignments receive the standard Staff role on upgrade. Unit membership, server linking and roster/account linking do not grant hosting access.
 
-Accounts use the same login page. Unit-only staff land in the unit workspace. Panel administrators create login accounts; unit administrators can assign existing accounts to their units.
+Accounts use the same login page. Unit-only accounts land in their unit workspace; Members land on My unit with reading, upcoming events and announcements, plus their own profile. Panel and unit administrators can create unit logins or assign existing accounts. Hosting permissions remain separate.
 
 ## Appearance
 

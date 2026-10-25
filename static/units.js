@@ -3,9 +3,9 @@
   const el=id=>document.getElementById(id), esc=escHtml;
   let listing, detail, unitId, dialogSave, baseline='', loading=false, dialogSaving=false;
   let rosterView='',rosterUnit=null,activeTab='roster';
-  const areas={overview:['dashboard','analytics'],people:['roster','qualifications','promotions','awards'],operations:['events','attendance','campaigns','servers'],resources:['references','catalog'],administration:['structure','staff','customization']};
+  const areas={overview:['home','profile','dashboard','analytics'],people:['roster','qualifications','promotions','awards'],operations:['events','attendance','campaigns','servers'],resources:['references','catalog'],administration:['structure','staff','customization']};
   const areaNames={overview:'Overview',people:'Roster',operations:'Operations',resources:'Resources',administration:'Administration'};
-  const pageNotes={customization:'Upload your unit’s icon and banner, and set its description.',dashboard:'Staffing, upcoming operations and work awaiting review.',analytics:'Recorded strength, retention and finalized attendance trends.',roster:'Members, primary billets and individual records.',qualifications:'Who holds each qualification, and where coverage is missing.',promotions:'Review readiness and approve promotions manually.',awards:'Medals, citations and issue history.',events:'Schedule operations and review event evidence.',attendance:'Monthly attendance decisions and exports.',campaigns:'Group operations and review campaign participation.',servers:'Basic health for this unit’s linked servers. Server control access is separate.',references:'Unit SOPs and role-specific kit references.',catalog:'Configure rank paths, qualification names and position suggestions.',structure:'Manage roster groups, sections and billet slots.',staff:'Create or assign staff logins and unit permissions.'};
+  const pageNotes={home:'Required reading, upcoming events, announcements and review reminders.',profile:'Your unit record, qualifications and finalized attendance. Staff notes remain private.',customization:'Upload your unit’s icon and banner, and set its description.',dashboard:'Staffing, upcoming operations and work awaiting review.',analytics:'Recorded strength, retention and finalized attendance trends.',roster:'Members, primary billets and individual records.',qualifications:'Who holds each qualification, and where coverage is missing.',promotions:'Review readiness and approve promotions manually.',awards:'Medals, citations and issue history.',events:'Schedule operations and review event evidence.',attendance:'Monthly attendance decisions and exports.',campaigns:'Group operations and review campaign participation.',servers:'Basic health for this unit’s linked servers. Server control access is separate.',references:'Unit SOPs and role-specific kit references.',catalog:'Configure rank paths, qualification names and position suggestions.',structure:'Manage roster groups, sections and billet slots.',staff:'Create logins and assign Member, Staff or Unit administrator access.'};
   const areaPages={};
 
   const dialog=el('unit-dialog'), form=el('unit-form');
@@ -65,11 +65,12 @@
       detail=result;el('unit-workspace').hidden=false;
       const selected=listing.units.find(u=>u.id===unitId);
       el('unit-access-description').hidden=false;
-      el('unit-access-description').textContent=listing.panel_admin?'Panel administrator · Full access':detail.can_staff?'Unit administrator · Full unit access':'Unit staff · Roster, events, attendance and resources';
+      el('unit-access-description').textContent=listing.panel_admin?'Panel administrator · Full access':detail.can_staff?'Unit administrator · Full unit access':detail.role==='member'?'Member · My unit, personal profile and published resources':'Unit staff · Roster, events, attendance and resources';
       el('unit-settings').hidden=!detail.can_settings;el('roster-add').hidden=!detail.can_edit;
       el('catalog-edit').hidden=!detail.can_staff;el('position-rename').hidden=!detail.can_staff;el('unit-tab-staff').hidden=!detail.can_staff;
       el('unit-tab-structure').hidden=!detail.can_staff;el('roster-structure').hidden=!detail.can_staff;
       for(const key of ['staff','structure','customization'])el('unit-tab-'+key).dataset.restricted=String(!detail.can_staff);
+      document.querySelectorAll('[data-unit-tab]').forEach(b=>{if(detail.role==='member')b.dataset.restricted=String(!['home','profile','references'].includes(b.dataset.unitTab));else if(!['staff','structure','customization'].includes(b.dataset.unitTab))b.dataset.restricted='false';});
       el('roster-export').href='/api/units/'+unitId+'/roster.csv';
       el('unit-page-title').textContent=detail.unit.name;applyBranding();
       selectTab(new URLSearchParams(location.search).get('tab')||activeTab,false);feedback('');
@@ -347,12 +348,12 @@
     (c.rank_structures||[]).forEach(addStructure);el('rank-structure-add').onclick=()=>addStructure();baseline=signature();
   }
   function renderStaff(){
-    el('staff-list').innerHTML=detail.staff.map(s=>`<div class="unit-block"><strong>${esc(s.username)}</strong> · ${s.role==='admin'?'Unit administrator':'Staff'}${!s.enabled?' · Account disabled':''}<p class="feature-note">${s.role==='admin'?'Full unit administration':'Roster, notes, assignments, qualifications, promotions, events, attendance and resources'}</p><button data-staff="${s.user_id}">Edit membership</button></div>`).join('');
+    el('staff-list').innerHTML=detail.staff.map(s=>`<div class="unit-block"><strong>${esc(s.username)}</strong> · ${s.role==='admin'?'Unit administrator':s.role==='member'?'Member':'Staff'}${!s.enabled?' · Account disabled':''}<p class="feature-note">${s.role==='admin'?'Full unit administration':s.role==='member'?'Published resources, RSVPs and own profile':'Roster, notes, assignments, qualifications, promotions, events, attendance and resources'}</p><button data-staff="${s.user_id}">Edit membership</button></div>`).join('');
     el('staff-list').querySelectorAll('[data-staff]').forEach(b=>b.onclick=()=>staffEditor(detail.staff.find(s=>s.user_id===Number(b.dataset.staff))));
   }
   function staffEditor(staff={}){
-    const editing=!!staff.user_id, mayCreate=listing.panel_admin&&!editing;
-    openDialog(editing?'Edit unit staff':'Add staff to '+detail.unit.name,`${mayCreate?'<label class="unit-field">Account<select name="account_mode"><option value="new">Create new login</option><option value="existing">Use existing account</option></select></label>':''}${field('Username','username',staff.username||'')}<label class="unit-field" id="staff-password-field" ${mayCreate?'':'hidden'}>Initial password<input name="password" type="password" autocomplete="new-password" minlength="10"><small>At least 10 characters; give these credentials to the staff member.</small></label><label class="unit-field">Unit role<select name="role"><option value="staff">Staff</option><option value="admin" ${staff.role==='admin'?'selected':''}>Unit administrator</option>${editing?'<option value="remove">Remove from this unit</option>':''}</select></label><label class="unit-field" id="staff-member-field">Link roster member (optional)<select name="link_member_id"></select><small>Uses their game name when recording notes and changes in this unit.</small></label><p id="staff-mode-note" class="feature-note"></p><p class="feature-note">Login: ${esc(new URL('/login',location.origin).href)}. Unit-only staff land in Units & rosters. Server access is assigned separately.</p>`,async()=>{
+    const editing=!!staff.user_id, mayCreate=detail.can_staff&&!editing;
+    openDialog(editing?'Edit unit access':'Add login to '+detail.unit.name,`${mayCreate?'<label class="unit-field">Account<select name="account_mode"><option value="new">Create new login</option><option value="existing">Use existing account</option></select></label>':''}${field('Username','username',staff.username||'')}<label class="unit-field" id="staff-password-field" ${mayCreate?'':'hidden'}>Initial password<input name="password" type="password" autocomplete="new-password" minlength="10"><small>At least 10 characters; give these credentials to the staff member.</small></label><label class="unit-field">Unit role<select name="role"><option value="member" ${staff.role==='member'||!editing?'selected':''}>Member (self-service)</option><option value="staff" ${staff.role==='staff'?'selected':''}>Staff</option><option value="admin" ${staff.role==='admin'?'selected':''}>Unit administrator</option>${editing?'<option value="remove">Remove from this unit</option>':''}</select></label><label class="unit-field" id="staff-member-field">Link roster member (optional)<select name="link_member_id"></select><small>Uses their game name when recording notes and changes in this unit.</small></label><p id="staff-mode-note" class="feature-note"></p><p class="feature-note">Login: ${esc(new URL('/login',location.origin).href)}. Unit-only accounts land in Units & rosters. Server access is assigned separately.</p>`,async()=>{
       const data=values(),creating=data.account_mode==='new';
       await write(`/api/units/${unitId}/staff`,{username:data.username,role:data.role,create_account:creating,...(creating?{password:data.password}:{}),...(data.role==='remove'?{}:{link_member_id:data.link_member_id?Number(data.link_member_id):null}),revision:detail.unit.revision});
       form.elements.password.value='';
@@ -374,7 +375,7 @@
       el('staff-password-field').hidden=!creating;form.elements.password.disabled=!creating;form.elements.password.required=creating;
       if(!creating)form.elements.password.value='';
       el('staff-member-field').hidden=role==='remove';
-      el('staff-mode-note').textContent=role==='remove'?'Removes unit staff access. Their login, roster record and direct server permissions remain.':role==='admin'?'Unit administrators manage this unit’s members, structure, events, attendance and staff.':creating?'Creates a Staff login with day-to-day access to this unit. Hosting access stays separate.':'Staff manage unit records, events, attendance and resources. Unit administrators also manage staff, structure, rank rules and branding.';
+      el('staff-mode-note').textContent=role==='remove'?'Removes access to this unit. Their login, roster record and direct server permissions remain.':role==='member'?'Members can read published resources, acknowledge reading, RSVP and view their own profile. Staff records and server controls stay private.':role==='admin'?'Unit administrators manage this unit’s members, structure, events, attendance and staff.':creating?'Creates a login with day-to-day access to this unit. Hosting access stays separate.':'Staff manage unit records, events, attendance and resources. Unit administrators also manage staff, structure, rank rules and branding.';
       form.querySelector('[type="submit"]').textContent=editing?'Save membership':creating?'Create account & assign':'Assign staff';
     }
     form.elements.username.oninput=links;form.elements.role.onchange=mode;
@@ -390,7 +391,7 @@
   function selectTab(key,notify=true){
     if(notify&&key!==activeTab&&!UnitUX.canLeave())return;
     const target=el('unit-tab-'+key);
-    if(!target||target.dataset.restricted==='true')key='roster';
+    if(!target||target.dataset.restricted==='true')key=detail?.role==='member'?'home':'roster';
     activeTab=key;
     const area=Object.keys(areas).find(group=>areas[group].includes(key));areaPages[area]=key;
     document.querySelectorAll('[data-unit-tab]').forEach(b=>{const selected=b.dataset.unitTab===key;b.hidden=b.dataset.restricted==='true'||!areas[area].includes(b.dataset.unitTab);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;el('unit-'+b.dataset.unitTab).hidden=!selected;});
@@ -409,6 +410,7 @@
     b.onclick=()=>selectTab(b.dataset.unitTab);
     b.onkeydown=e=>{const tabs=[...document.querySelectorAll('[data-unit-tab]')].filter(t=>!t.hidden);let i=tabs.indexOf(b);if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[i].click();tabs[i].focus();};
   });
+  document.addEventListener('unit-navigate',e=>selectTab(e.detail));
   document.addEventListener('unit-access-changed',()=>loadListing());
   document.addEventListener('unit-open-member',e=>memberRecord(e.detail));
   el('position-rename').onclick=()=>openDialog('Rename position',`<label class="unit-field">Existing position<select name="old">${options(detail.unit.catalog.positions||[],'','Choose position')}</select></label>${field('New name','name')}<p class="feature-note">Updates this unit’s current and former roster assignments together.</p>`,async()=>{const data=values();await write(`/api/units/${unitId}/positions/rename`,{...data,revision:detail.unit.revision});});

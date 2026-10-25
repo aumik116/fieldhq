@@ -88,7 +88,7 @@ def install(api):
                 PRIMARY KEY(unit_id,server_id));
             CREATE TABLE IF NOT EXISTS unit_staff (
                 unit_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
-                role TEXT NOT NULL CHECK(role IN ('staff','admin')),
+                role TEXT NOT NULL CHECK(role IN ('member','staff','admin')),
                 capabilities TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(unit_id,user_id));
             CREATE TABLE IF NOT EXISTS unit_roster (
                 id INTEGER PRIMARY KEY, unit_id INTEGER NOT NULL,
@@ -116,6 +116,12 @@ def install(api):
             CREATE INDEX IF NOT EXISTS unit_member_notes_member ON unit_member_notes(unit_id,member_id,id);
 
         ''')
+        if "'member'" not in conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='unit_staff'").fetchone()[0]:
+            conn.execute('BEGIN IMMEDIATE')
+            conn.execute("CREATE TABLE unit_staff_member_upgrade (unit_id INTEGER NOT NULL,user_id INTEGER NOT NULL,role TEXT NOT NULL CHECK(role IN ('member','staff','admin')),capabilities TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(unit_id,user_id))")
+            conn.execute('INSERT INTO unit_staff_member_upgrade SELECT * FROM unit_staff')
+            conn.execute('DROP TABLE unit_staff')
+            conn.execute('ALTER TABLE unit_staff_member_upgrade RENAME TO unit_staff')
         for table, column, definition in [('units','catalog',"TEXT NOT NULL DEFAULT '{}'"),('unit_roster','last_promo',"TEXT NOT NULL DEFAULT ''"),('unit_roster','certificates',"TEXT NOT NULL DEFAULT ''"),('unit_roster','panel_user_id','INTEGER'),('unit_roster','rank_track',"TEXT NOT NULL DEFAULT ''")]:
             if column not in {r['name'] for r in conn.execute(f'PRAGMA table_info({table})')}:
                 conn.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
@@ -156,6 +162,8 @@ def install(api):
         membership = conn.execute('SELECT * FROM unit_staff WHERE unit_id=? AND user_id=?', (unit_id,g.user['id'])).fetchone()
         if not membership:
             abort(404, description='Unit not found')
+        if membership['role'] == 'member' and request.endpoint not in {'unit_detail', 'unit_branding_image', 'unit_library', 'unit_reference', 'unit_reference_file', 'unit_member_home', 'unit_self_profile', 'unit_reading_acknowledge', 'unit_rsvp_save'}:
+            abort(403, description='This page is for unit staff. Use My unit, My profile or published resources.')
         if capability and capability not in unit_role_capabilities(membership['role']):
             abort(403, description='Your unit role does not allow this change')
         return unit
@@ -167,8 +175,8 @@ def install(api):
             abort(409, description='This unit changed. Reload it before saving your changes.')
 
     def validate_staff(role):
-        if role not in ('staff','admin'):
-            raise ValueError('Choose Staff or Unit administrator')
+        if role not in ('member','staff','admin'):
+            raise ValueError('Choose Member, Staff or Unit administrator')
 
     def protect_admin(conn, unit_id, user_id, new_role):
         previous = conn.execute('SELECT role FROM unit_staff WHERE unit_id=? AND user_id=?', (unit_id,user_id)).fetchone()
@@ -243,8 +251,11 @@ def install(api):
             result = []
             for row in rows:
                 member = conn.execute('SELECT role,capabilities FROM unit_staff WHERE unit_id=? AND user_id=?',(row['id'],g.user['id'])).fetchone()
-                result.append(dict(row,role='admin' if panel_admin() else member['role'],capabilities=list(CAPABILITIES) if panel_admin() or member['role']=='admin' else list(unit_role_capabilities(member['role'])),
-                    servers=[r['server_id'] for r in conn.execute('SELECT server_id FROM unit_servers WHERE unit_id=?',(row['id'],))]))
+                visible_row = dict(row)
+                if not panel_admin() and member['role'] == 'member':
+                    visible_row = {key: row[key] for key in ('id', 'name', 'revision')}
+                result.append(dict(visible_row,role='admin' if panel_admin() else member['role'],capabilities=list(CAPABILITIES) if panel_admin() or member['role']=='admin' else list(unit_role_capabilities(member['role'])),
+                    servers=[] if not panel_admin() and member['role']=='member' else [r['server_id'] for r in conn.execute('SELECT server_id FROM unit_servers WHERE unit_id=?',(row['id'],))]))
             # Only disclose server names linked to visible units, plus explicit server grants.
             visible = {s for row in result for s in row['servers']}
             servers = [dict(id=s.id,name=s.name) for s in api.server_registry.list() if panel_admin() or s.id in visible or api.server_permissions(g.user,s.id)]
@@ -602,6 +613,9 @@ def install(api):
             unit = access(conn,unit_id)
             roster = [dict(r) for r in conn.execute('SELECT r.*,u.username AS panel_username,u.enabled AS panel_user_enabled FROM unit_roster r LEFT JOIN users u ON u.id=r.panel_user_id WHERE r.unit_id=? ORDER BY r.archived,r.game_name COLLATE NOCASE,r.id',(unit_id,))]
             membership = conn.execute('SELECT role,capabilities FROM unit_staff WHERE unit_id=? AND user_id=?',(unit_id,g.user['id'])).fetchone()
+            if not panel_admin() and membership['role'] == 'member':
+                public_unit = {key: unit[key] for key in ('id', 'name', 'revision')}
+                return jsonify(unit=dict(public_unit, catalog={}, branding=branding(conn, unit_id)), role='member', structure=[], roster=[], staff=[], accounts=[], can_edit=False, can_staff=False, can_delete=False, can_settings=False)
             catalog=json.loads(unit['catalog'])
             structure=structure_rows(conn,unit_id)
             decorate_slots(conn,unit_id,roster,structure)
@@ -793,11 +807,9 @@ def install(api):
                 if type(data.get('create_account',False)) is not bool:
                     raise ValueError('Choose a new or existing account')
                 if data.get('create_account'):
-                    if not panel_admin():
-                        abort(403,description='Only panel administrators can create login accounts')
-                    if data.get('role') not in ('staff','admin'):
-                        raise ValueError('Choose Staff or Unit administrator')
-                    user_id=api.create_unit_login(conn,username,data.get('password'))
+                    if data.get('role') not in ('member','staff','admin'):
+                        raise ValueError('Choose Member, Staff or Unit administrator')
+                    user_id=api.create_unit_login(conn,username,data.get('password'),unit_id=unit_id)
                     user=conn.execute('SELECT * FROM users WHERE id=?',(user_id,)).fetchone()
                 else:
                     user = conn.execute('SELECT * FROM users WHERE username=? COLLATE NOCASE',(username,)).fetchone()
@@ -875,3 +887,6 @@ def install(api):
 
     from unit_resources import install as install_resources
     install_resources(api, db, access, revision, panel_admin, endpoints)
+
+    from unit_members import install as install_members
+    install_members(api, db, access, revision, panel_admin, endpoints)
