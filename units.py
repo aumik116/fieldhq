@@ -658,6 +658,9 @@ def install(api):
                 ranks.append(
                     dict(
                         name=text(item.get("name"), "Rank", 80, True),
+                        abbreviation=text(
+                            item.get("abbreviation", ""), "Rank abbreviation", 20
+                        ),
                         paygrade=text(item.get("paygrade", ""), "Paygrade label", 40),
                         days=item.get("days", 0),
                         next_rank=text(item.get("next_rank", ""), "Next rank", 80),
@@ -710,6 +713,30 @@ def install(api):
                         old_details.get(entry["name"], entry)
                         for entry in catalog["qualification_details"]
                     ]
+                previous_ranks = {
+                    (track["name"], rank["name"]): rank
+                    for track in json.loads(
+                        conn.execute(
+                            "SELECT catalog FROM units WHERE id=?", (unit_id,)
+                        ).fetchone()[0]
+                    ).get("rank_structures", [])
+                    for rank in track["ranks"]
+                }
+                raw_ranks = {
+                    (track.get("name"), rank.get("name")): rank
+                    for track in data["catalog"].get("rank_structures", [])
+                    for rank in track.get("ranks", [])
+                }
+                for track in catalog["rank_structures"]:
+                    for rank in track["ranks"]:
+                        key = (track["name"], rank["name"])
+                        if (
+                            key in previous_ranks
+                            and "abbreviation" not in raw_ranks.get(key, {})
+                        ):
+                            rank["abbreviation"] = previous_ranks[key].get(
+                                "abbreviation", ""
+                            )
                 used = [
                     dict(r)
                     for r in conn.execute(
@@ -927,6 +954,16 @@ def install(api):
         structure = (
             structure if structure is not None else structure_rows(conn, unit_id)
         )
+        catalog = json.loads(
+            conn.execute("SELECT catalog FROM units WHERE id=?", (unit_id,)).fetchone()[
+                "catalog"
+            ]
+        )
+        abbreviations = {
+            (track["name"], rank["name"]): rank.get("abbreviation", "")
+            for track in catalog.get("rank_structures", [])
+            for rank in track["ranks"]
+        }
         by_id = {row["id"]: row for row in structure}
         slots = {
             row["member_id"]: row["billet_id"]
@@ -951,6 +988,10 @@ def install(api):
             return " / ".join(parts)
 
         for member in members:
+            member["rank_abbreviation"] = abbreviations.get(
+                (member["rank_track"], member["rank"]), ""
+            )
+            member["rank_display"] = member["rank_abbreviation"] or member["rank"]
             member["scheduled_status"] = member["status"]
             member["status"] = roster_status(member)
             slot = by_id.get(slots.get(member["id"]))
@@ -1541,6 +1582,8 @@ def install(api):
                             "game_name",
                             "rank",
                             "rank_track",
+                            "rank_display",
+                            "rank_abbreviation",
                             "status",
                             "certificates",
                             "billet_id",
@@ -2235,6 +2278,7 @@ def install(api):
             (
                 *FIELDS,
                 "archived",
+                "rank_abbreviation",
                 "primary_billet",
                 "primary_billet_path",
                 "effective_callsign",
@@ -2249,6 +2293,7 @@ def install(api):
             writer.writerow(
                 [export_cell(row[f]) for f in (*FIELDS, "archived")]
                 + [
+                    export_cell(row["rank_abbreviation"]),
                     export_cell(row["billet_name"]),
                     export_cell(row["billet_path"]),
                     export_cell(row["effective_callsign"]),

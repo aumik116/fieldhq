@@ -195,6 +195,8 @@ Open **Administration → Rank & qualification setup**. The two setup screens ar
 
 Assigned structure/rank names cannot be renamed or removed until roster records are moved off them. Qualifications show who holds them and which ranks require them. Use **Edit details / archive** to archive a qualification: new awards are blocked, but existing awards and promotion requirements remain valid. Uncheck Archive to restore it. Abbreviations and descriptions can be edited without renaming the qualification.
 
+Each rank also has an optional **Rank abbreviation (shown on rosters)** field, such as Sergeant → Sgt. Rosters show the abbreviation when set and otherwise use the full rank name. Hover over the roster rank to see the full name. Abbreviations can be changed even when the rank is assigned; full names continue identifying ranks for progression rules. Roster CSV exports include the abbreviation separately.
+
 ### Grant or correct a qualification
 
 1. Open **Roster → Qualifications**.

@@ -145,6 +145,7 @@ window.UnitStructure = {
         [
           member.game_name,
           member.rank,
+          member.rank_display,
           member.assignment_path,
           member.certificates,
           member.effective_callsign,
@@ -187,14 +188,14 @@ window.UnitStructure = {
           })
           .map((slot) => {
             const member = occupants.get(slot.id);
-            return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td>${member ? esc(member.rank || '—') : '—'}</td><td>${member ? person(member) : detail.can_edit ? `<button type="button" class="member-record-link billet-open" data-board-action="assign" data-node="${slot.id}" aria-label="Assign ${esc(slot.name)}">— Open —</button>` : '<span class="billet-open">— Open —</span>'}</td></tr>`;
+            return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td title="${member ? esc(member.rank) : ''}">${member ? esc(member.rank_display || member.rank || '—') : '—'}</td><td>${member ? person(member) : detail.can_edit ? `<button type="button" class="member-record-link billet-open" data-board-action="assign" data-node="${slot.id}" aria-label="Assign ${esc(slot.name)}">— Open —</button>` : '<span class="billet-open">— Open —</span>'}</td></tr>`;
           })
           .join('') +
         (direct.get(node.id) || [])
           .filter(match)
           .map(
             (member) =>
-              `<tr><td class="feature-note">—</td><td>${esc(member.rank || '—')}</td><td>${person(member)}</td></tr>`,
+              `<tr><td class="feature-note">—</td><td title="${esc(member.rank)}">${esc(member.rank_display || member.rank || '—')}</td><td>${person(member)}</td></tr>`,
           )
           .join('');
       const nested = childNodes

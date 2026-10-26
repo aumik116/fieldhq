@@ -320,6 +320,7 @@
           m.identity,
           m.panel_username,
           m.rank,
+          m.rank_display,
           m.section,
           m.position,
           m.certificates,
@@ -350,7 +351,7 @@
         rows
           .map(
             (m) =>
-              `<tr><td>${esc(m.game_name)}${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}</td><td>${esc(m.status === 'loa' ? 'LOA' : m.status)}</td><td>${esc(m.rank || '—')}</td><td>${esc(m.assignment_path || 'Unassigned')}</td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td></tr>`,
+              `<tr><td>${esc(m.game_name)}${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}</td><td>${esc(m.status === 'loa' ? 'LOA' : m.status)}</td><td title="${esc(m.rank)}">${esc(m.rank_display || m.rank || '—')}</td><td>${esc(m.assignment_path || 'Unassigned')}</td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td></tr>`,
           )
           .join('') || '<tr><td colspan="5">No members match.</td></tr>';
       return;
@@ -365,7 +366,7 @@
       rows
         .map((m) => {
           const p = m.promotion;
-          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button>${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}<small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td>${esc(m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
+          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button>${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}<small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td title="${esc(m.rank)}">${esc(m.rank_display || m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
         })
         .join('') ||
       '<tr><td colspan="8" class="unit-empty">No members match. Add a member to start.</td></tr>';

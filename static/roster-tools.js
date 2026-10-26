@@ -82,7 +82,7 @@
     );
   }
   function memberButton(member) {
-    return `<button type="button" class="member-record-link" data-tool-record="${member.id}">${esc(member.game_name)}</button><small>${esc([member.rank_track, member.rank].filter(Boolean).join(' · '))}</small>`;
+    return `<button type="button" class="member-record-link" data-tool-record="${member.id}">${esc(member.game_name)}</button><small>${esc([member.rank_track, member.rank_display || member.rank].filter(Boolean).join(' · '))}</small>`;
   }
   function bindMembers(root) {
     root.querySelectorAll('[data-tool-record]').forEach(
@@ -106,7 +106,14 @@
         (status === 'archived'
           ? m.archived
           : !m.archived && (!status || m.status === status)) &&
-        [m.game_name, m.rank, m.rank_track, m.discord, m.billet_path]
+        [
+          m.game_name,
+          m.rank,
+          m.rank_display,
+          m.rank_track,
+          m.discord,
+          m.billet_path,
+        ]
           .join(' ')
           .toLowerCase()
           .includes(search),
@@ -333,7 +340,7 @@
     );
     open(
       'Bulk roster edit',
-      `<p class="feature-note">Select up to 500 current members. Review every proposed change before applying. Section moves fill open primary billets; ranks and qualifications do not restrict placement.</p><div class="bulk-layout"><section><div class="unit-toolbar"><input type="search" id="bulk-search" aria-label="Find members for bulk editing" placeholder="Search members"><button type="button" id="bulk-select-visible">Select shown</button><button type="button" id="bulk-clear">Clear selection</button></div><p id="bulk-count" role="status"></p><div class="bulk-member-list">${members.map((m) => `<label data-bulk-row="${m.id}"><input type="checkbox" name="bulk_members" value="${m.id}" ${chosen.has(m.id) ? 'checked' : ''}><span>${esc(m.game_name)}<small>${esc([m.rank, m.status, m.assignment_path || m.billet_path || 'Unassigned'].join(' · '))}</small></span></label>`).join('') || '<p>No current members.</p>'}</div></section><section><label class="unit-field">Change<select name="action"><option value="grant">Grant qualification</option><option value="revoke">Revoke qualification</option><option value="status">Change status</option><option value="section">Move to section’s open billets</option><option value="unassign">Remove primary placement</option></select></label><div id="bulk-fields"></div><label class="unit-field">Reason / award note<textarea name="reason" required maxlength="1000">${esc(initial.reason || '')}</textarea></label></section></div>`,
+      `<p class="feature-note">Select up to 500 current members. Review every proposed change before applying. Section moves fill open primary billets; ranks and qualifications do not restrict placement.</p><div class="bulk-layout"><section><div class="unit-toolbar"><input type="search" id="bulk-search" aria-label="Find members for bulk editing" placeholder="Search members"><button type="button" id="bulk-select-visible">Select shown</button><button type="button" id="bulk-clear">Clear selection</button></div><p id="bulk-count" role="status"></p><div class="bulk-member-list">${members.map((m) => `<label data-bulk-row="${m.id}"><input type="checkbox" name="bulk_members" value="${m.id}" ${chosen.has(m.id) ? 'checked' : ''}><span>${esc(m.game_name)}<small>${esc([m.rank_display || m.rank, m.status, m.assignment_path || m.billet_path || 'Unassigned'].join(' · '))}</small></span></label>`).join('') || '<p>No current members.</p>'}</div></section><section><label class="unit-field">Change<select name="action"><option value="grant">Grant qualification</option><option value="revoke">Revoke qualification</option><option value="status">Change status</option><option value="section">Move to section’s open billets</option><option value="unassign">Remove primary placement</option></select></label><div id="bulk-fields"></div><label class="unit-field">Reason / award note<textarea name="reason" required maxlength="1000">${esc(initial.reason || '')}</textarea></label></section></div>`,
       async () => {
         const data = Object.fromEntries(new FormData(form));
         delete data.bulk_members;

@@ -42,7 +42,7 @@ window.UnitCatalog = (() => {
                       const previous = structure.ranks.filter(
                         (item) => item.next_rank === rank.name,
                       );
-                      return `<li><strong>${esc(rank.name)}</strong>${rank.paygrade ? ` <small>${esc(rank.paygrade)}</small>` : ''}<p>${previous.length ? `${esc(previous.map((item) => item.name).join(' / '))} → ${esc(rank.name)}: ${rank.days} days since last promotion${rank.certificates.length ? ' + ' + esc(rank.certificates.join(', ')) : ' · No qualification requirements'}` : 'Entry rank or manually assigned rank.'}</p><small>${rank.next_rank ? 'Next: ' + esc(rank.next_rank) : 'End of promotion path'}</small></li>`;
+                      return `<li><strong>${esc(rank.name)}</strong>${rank.abbreviation ? ` <small>(${esc(rank.abbreviation)})</small>` : ''}${rank.paygrade ? ` <small>${esc(rank.paygrade)}</small>` : ''}<p>${previous.length ? `${esc(previous.map((item) => item.name).join(' / '))} → ${esc(rank.name)}: ${rank.days} days since last promotion${rank.certificates.length ? ' + ' + esc(rank.certificates.join(', ')) : ' · No qualification requirements'}` : 'Entry rank or manually assigned rank.'}</p><small>${rank.next_rank ? 'Next: ' + esc(rank.next_rank) : 'End of promotion path'}</small></li>`;
                     })
                     .join('') ||
                   '<li>No ranks yet. Open the editor to add the first rank.</li>'
@@ -210,7 +210,7 @@ window.UnitCatalog = (() => {
         usedRanks(detail, existing.name, rank.name).length > 0 &&
         !!rank.name;
       const rowId = nextId++;
-      row.innerHTML = `<div class="formation-heading"><strong data-rank-heading>Rank</strong><div class="formation-actions"><button type="button" data-rank-up aria-label="Move rank up">↑</button><button type="button" data-rank-down aria-label="Move rank down">↓</button><button type="button" data-rank-remove ${held ? 'disabled' : ''}>Remove</button></div></div><label class="unit-field">Rank name<input name="setup_rank_name" required maxlength="80" value="${esc(rank.name || '')}" ${held ? 'readonly' : ''}></label>${held ? '<small class="feature-note">Assigned to roster records; its name is protected.</small>' : ''}<details><summary>Edit requirements & optional paygrade</summary><label class="unit-field">Days since previous promotion to reach this rank<input name="setup_rank_days" type="number" min="0" max="36500" step="1" required value="${rank.days ?? 0}"></label><label class="unit-field">Paygrade label (optional)<input name="setup_rank_paygrade" maxlength="40" value="${esc(rank.paygrade || '')}"></label><label class="unit-field">Find qualification<input type="search" data-qual-search placeholder="Search qualifications"></label><div class="unit-checks" data-rank-qualifications>${
+      row.innerHTML = `<div class="formation-heading"><strong data-rank-heading>Rank</strong><div class="formation-actions"><button type="button" data-rank-up aria-label="Move rank up">↑</button><button type="button" data-rank-down aria-label="Move rank down">↓</button><button type="button" data-rank-remove ${held ? 'disabled' : ''}>Remove</button></div></div><label class="unit-field">Rank name<input name="setup_rank_name" required maxlength="80" value="${esc(rank.name || '')}" ${held ? 'readonly' : ''}></label>${held ? '<small class="feature-note">Assigned to roster records; its name is protected.</small>' : ''}<label class="unit-field">Rank abbreviation (shown on rosters)<input name="setup_rank_abbreviation" maxlength="20" value="${esc(rank.abbreviation || '')}" placeholder="e.g. Sgt"><small>Leave blank to show the full rank name.</small></label><details><summary>Edit requirements & optional paygrade</summary><label class="unit-field">Days since previous promotion to reach this rank<input name="setup_rank_days" type="number" min="0" max="36500" step="1" required value="${rank.days ?? 0}"></label><label class="unit-field">Paygrade label (optional)<input name="setup_rank_paygrade" maxlength="40" value="${esc(rank.paygrade || '')}"></label><label class="unit-field">Find qualification<input type="search" data-qual-search placeholder="Search qualifications"></label><div class="unit-checks" data-rank-qualifications>${
         quals
           .filter(
             (qual) =>
@@ -256,6 +256,9 @@ window.UnitCatalog = (() => {
         name,
         ranks: rows.map((row, i) => ({
           name: row.querySelector('[name="setup_rank_name"]').value.trim(),
+          abbreviation: row
+            .querySelector('[name="setup_rank_abbreviation"]')
+            .value.trim(),
           paygrade: row
             .querySelector('[name="setup_rank_paygrade"]')
             .value.trim(),
