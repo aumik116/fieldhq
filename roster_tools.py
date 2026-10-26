@@ -287,6 +287,13 @@ def install(
                 reason = text(
                     data.get("reason", ""), "Reason", 1000, action == "revoke"
                 )
+                if action == "grant" and any(
+                    entry["name"] == certificate and entry.get("archived")
+                    for entry in json.loads(unit["catalog"]).get(
+                        "qualification_details", []
+                    )
+                ):
+                    raise ValueError("Restore this qualification before awarding it")
                 if action == "grant":
                     if certificate in held:
                         raise ValueError("Already held; edit the award details instead")
@@ -457,6 +464,13 @@ def install(
             if certificate not in json.loads(unit["catalog"]).get("certificates", []):
                 raise ValueError("Choose a qualification from this unit’s catalog")
             if action == "grant":
+                if any(
+                    entry["name"] == certificate and entry.get("archived")
+                    for entry in json.loads(unit["catalog"]).get(
+                        "qualification_details", []
+                    )
+                ):
+                    raise ValueError("Restore this qualification before awarding it")
                 award_date(data.get("awarded_on"))
             for change in changes:
                 held = set(filter(None, change["before"]["certificates"].split(";")))

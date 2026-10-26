@@ -398,6 +398,7 @@ def install(api):
         "units_page",
         "panel_users_page",
         "unit_catalog_save",
+        "unit_catalog_preview",
         "unit_position_rename",
         "unit_member_record",
         "unit_member_note_save",
@@ -586,6 +587,32 @@ def install(api):
             ";" in c for c in certificates
         ):
             raise ValueError("Use unique qualification names without semicolons")
+        details = raw.get("qualification_details", [])
+        if not isinstance(details, list) or len(details) > 100:
+            raise ValueError("Keep at most 100 qualification descriptions")
+        detail_by_name = {}
+        for entry in details:
+            if not isinstance(entry, dict):
+                raise ValueError("Choose valid qualification details")
+            name = text(entry.get("name"), "Qualification", 80, True)
+            if name not in certificates or name in detail_by_name:
+                raise ValueError(
+                    "Qualification details must match unique catalog names"
+                )
+            if type(entry.get("archived", False)) is not bool:
+                raise ValueError("Archived must be true or false")
+            detail_by_name[name] = dict(
+                name=name,
+                abbreviation=text(entry.get("abbreviation", ""), "Abbreviation", 20),
+                description=text(entry.get("description", ""), "Description", 1000),
+                archived=entry.get("archived", False),
+            )
+        qualification_details = [
+            detail_by_name.get(
+                name, dict(name=name, abbreviation="", description="", archived=False)
+            )
+            for name in certificates
+        ]
         positions = raw.get("positions", [])
         if not isinstance(positions, list) or len(positions) > 100:
             raise ValueError("Keep at most 100 positions")
@@ -654,7 +681,10 @@ def install(api):
         if len({s["name"].casefold() for s in result}) != len(result):
             raise ValueError("Rank structure names must be unique")
         return dict(
-            certificates=certificates, positions=positions, rank_structures=result
+            certificates=certificates,
+            positions=positions,
+            rank_structures=result,
+            qualification_details=qualification_details,
         )
 
     @api.app.post("/api/units/<int:unit_id>/catalog")
@@ -666,6 +696,20 @@ def install(api):
                 conn.execute("BEGIN IMMEDIATE")
                 access(conn, unit_id, "staff")
                 revision(conn, unit_id, data)
+                if "qualification_details" not in data.get("catalog", {}):
+                    previous = json.loads(
+                        conn.execute(
+                            "SELECT catalog FROM units WHERE id=?", (unit_id,)
+                        ).fetchone()[0]
+                    )
+                    old_details = {
+                        entry["name"]: entry
+                        for entry in previous.get("qualification_details", [])
+                    }
+                    catalog["qualification_details"] = [
+                        old_details.get(entry["name"], entry)
+                        for entry in catalog["qualification_details"]
+                    ]
                 used = [
                     dict(r)
                     for r in conn.execute(
@@ -702,6 +746,78 @@ def install(api):
                 unit_id=unit_id, change="rank and qualification catalog"
             )
             return jsonify(ok=True)
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+
+    @api.app.post("/api/units/<int:unit_id>/catalog/preview")
+    def unit_catalog_preview(unit_id):
+        try:
+            data = request.get_json()
+            with db() as conn:
+                access(conn, unit_id, "staff")
+                catalog = catalog_values(data.get("catalog"))
+                key = data.get("member_id")
+                if type(key) is not int or not 1 <= key <= 9223372036854775807:
+                    raise ValueError("Choose a roster member")
+                member = dict(find_member(conn, unit_id, key))
+                member["rank_track"] = text(
+                    data.get("rank_track", member["rank_track"]), "Rank structure", 80
+                )
+                member["rank"] = text(
+                    data.get("rank", member["rank"]), "Current rank", 80
+                )
+                member["last_promo"] = text(
+                    data.get("last_promo", member["last_promo"]),
+                    "Last promotion date",
+                    10,
+                )
+                if member["last_promo"]:
+                    member["last_promo"] = date.fromisoformat(
+                        member["last_promo"]
+                    ).isoformat()
+                    if member["last_promo"] > date.today().isoformat():
+                        raise ValueError("Last promotion date cannot be in the future")
+                structure = next(
+                    (
+                        item
+                        for item in catalog["rank_structures"]
+                        if item["name"] == member["rank_track"]
+                    ),
+                    None,
+                )
+                current = (
+                    next(
+                        (
+                            rank
+                            for rank in structure["ranks"]
+                            if rank["name"] == member["rank"]
+                        ),
+                        None,
+                    )
+                    if structure
+                    else None
+                )
+                if current is None:
+                    raise ValueError("Choose a current rank in this structure")
+                target = next(
+                    (
+                        rank
+                        for rank in structure["ranks"]
+                        if rank["name"] == current["next_rank"]
+                    ),
+                    None,
+                )
+                result = promotion(member, catalog)
+            return jsonify(
+                ok=True,
+                member=dict(
+                    game_name=member["game_name"], archived=bool(member["archived"])
+                ),
+                promotion=result,
+                target=target,
+                today=date.today().isoformat(),
+                held=[value for value in member["certificates"].split(";") if value],
+            )
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
 
@@ -1715,6 +1831,14 @@ def install(api):
         certs = [c.strip() for c in values["certificates"].split(";") if c.strip()]
         if any(c not in catalog.get("certificates", []) for c in certs):
             raise ValueError("Choose qualifications from the unit catalog")
+        archived = {
+            entry["name"]
+            for entry in catalog.get("qualification_details", [])
+            if entry.get("archived")
+        }
+        previous = set(existing["certificates"].split(";")) if existing else set()
+        if any(name in archived and name not in previous for name in certs):
+            raise ValueError("Archived qualifications cannot be newly awarded")
         values["certificates"] = ";".join(sorted(set(certs)))
         positions = [p.strip() for p in values["position"].split(";") if p.strip()]
         if any(p not in catalog.get("positions", []) for p in positions) and values[

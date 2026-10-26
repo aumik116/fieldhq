@@ -21,7 +21,7 @@ TOPICS={
     'unit-events':('staff','create-an-event'), 'unit-attendance':('staff','review-correct-and-finalize'),
     'unit-references':('staff','sops-and-loadouts'), 'unit-awards':('staff','awards'),
     'unit-campaigns':('staff','campaigns'), 'unit-analytics':('staff','analytics'),
-    'unit-catalog':('staff','structure-and-catalogs'), 'unit-staff':('staff','accounts--access'),
+    'unit-catalog':('staff','set-up-rank-structures-and-qualifications'), 'unit-staff':('staff','accounts--access'),
     'unit-customization':('staff','branding'), 'unit-servers':('staff','2-'), 'units':('staff','1-'),
 }
 HEADINGS=re.compile(r'<h([23])\s+id="([^"]+)"[^>]*>(.*?)</h\1>',re.S)

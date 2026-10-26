@@ -19,6 +19,9 @@ Keep all unit SQL scoped to its unit. Keep member responses explicit about which
 
 ## UI conventions
 
+`static/unit-catalog.js` owns focused rank/qualification setup. Catalog edits retain string qualification identifiers for existing awards and requirements. Optional `qualification_details` adds abbreviation, description and archive state. Archived definitions keep existing awards valid while new grants are rejected. Promotion previews call the existing backend calculation without saving.
+
+
 `static/unit-ux.js` provides the shared unit dialog operations:
 
 - `prepare`: install a title, body, save label and visibility, then open/focus the dialog.

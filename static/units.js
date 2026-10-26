@@ -33,7 +33,7 @@
       'Basic health for this unit’s linked servers. Server control access is separate.',
     references: 'Unit SOPs and role-specific kit references.',
     catalog:
-      'Configure rank paths, qualification names and position suggestions.',
+      'Create qualifications, build ordered promotion ladders and preview eligibility.',
     structure:
       'Assign members to formations and billets. Administrators also manage layouts and saved billet types.',
     staff:
@@ -79,6 +79,8 @@
     UnitUX.close(dialog);
   }
   function openDialog(title, html, save) {
+    form.oninput = null;
+    form.onchange = null;
     dialog.dataset.record = '';
     dialogSave = save;
     form.querySelector('[type="submit"]').disabled = false;
@@ -219,8 +221,7 @@
             : 'Unit staff · Roster, events, attendance and resources';
       el('unit-settings').hidden = !detail.can_settings;
       el('roster-add').hidden = !detail.can_edit;
-      el('catalog-edit').hidden = !detail.can_staff;
-      el('position-rename').hidden = !detail.can_staff;
+      el('position-rename').hidden = true;
       el('unit-tab-staff').hidden = !detail.can_staff;
       el('unit-tab-structure').hidden = !detail.can_edit;
       el('unit-tab-structure').textContent = detail.can_staff
@@ -1247,7 +1248,16 @@
       `<div class="unit-form-grid">${field('Game name', 'game_name', member.game_name || '')}${field('Discord handle', 'discord', member.discord || '')}${field('Personal callsign override (optional)', 'callsign', member.callsign || '')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity ? [member.identity] : [], member.identity || '', 'Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${(member.scheduled_status || member.status) === s ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s === 'active' ? 'Active' : 'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options(
         (catalog.rank_structures || []).map((s) => s.name),
         member.rank_track || '',
-      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary placement<select name="billet_id" id="member-billet"></select><small>Choose a named billet or assign directly to a formation. One primary placement per member; no rank or qualification requirements.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA starts (optional)', 'loa_from', member.loa_from || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates', catalog.certificates || [], (member.certificates || '').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
+      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary placement<select name="billet_id" id="member-billet"></select><small>Choose a named billet or assign directly to a formation. One primary placement per member; no rank or qualification requirements.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA starts (optional)', 'loa_from', member.loa_from || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks(
+        'certificates',
+        (catalog.certificates || []).filter(
+          (name) =>
+            !catalog.qualification_details?.some(
+              (item) => item.name === name && item.archived,
+            ) || (member.certificates || '').split(';').includes(name),
+        ),
+        (member.certificates || '').split(';'),
+      )}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
       async () => {
         const data = values();
         await write(`/api/units/${unitId}/roster`, {
@@ -1416,88 +1426,44 @@
       dialogSaving = false;
     }
   }
-  function renderCatalog() {
-    const c = detail.unit.catalog;
-    el('catalog-summary').innerHTML =
-      `<div class="unit-block"><h3>Qualifications / certifications</h3>${esc((c.certificates || []).join(', ') || 'None defined')}</div><div class="unit-block"><h3>Legacy position labels</h3>${esc((c.positions || []).join(', ') || 'None defined')}</div>${(c.rank_structures || []).map((s) => `<div class="unit-block"><h3>${esc(s.name)}</h3><div class="rank-policy-table"><table><thead><tr><th>Rank</th><th>Paygrade label</th><th>Days to enter</th><th>Required qualifications</th><th>Next rank</th></tr></thead><tbody>${s.ranks.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.paygrade || '—')}</td><td>${r.days}</td><td>${esc(r.certificates.join(', ') || 'None')}</td><td>${esc(r.next_rank || 'End of structure')}</td></tr>`).join('')}</tbody></table></div></div>`).join('') || '<p class="unit-empty">No rank structures defined. Add Marine, Medical, Officer or your own structures.</p>'}`;
-  }
-  function catalogEditor() {
-    const c = detail.unit.catalog;
-    openDialog(
-      'Rank structures & qualifications',
-      `<p class="feature-note">Each rank structure is independent. Marine, Medical and Officer can have different rank names, advancement times and qualification requirements. Paygrade labels are optional and do not share rules between structures. Reusable billet titles are managed in Structure → Billet types; legacy position labels are kept for older records.</p><div class="unit-form-grid"><label class="unit-field">Qualification names<textarea name="qualification_names">${esc((c.certificates || []).join('\n'))}</textarea></label><label class="unit-field">Legacy position labels<textarea name="position_names">${esc((c.positions || []).join('\n'))}</textarea></label></div><h3>Rank structures</h3><p class="feature-note">Days to enter is the minimum time since the last promotion needed to enter that rank. Requirements use qualification names separated by semicolons. Next rank must name a rank in the same structure. Eligibility is a notice for staff; no automatic promotion.</p><div id="rank-structure-rows"></div><button type="button" id="rank-structure-add">Add rank structure</button>`,
-      async () => {
-        const split = (value) =>
-          value
-            .split(/[;\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean);
-        const structures = [
-          ...form.querySelectorAll('[data-rank-structure]'),
-        ].map((block) => ({
-          name: block.querySelector('[name="structure_name"]').value.trim(),
-          ranks: [...block.querySelectorAll('[data-policy-rank]')].map(
-            (row) => ({
-              name: row.querySelector('[name="rank_name"]').value.trim(),
-              paygrade: row
-                .querySelector('[name="rank_paygrade"]')
-                .value.trim(),
-              days: Number(row.querySelector('[name="rank_days"]').value),
-              next_rank: row
-                .querySelector('[name="rank_next_rank"]')
-                .value.trim(),
-              certificates: split(
-                row.querySelector('[name="rank_certificates"]').value,
-              ),
-            }),
-          ),
-        }));
-        await write(`/api/units/${unitId}/catalog`, {
-          catalog: {
-            certificates: split(form.elements.qualification_names.value),
-            positions: split(form.elements.position_names.value),
-            rank_structures: structures,
-          },
-          revision: detail.unit.revision,
-        });
+  function catalogOptions() {
+    return {
+      detail,
+      unitId,
+      open: openDialog,
+      form,
+      write,
+      baseline: () => {
+        baseline = signature();
       },
-    );
-    function addStructure(structure = {}) {
-      const block = document.createElement('section');
-      block.className = 'rank-structure-editor';
-      block.dataset.rankStructure = '';
-      block.innerHTML = `<div class="rank-structure-heading">${field('Structure name', 'structure_name', structure.name || '')}<button type="button" data-remove-structure>Remove structure</button></div><div data-rank-list></div><button type="button" data-add-rank>Add rank</button>`;
-      function addRank(rank = {}) {
-        const row = document.createElement('div');
-        row.className = 'rank-policy-row';
-        row.dataset.policyRank = '';
-        row.innerHTML =
-          field('Rank', 'rank_name', rank.name || '') +
-          field(
-            'Paygrade label (optional)',
-            'rank_paygrade',
-            rank.paygrade || '',
-          ) +
-          field('Days to enter', 'rank_days', rank.days ?? 0, 'number') +
-          field('Next rank', 'rank_next_rank', rank.next_rank || '') +
-          field(
-            'Required qualifications',
-            'rank_certificates',
-            (rank.certificates || []).join(';'),
-          ) +
-          '<button type="button">Remove rank</button>';
-        row.querySelector('button').onclick = () => row.remove();
-        block.querySelector('[data-rank-list]').append(row);
-      }
-      block.querySelector('[data-remove-structure]').onclick = () =>
-        block.remove();
-      block.querySelector('[data-add-rank]').onclick = () => addRank();
-      (structure.ranks || []).forEach(addRank);
-      el('rank-structure-rows').append(block);
-    }
-    (c.rank_structures || []).forEach(addStructure);
-    el('rank-structure-add').onclick = () => addStructure();
-    baseline = signature();
+    };
+  }
+  function renderCatalog() {
+    UnitCatalog.render(el('catalog-summary'), detail, {
+      structure: (existing, duplicate) =>
+        UnitCatalog.structure(catalogOptions(), existing, duplicate),
+      qualification: (existing) =>
+        UnitCatalog.qualification(catalogOptions(), existing),
+      remove: (structure) => {
+        openDialog(
+          'Remove rank structure',
+          `<p>Remove ${esc(structure.name)}? No roster members use it.</p>${field('Type the structure name to confirm', 'confirm_name')}`,
+          async () => {
+            if (values().confirm_name !== structure.name)
+              throw new Error('Enter the exact structure name.');
+            await write(`/api/units/${unitId}/catalog`, {
+              catalog: {
+                ...detail.unit.catalog,
+                rank_structures: detail.unit.catalog.rank_structures.filter(
+                  (item) => item.name !== structure.name,
+                ),
+              },
+              revision: detail.unit.revision,
+            });
+          },
+        );
+      },
+    });
   }
   function renderStaff() {
     el('staff-list').innerHTML = detail.staff
@@ -1837,7 +1803,6 @@
   el('unit-new').onclick = () => unitSettings(true);
   el('unit-settings').onclick = () => unitSettings();
   el('roster-add').onclick = () => memberEditor();
-  el('catalog-edit').onclick = catalogEditor;
   el('staff-add').onclick = () => staffEditor();
   for (const id of ['roster-search', 'roster-status', 'roster-sort'])
     el(id).addEventListener(

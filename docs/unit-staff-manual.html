@@ -72,8 +72,8 @@ RSVP and view their own profile; no staff notes or hosting controls</td>
 </tr>
 <tr class="odd">
 <td><strong>Unit administrator</strong></td>
-<td>All Staff functions, plus staff access, rank rules/catalogs,
-structure, branding and permanent member deletion</td>
+<td>All Staff functions, plus staff access, rank and qualification
+setup, structure, branding and permanent member deletion</td>
 </tr>
 </tbody>
 </table>
@@ -104,7 +104,7 @@ servers; hosting access is assigned separately.</p>
 </tr>
 <tr class="even">
 <td>Resources</td>
-<td>SOPs &amp; loadouts, Rank rules &amp; catalogs</td>
+<td>SOPs &amp; loadouts, Rank &amp; qualification setup</td>
 </tr>
 <tr class="odd">
 <td>Administration</td>
@@ -337,6 +337,45 @@ items and permanently deleting a member are different actions; read the
 form's consequences before saving.</p>
 <h2 id="6-qualifications-and-promotions">6. Qualifications and
 promotions</h2>
+<h3 id="set-up-rank-structures-and-qualifications">Set up rank
+structures and qualifications</h3>
+<p>Open <strong>Administration → Rank &amp; qualification
+setup</strong>. The two setup screens are separate from <strong>Roster →
+Qualifications</strong>, which records awards to people.</p>
+<ol type="1">
+<li>Under <strong>Qualifications</strong>, choose <strong>Add
+qualification</strong>. Enter a name, optional abbreviation and
+description. Names remain stable after creation so existing award
+records and promotion rules keep their references.</li>
+<li>Under <strong>Rank structures</strong>, choose <strong>New rank
+structure</strong>, or select an existing structure. Marine, Medical and
+Officer structures keep independent rules. <strong>Duplicate
+structure</strong> creates an editable copy with its own name.</li>
+<li>Add ranks from lowest to highest. Use the up/down controls to change
+their order; the next rank follows automatically. Existing structures
+with custom links preserve those links unless you explicitly select
+<strong>Use displayed rank order</strong>.</li>
+<li>Open <strong>Edit requirements &amp; optional paygrade</strong> on
+the destination rank. Enter the days since the previous promotion needed
+to reach it, then select required qualifications using searchable
+checkboxes. For Pfc → Cpl, put the time and qualifications on
+<strong>Cpl</strong>. Optional paygrade labels do not share rules
+between structures.</li>
+<li>Under <strong>Preview eligibility</strong>, select a member, a
+current rank for the simulation and their last promotion date. Choose
+<strong>Explain eligibility</strong> to see the next rank, time
+requirement date and missing qualifications using the unsaved rules. The
+preview changes no member records.</li>
+<li>Save the structure. Saving rules updates eligibility calculations
+only; staff must approve each actual promotion separately.</li>
+</ol>
+<p>Assigned structure/rank names cannot be renamed or removed until
+roster records are moved off them. Qualifications show who holds them
+and which ranks require them. Use <strong>Edit details /
+archive</strong> to archive a qualification: new awards are blocked, but
+existing awards and promotion requirements remain valid. Uncheck Archive
+to restore it. Abbreviations and descriptions can be edited without
+renaming the qualification.</p>
 <h3 id="grant-or-correct-a-qualification">Grant or correct a
 qualification</h3>
 <ol type="1">
@@ -383,8 +422,8 @@ stale record needs another review. <strong>Promotions are never
 automatic.</strong> Follow the unit's approval policy even when the
 panel says someone is eligible.</p>
 <p>Rank paths, time requirements and qualification names are maintained
-by permitted administrators in <strong>Resources → Rank rules &amp;
-catalogs</strong>.</p>
+by permitted administrators in <strong>Resources → Rank &amp;
+qualification setup</strong>.</p>
 <h2 id="7-events-and-attendance">7. Events and attendance</h2>
 <h3 id="create-an-event">Create an event</h3>
 <p>With event permission:</p>
@@ -589,8 +628,8 @@ separately when someone leaves.</p>
 <h3 id="structure-and-catalogs">Structure and catalogs</h3>
 <p>Create groups, sections and billets in Structure. Maintain
 independent rank paths, qualifications and position suggestions under
-Rank rules &amp; catalogs. Review the effect of rule changes on existing
-members' eligibility.</p>
+Rank &amp; qualification setup. Review the effect of rule changes on
+existing members' eligibility.</p>
 <h3 id="branding">Branding</h3>
 <p>Use <strong>Administration → Customization</strong> for the unit
 description, icon and banner. PNG, JPEG and WebP images up to 4 MB each

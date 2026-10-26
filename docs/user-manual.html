@@ -190,9 +190,9 @@ cannot access other members’ staff records, drafts, revision history or
 hosting controls. <strong>Staff</strong> manage rosters, notes,
 assignments, qualifications, promotion reviews, events, attendance,
 SOPs/loadouts, awards and campaigns. <strong>Unit
-administrators</strong> additionally manage staff access, rank
-rules/catalogs, structure, branding and permanent member deletion. There
-are no individual permission switches. Unit authority grants no
+administrators</strong> additionally manage staff access, rank and
+qualification setup, structure, branding and permanent member deletion.
+There are no individual permission switches. Unit authority grants no
 automatic hosting control.</p>
 <p>Inside a unit, <strong>Administration → Accounts &amp; access → Add
 account</strong> lets panel and unit administrators create a new login
@@ -774,8 +774,9 @@ administrators then manage the permitted unit records and staff.</p>
 <ol type="1">
 <li>Create the unit and link its game server(s).</li>
 <li>Assign its unit administrators and staff.</li>
-<li>Under <strong>Resources → Rank rules &amp; catalogs</strong>, define
-qualifications, position suggestions and any rank structures.</li>
+<li>Under <strong>Resources → Rank &amp; qualification setup</strong>,
+define qualifications, position suggestions and any rank
+structures.</li>
 <li>If using organized slots, build <strong>Administration →
 Structure</strong>.</li>
 <li>Add members manually to the roster and link recorded UUIDs.</li>
@@ -1021,6 +1022,45 @@ confirm.</li>
 </ol>
 <p>Eligibility is a notice for staff. The panel never automatically
 promotes a member.</p>
+<h3 id="set-up-rank-structures-and-qualifications">Set up rank
+structures and qualifications</h3>
+<p>Open <strong>Administration → Rank &amp; qualification
+setup</strong>. The two setup screens are separate from <strong>Roster →
+Qualifications</strong>, which records awards to people.</p>
+<ol type="1">
+<li>Under <strong>Qualifications</strong>, choose <strong>Add
+qualification</strong>. Enter a name, optional abbreviation and
+description. Names remain stable after creation so existing award
+records and promotion rules keep their references.</li>
+<li>Under <strong>Rank structures</strong>, choose <strong>New rank
+structure</strong>, or select an existing structure. Marine, Medical and
+Officer structures keep independent rules. <strong>Duplicate
+structure</strong> creates an editable copy with its own name.</li>
+<li>Add ranks from lowest to highest. Use the up/down controls to change
+their order; the next rank follows automatically. Existing structures
+with custom links preserve those links unless you explicitly select
+<strong>Use displayed rank order</strong>.</li>
+<li>Open <strong>Edit requirements &amp; optional paygrade</strong> on
+the destination rank. Enter the days since the previous promotion needed
+to reach it, then select required qualifications using searchable
+checkboxes. For Pfc → Cpl, put the time and qualifications on
+<strong>Cpl</strong>. Optional paygrade labels do not share rules
+between structures.</li>
+<li>Under <strong>Preview eligibility</strong>, select a member, a
+current rank for the simulation and their last promotion date. Choose
+<strong>Explain eligibility</strong> to see the next rank, time
+requirement date and missing qualifications using the unsaved rules. The
+preview changes no member records.</li>
+<li>Save the structure. Saving rules updates eligibility calculations
+only; staff must approve each actual promotion separately.</li>
+</ol>
+<p>Assigned structure/rank names cannot be renamed or removed until
+roster records are moved off them. Qualifications show who holds them
+and which ranks require them. Use <strong>Edit details /
+archive</strong> to archive a qualification: new awards are blocked, but
+existing awards and promotion requirements remain valid. Uncheck Archive
+to restore it. Abbreviations and descriptions can be edited without
+renaming the qualification.</p>
 <h2 id="16-events-and-attendance">16. Events and attendance</h2>
 <h3 id="create-an-event">Create an event</h3>
 <ol type="1">

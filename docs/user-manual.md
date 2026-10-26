@@ -97,7 +97,7 @@ Use the separate password-reset action when someone needs replacement credential
 
 ### Unit staff
 
-There are three unit roles. **Members** can read their unit roster and use My unit for published guidance, required reading, announcements and RSVPs, and My profile for their own record. They cannot access other members’ staff records, drafts, revision history or hosting controls. **Staff** manage rosters, notes, assignments, qualifications, promotion reviews, events, attendance, SOPs/loadouts, awards and campaigns. **Unit administrators** additionally manage staff access, rank rules/catalogs, structure, branding and permanent member deletion. There are no individual permission switches. Unit authority grants no automatic hosting control.
+There are three unit roles. **Members** can read their unit roster and use My unit for published guidance, required reading, announcements and RSVPs, and My profile for their own record. They cannot access other members’ staff records, drafts, revision history or hosting controls. **Staff** manage rosters, notes, assignments, qualifications, promotion reviews, events, attendance, SOPs/loadouts, awards and campaigns. **Unit administrators** additionally manage staff access, rank and qualification setup, structure, branding and permanent member deletion. There are no individual permission switches. Unit authority grants no automatic hosting control.
 
 Inside a unit, **Administration → Accounts & access → Add account** lets panel and unit administrators create a new login or assign an existing account. Choose Member, Staff or Unit administrator. Link the account to its roster member when applicable; this provides the person's unit-specific name for notes and history.
 
@@ -461,7 +461,7 @@ A practical setup order:
 
 1. Create the unit and link its game server(s).
 2. Assign its unit administrators and staff.
-3. Under **Resources → Rank rules & catalogs**, define qualifications, position suggestions and any rank structures.
+3. Under **Resources → Rank & qualification setup**, define qualifications, position suggestions and any rank structures.
 4. If using organized slots, build **Administration → Structure**.
 5. Add members manually to the roster and link recorded UUIDs.
 6. Create events with attendance tracking.
@@ -591,6 +591,19 @@ A paygrade label does not merge different advancement paths. Members select the 
 4. If the roster or eligibility changed, refresh and review again.
 
 Eligibility is a notice for staff. The panel never automatically promotes a member.
+
+### Set up rank structures and qualifications
+
+Open **Administration → Rank & qualification setup**. The two setup screens are separate from **Roster → Qualifications**, which records awards to people.
+
+1. Under **Qualifications**, choose **Add qualification**. Enter a name, optional abbreviation and description. Names remain stable after creation so existing award records and promotion rules keep their references.
+2. Under **Rank structures**, choose **New rank structure**, or select an existing structure. Marine, Medical and Officer structures keep independent rules. **Duplicate structure** creates an editable copy with its own name.
+3. Add ranks from lowest to highest. Use the up/down controls to change their order; the next rank follows automatically. Existing structures with custom links preserve those links unless you explicitly select **Use displayed rank order**.
+4. Open **Edit requirements & optional paygrade** on the destination rank. Enter the days since the previous promotion needed to reach it, then select required qualifications using searchable checkboxes. For Pfc → Cpl, put the time and qualifications on **Cpl**. Optional paygrade labels do not share rules between structures.
+5. Under **Preview eligibility**, select a member, a current rank for the simulation and their last promotion date. Choose **Explain eligibility** to see the next rank, time requirement date and missing qualifications using the unsaved rules. The preview changes no member records.
+6. Save the structure. Saving rules updates eligibility calculations only; staff must approve each actual promotion separately.
+
+Assigned structure/rank names cannot be renamed or removed until roster records are moved off them. Qualifications show who holds them and which ranks require them. Use **Edit details / archive** to archive a qualification: new awards are blocked, but existing awards and promotion requirements remain valid. Uncheck Archive to restore it. Abbreviations and descriptions can be edited without renaming the qualification.
 
 ## 16. Events and attendance
 

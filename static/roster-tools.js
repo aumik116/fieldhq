@@ -192,10 +192,17 @@
     }
     const member = context.detail.roster.find((m) => m.id === memberId);
     if (!member) return;
-    const catalog = context.detail.unit.catalog.certificates || [];
+    const catalog = (context.detail.unit.catalog.certificates || []).filter(
+      (name) =>
+        !context.detail.unit.catalog.qualification_details?.some(
+          (item) => item.name === name && item.archived,
+        ) || member.certificates.split(';').includes(name),
+    );
     certificate ||= catalog[0];
     if (!certificate) {
-      feedback('Create qualifications in Ranks & qualifications first.');
+      feedback(
+        'No active qualifications are available. Create or restore one in Rank & qualification setup.',
+      );
       return;
     }
     const canEdit = context.detail.can_edit,
@@ -348,9 +355,18 @@
     form.elements.action.value = initial.action || 'grant';
     function fields() {
       const action = form.elements.action.value;
+      const available =
+        action === 'grant'
+          ? catalog.filter(
+              (name) =>
+                !context.detail.unit.catalog.qualification_details?.some(
+                  (item) => item.name === name && item.archived,
+                ),
+            )
+          : catalog;
       el('bulk-fields').innerHTML =
         action === 'grant' || action === 'revoke'
-          ? `<label class="unit-field">Qualification<select name="certificate" required>${catalog.map((c) => `<option ${c === initial.certificate ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>${!catalog.length ? '<p class="unit-warn">Create qualifications in Ranks & qualifications first.</p>' : ''}${action === 'grant' ? `<label class="unit-field">Award date<input type="date" name="awarded_on" required value="${esc(initial.awarded_on || metadata.today)}" max="${metadata.today}"></label><p class="feature-note">Members who already hold it keep their current award date and issuer.</p>` : ''}`
+          ? `<label class="unit-field">Qualification<select name="certificate" required>${available.map((c) => `<option ${c === initial.certificate ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>${!available.length ? '<p class="unit-warn">Create or restore a qualification in setup first.</p>' : ''}${action === 'grant' ? `<label class="unit-field">Award date<input type="date" name="awarded_on" required value="${esc(initial.awarded_on || metadata.today)}" max="${metadata.today}"></label><p class="feature-note">Members who already hold it keep their current award date and issuer.</p>` : ''}`
           : action === 'status'
             ? `<label class="unit-field">New status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${s === initial.status ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select></label><p class="feature-note">Changing status clears the previous LOA dates. Set date ranges in Edit member. Future event rosters update; past and active event expectations stay unchanged.</p>`
             : action === 'section'

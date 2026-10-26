@@ -42,7 +42,7 @@ Ordinary staff see only their assigned units. Panel administrators have broader 
 | --- | --- |
 | **Staff** | Manage rosters, notes, assignments, qualifications, promotion reviews, events, attendance, SOPs/loadouts, awards and campaigns in assigned units |
 | **Member** | Read their unit roster and published resources, acknowledge reading, RSVP and view their own profile; no staff notes or hosting controls |
-| **Unit administrator** | All Staff functions, plus staff access, rank rules/catalogs, structure, branding and permanent member deletion |
+| **Unit administrator** | All Staff functions, plus staff access, rank and qualification setup, structure, branding and permanent member deletion |
 
 There are no individual permission checkboxes. Existing Staff assignments keep the standard Staff permissions after the update. A unit role does not grant permission to start, stop, configure or update game servers; hosting access is assigned separately.
 
@@ -53,7 +53,7 @@ There are no individual permission checkboxes. Existing Staff assignments keep t
 | Overview | Dashboard, Analytics |
 | Roster | Roster, Qualifications, Promotions, Awards |
 | Operations | Events, Attendance, Campaigns, Linked servers |
-| Resources | SOPs & loadouts, Rank rules & catalogs |
+| Resources | SOPs & loadouts, Rank & qualification setup |
 | Administration | Structure, Accounts & access, Customization; available when permitted |
 
 The unit Dashboard summarizes staffing, upcoming events and work awaiting review. Analytics summarizes recorded trends. **Linked servers** provides basic health for the unit's servers; opening their hosting workspace needs separate access.
@@ -182,6 +182,19 @@ Unit administrators create and remove groups, sections and billets in **Administ
 
 ## 6. Qualifications and promotions
 
+### Set up rank structures and qualifications
+
+Open **Administration → Rank & qualification setup**. The two setup screens are separate from **Roster → Qualifications**, which records awards to people.
+
+1. Under **Qualifications**, choose **Add qualification**. Enter a name, optional abbreviation and description. Names remain stable after creation so existing award records and promotion rules keep their references.
+2. Under **Rank structures**, choose **New rank structure**, or select an existing structure. Marine, Medical and Officer structures keep independent rules. **Duplicate structure** creates an editable copy with its own name.
+3. Add ranks from lowest to highest. Use the up/down controls to change their order; the next rank follows automatically. Existing structures with custom links preserve those links unless you explicitly select **Use displayed rank order**.
+4. Open **Edit requirements & optional paygrade** on the destination rank. Enter the days since the previous promotion needed to reach it, then select required qualifications using searchable checkboxes. For Pfc → Cpl, put the time and qualifications on **Cpl**. Optional paygrade labels do not share rules between structures.
+5. Under **Preview eligibility**, select a member, a current rank for the simulation and their last promotion date. Choose **Explain eligibility** to see the next rank, time requirement date and missing qualifications using the unsaved rules. The preview changes no member records.
+6. Save the structure. Saving rules updates eligibility calculations only; staff must approve each actual promotion separately.
+
+Assigned structure/rank names cannot be renamed or removed until roster records are moved off them. Qualifications show who holds them and which ranks require them. Use **Edit details / archive** to archive a qualification: new awards are blocked, but existing awards and promotion requirements remain valid. Uncheck Archive to restore it. Abbreviations and descriptions can be edited without renaming the qualification.
+
 ### Grant or correct a qualification
 
 1. Open **Roster → Qualifications**.
@@ -215,7 +228,7 @@ Marine, Medical and Officer paths can have separate rules. An optional paygrade 
 
 The panel rechecks eligibility and record changes before applying. A stale record needs another review. **Promotions are never automatic.** Follow the unit's approval policy even when the panel says someone is eligible.
 
-Rank paths, time requirements and qualification names are maintained by permitted administrators in **Resources → Rank rules & catalogs**.
+Rank paths, time requirements and qualification names are maintained by permitted administrators in **Resources → Rank & qualification setup**.
 
 ## 7. Events and attendance
 
@@ -332,7 +345,7 @@ Removing unit staff access does not delete the login, remove the roster record o
 
 ### Structure and catalogs
 
-Create groups, sections and billets in Structure. Maintain independent rank paths, qualifications and position suggestions under Rank rules & catalogs. Review the effect of rule changes on existing members' eligibility.
+Create groups, sections and billets in Structure. Maintain independent rank paths, qualifications and position suggestions under Rank & qualification setup. Review the effect of rule changes on existing members' eligibility.
 
 ### Branding
 

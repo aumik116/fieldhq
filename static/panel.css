@@ -5419,3 +5419,16 @@ html[data-theme] #unit-sidebar [hidden] {
 .rank-chart-track > span { display: block; height: 100%; background: var(--accent); }
 .rank-chart-member-list { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 @media (max-width: 700px) { .units-page .rank-chart-row { gap: 7px; } }
+
+/* Rank and qualification setup: a readable ladder and focused editors. */
+#catalog-summary [data-catalog-view][aria-pressed='true'] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.rank-ladder { list-style: none; margin: 12px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--accent); }
+.rank-ladder li { position: relative; padding: 10px 14px; margin-bottom: 10px; background: var(--surface2); }
+.rank-ladder li::before { content: ''; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); left: -19px; top: 16px; }
+.rank-ladder p { margin: 5px 0; }
+.rank-ladder small { color: var(--muted); }
+.setup-rank > details { margin-top: 12px; }
+.setup-rank > details > .unit-field { margin-top: 10px; }
+.setup-rank [data-rank-qualifications] { max-height: 210px; overflow: auto; }
+.unit-checks label[hidden], .qualification-definition[hidden] { display: none; }
+#setup-preview-result { margin-top: 12px; }
