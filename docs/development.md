@@ -36,16 +36,3 @@ python3 -m black unit_common.py unit_sops.py units.py unit_resources.py unit_mem
 ```
 
 New Python runtime modules must be added to `PANEL_PY_FILES` in `install.sh`, so fresh installations and updates deploy the same files. When shared JavaScript interfaces change, update the relevant script cache versions together.
-
-## Regression checks
-
-The isolated backend tests use temporary configurations and databases. The self-service suite also starts a loopback HTTP server; the execution environment must permit local sockets.
-
-```bash
-PYTHONPATH=tests .test-deps/venv/bin/python -m unittest test_unit_self_service test_units
-node tests/frontend_regressions.cjs
-npm install --prefix .test-deps/dom --no-save --package-lock=false --ignore-scripts jsdom@26.1.0
-NODE_PATH="$PWD/.test-deps/dom/node_modules" node tests/unit_navigation.cjs
-```
-
-JSDOM is a development-only test dependency. It does not replace real browser layout checks. See [the local regression report](regression-2026-10-25.md) for tested workflows, framework compatibility and unresolved broad-suite failures.

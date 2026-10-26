@@ -15,3 +15,6 @@ config.env
 .panel-save-selection.json
 .panel-save-archives/
 instances/
+
+# Keep local test work out of this repository.
+/tests/
