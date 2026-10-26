@@ -61,6 +61,10 @@ The unit Dashboard summarizes staffing, upcoming events and work awaiting review
 If a button is missing or disabled, ask an administrator to check your unit role. Linking a server to the unit or linking your account to a member does not grant that permission.
 
 
+### Workspace navigation
+
+Unit pages use the same grouped sidebar pattern as server workspaces. Choose a unit at the top of the sidebar; permitted pages are always visible under group headings. On phones, use **Menu** to open navigation. **Hosting** and **Units** switch workspaces in the top bar; Help and account controls are on the right. All Servers is a full-width landing page without a server sidebar. Its attention strip shows confirmed server errors, unavailable status and low panel-disk space, with links to the affected server or Storage; it is hidden when clear. Panel administrators can open **Panel users** directly from the landing page.
+
 ### Member home and self-service
 
 Members use the same `/login` page as staff. A unit administrator creates the account under **Administration → Accounts & access** and links it to the correct roster member. Members land on **Overview → My unit**. Staff can open the same page to manage announcements, see document review reminders, and inspect event RSVPs.

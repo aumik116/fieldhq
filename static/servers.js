@@ -164,10 +164,16 @@ document.addEventListener('DOMContentLoaded', () => {
       Array.from(card?.querySelectorAll('[data-action]') || []).find(node => node.dataset.action === focusedAction)?.focus({preventScroll:true});
     }
     document.dispatchEvent(new Event('fleet-rows-rendered'));
-    const alerts = document.getElementById('overview-alerts'); alerts.replaceChildren();
-    const problems = servers.filter(attention); alerts.hidden = !problems.length;
-    for (const server of problems) { const link = element('a',server.name + ': ' + (server.error || 'Installation failed. Open progress to review and retry.')); link.href = server.state === 'ready' ? workspace(server) : '/setup?server='+encodeURIComponent(server.id); alerts.append(link); }
-    document.getElementById('overview-alert-count').textContent = problems.length;
+    const alerts = document.getElementById('overview-alerts');
+    const notices=servers.filter(attention).map(server=>({label:server.name+': '+(server.error||(server.status==='unavailable'?'Status unavailable':'Installation failed')),href:server.state==='ready'?workspace(server):'/setup?server='+encodeURIComponent(server.id),action:server.state==='ready'?'Open server':'View progress',severity:'error'}));
+    if(host?.disk_total>0&&Number.isFinite(host.disk_free)&&host.disk_free/host.disk_total<.2)notices.push({label:'Panel disk space below 20% free',action:'Open storage',severity:'warning'});
+    if(!alerts.contains(document.activeElement)){
+      alerts.replaceChildren();alerts.hidden=!notices.length;
+      if(notices.length){alerts.append(element('strong','Needs attention · '+notices.length,'attention-heading'));const list=element('div',null,'attention-items');
+        for(const notice of notices){const item=element('div',null,'attention-item '+notice.severity);item.append(element('span',notice.label));const action=element(notice.href?'a':'button',notice.action,'btn-logout');if(notice.href)action.href=notice.href;else{action.type='button';action.onclick=()=>document.getElementById('overview-storage').click();}item.append(action);list.append(item);}alerts.append(list);
+      }
+    }
+    document.getElementById('overview-alert-count').textContent = notices.length;
     document.getElementById('overview-cpu').textContent = Number.isFinite(host?.cpu_host) ? host.cpu_host.toFixed(1)+'%' : '—';
     document.getElementById('overview-ram').textContent = host?.ram_total > 0 && Number.isFinite(host.ram_used) ? (100*host.ram_used/host.ram_total).toFixed(1)+'%' : '—';
     document.getElementById('overview-ram-detail').textContent = host?.ram_total > 0 && Number.isFinite(host.ram_used) ? (host.ram_used/1024).toFixed(1)+' / '+(host.ram_total/1024).toFixed(1)+' GiB' : 'Waiting for a reading';
@@ -193,22 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!rows.contains(document.activeElement)) render(snapshots);
     renderEvents();
   });
-  let navigationServers = [];
-  const switcher = document.getElementById('fleet-switcher');
-  function updateNavigation() {
-    const server = navigationServers.find(item => item.id === switcher.value);
-    document.querySelectorAll('[data-fleet-panel]').forEach(link => {
-      const allowed = server && (server.permissions || []).includes(link.dataset.fleetPermission);
-      link.hidden = !allowed;
-      if (allowed) link.href = workspace(server) + '#' + link.dataset.fleetPanel;
-      else link.removeAttribute('href');
-    });
-  }
-  switcher.onchange = updateNavigation;
-  document.getElementById('fleet-nav-toggle').onclick = event => {
-    const open = document.body.classList.toggle('navigation-open');
-    event.currentTarget.setAttribute('aria-expanded', String(open));
-  };
   async function refresh(report = true) {
     if (loading) return; loading = true;
     const button = document.getElementById('overview-refresh'); button.disabled = true;
@@ -220,16 +210,6 @@ document.addEventListener('DOMContentLoaded', () => {
       for(const unit of fleetUnits)unitFilter.append(new Option(unit.name,unit.id));
       if(fleetUnits.some(u=>String(u.id)===unitSelection))unitFilter.value=unitSelection;
       const servers = [...(data.legacy_server ? [{id:'',name:data.legacy_server.name,state:'ready',permissions:data.legacy_server.permissions}] : []),...data.servers];
-      const previousSelection = switcher.value;
-      navigationServers = servers.filter(server => server.state === 'ready');
-      switcher.replaceChildren();
-      for (const server of navigationServers) {
-        const option = element('option', server.name); option.value = server.id; switcher.append(option);
-      }
-      switcher.disabled = !navigationServers.length;
-      if (!navigationServers.length) switcher.append(element('option', 'No ready servers'));
-      else if (navigationServers.some(server => server.id === previousSelection)) switcher.value = previousSelection;
-      updateNavigation();
       const activityServer = servers.find(server => (server.permissions || []).includes('activity'));
       const canReadActivity = permissions.includes('activity') || !!activityServer;
       const hostResult = await Promise.allSettled([read('/api/host-metrics'), canReadActivity ? read('/api/activity', permissions.includes('activity') ? undefined : activityServer.id) : Promise.resolve(null)]);
@@ -267,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('overview-filter').onchange = () => render(snapshots);
   document.getElementById('overview-refresh').onclick = () => refresh();
   document.getElementById('overview-logout').onclick = async () => { await postJson('/logout',{}); location.href = '/login'; };
-  read('/api/me').then(account => { permissions = account.panel_permissions || account.permissions || []; document.getElementById('overview-account').textContent = account.username; document.getElementById('overview-create').hidden = !permissions.includes('admin_config'); document.getElementById('server-cleanup-open').hidden=!permissions.includes('users'); return refresh(); }).catch(error => feedback.textContent = error.message);
+  read('/api/me').then(account => { permissions = account.panel_permissions || account.permissions || []; document.getElementById('overview-account').textContent = account.username; document.getElementById('fleet-panel-users').hidden=!permissions.includes('users'); document.getElementById('overview-create').hidden = !permissions.includes('admin_config'); document.getElementById('server-cleanup-open').hidden=!permissions.includes('users'); return refresh(); }).catch(error => feedback.textContent = error.message);
   timer = setInterval(() => { if (!document.hidden) refresh(); },10000);
   window.addEventListener('pagehide',() => clearInterval(timer));
 });
