@@ -412,3 +412,7 @@ Panel administrators can choose **Create demo unit** at the top of Units. Confir
 The demo contains 48 fictional members: company HQ, two platoons, four squads and eight teams. Leadership/support personnel hold 24 named billets; 24 troops belong directly to teams, and three billets are vacant. Six published SOPs, six sample kit references, qualification awards, promotion examples, staff notes, callsigns and Active/Reserve/LOA examples are included.
 
 The demo is an ordinary editable unit. It creates no passwords, player UUIDs, game servers or server links. To try Member access, create a login from one of the demo roster records and sign into that account separately. Sample kit references do not apply equipment in game. Keep real personnel and server links in your real units.
+
+Formation rosters are collapsible: companies/platoons start open and deeper formations start closed. Expand all / Collapse all controls affect the current view, and parent-path links open and jump to the parent formation. Search temporarily opens matching branches. Expansion choices are retained while the unit workspace remains open.
+
+Analytics includes an interactive current-rank bar chart. Filter by rank structure, then click a bar to see matching member names and open their staff records. Counts and percentages describe the current roster, independently of the historical date range.

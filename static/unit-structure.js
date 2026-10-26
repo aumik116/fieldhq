@@ -1,5 +1,6 @@
 // Formation and billet views. Mutations and permission checks stay with the unit workspace/API.
 window.UnitStructure = {
+  expanded: new Map(),
   index(detail) {
     const nodes = detail.structure || [],
       byId = new Map(nodes.map((n) => [n.id, n])),
@@ -157,6 +158,17 @@ window.UnitStructure = {
       const value = totals.get(node.id);
       return `${value.members} member${value.members === 1 ? '' : 's'}${value.slots ? ` · ${value.filled}/${value.slots} billets filled${value.slots > value.filled ? ` · ${value.slots - value.filled} open` : ''}` : ''}`;
     };
+    const expanded = this.expanded,
+      key = (id) => `${detail.unit.id}:${id}`;
+    function parents(node) {
+      const path = [];
+      let parent = index.byId.get(node.parent_id);
+      while (parent) {
+        path.unshift(parent);
+        parent = index.byId.get(parent.parent_id);
+      }
+      return path;
+    }
     function formation(node, depth = 0) {
       const childNodes = children.get(node.id) || [];
       const rows =
@@ -190,24 +202,58 @@ window.UnitStructure = {
         .map((child) => formation(child, depth + 1))
         .join('');
       if ((state.query || state.status) && !rows && !nested) return '';
-      const heading = `<div class="roster-formation-heading" style="--formation-depth:${Math.min(depth, 5)}"><div><${depth ? 'h3' : 'h2'}>${esc(node.name)}</${depth ? 'h3' : 'h2'}><span>${esc(counts(node))}</span></div></div>`;
+      const ancestry = parents(node);
+      const heading = `<summary class="roster-formation-heading"><span class="roster-disclosure" aria-hidden="true">▸</span><span class="roster-formation-identity"><strong>${esc(node.name)}</strong><span>${esc(counts(node))}</span>${ancestry.length ? `<span class="formation-breadcrumb" aria-label="Parent formations">${ancestry.map((parent) => `<button type="button" data-board-action="parent" data-node="${parent.id}">${esc(parent.name)}</button>`).join('<span aria-hidden="true"> / </span>')}</span>` : ''}</span></summary>`;
       const table = rows
         ? `<div class="billet-table roster-formation-table"><table><thead><tr><th>Billet</th><th>Rank</th><th>Name</th></tr></thead><tbody>${rows}</tbody></table></div>`
         : !nested
           ? '<p class="roster-formation-empty">No members or billets assigned.</p>'
           : '';
-      return heading + table + nested;
+      const open =
+        state.query ||
+        state.status ||
+        (expanded.has(key(node.id)) ? expanded.get(key(node.id)) : depth < 2);
+      return `<details class="roster-formation" id="roster-formation-${node.id}" data-formation="${node.id}" ${open ? 'open' : ''}>${heading}<div class="roster-formation-content">${table}${nested}</div></details>`;
     }
     const groups = state.group
       ? index.nodes.filter((n) => n.id === state.group)
       : children.get(null) || [];
-    root.innerHTML = `<div class="roster-formations">${groups.map((node) => formation(node)).join('') || '<p class="unit-empty">No matching formations. Use All members for the flat roster.</p>'}</div>`;
+    root.innerHTML = `<div class="unit-toolbar roster-disclosure-controls"><button type="button" data-board-action="expand">Expand all</button><button type="button" data-board-action="collapse">Collapse all</button></div><div class="roster-formations">${groups.map((node) => formation(node)).join('') || '<p class="unit-empty">No matching formations. Use All members for the flat roster.</p>'}</div>`;
+    root.querySelectorAll('[data-formation]').forEach((region) => {
+      region.ontoggle = () => {
+        if (!state.query && !state.status)
+          expanded.set(key(Number(region.dataset.formation)), region.open);
+      };
+    });
     root.onclick = (event) => {
       const button = event.target.closest('[data-board-action]');
       if (!button) return;
       const member = Number(button.dataset.member),
         node = Number(button.dataset.node);
       switch (button.dataset.boardAction) {
+        case 'expand':
+        case 'collapse':
+          root.querySelectorAll('[data-formation]').forEach((region) => {
+            region.open = button.dataset.boardAction === 'expand';
+            expanded.set(key(Number(region.dataset.formation)), region.open);
+          });
+          break;
+        case 'parent': {
+          event.preventDefault();
+          event.stopPropagation();
+          const target = root.querySelector(`#roster-formation-${node}`);
+          if (target) {
+            let region = target;
+            while (region && region !== root) {
+              if (region.tagName === 'DETAILS') region.open = true;
+              region = region.parentElement;
+            }
+            const heading = target.querySelector('summary');
+            heading.focus();
+            heading.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          break;
+        }
         case 'record':
           actions.record(member);
           break;

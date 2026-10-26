@@ -1860,7 +1860,8 @@
     loadUnit();
   };
   el('unit-refresh').onclick = () => loadListing();
-  el('unit-users').onclick = async () => {
+  el('unit-users').onclick = async (event) => {
+    event.preventDefault();
     el('panel-users').hidden = !el('panel-users').hidden;
     if (!el('panel-users').hidden) {
       await loadUsers();
@@ -1871,6 +1872,7 @@
   read('/api/me')
     .then((account) => {
       window.unitAccount = account;
+      el('unit-account-name').textContent = account.username;
       return loadListing(
         Number(new URLSearchParams(location.search).get('unit')),
       );

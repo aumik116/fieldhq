@@ -101,17 +101,15 @@
     }
   };
   function members(root) {
-    root
-      .querySelectorAll('[data-resource-member]')
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            document.dispatchEvent(
-              new CustomEvent('unit-open-member', {
-                detail: Number(b.dataset.resourceMember),
-              }),
-            )),
-      );
+    root.querySelectorAll('[data-resource-member]').forEach(
+      (b) =>
+        (b.onclick = () =>
+          document.dispatchEvent(
+            new CustomEvent('unit-open-member', {
+              detail: Number(b.dataset.resourceMember),
+            }),
+          )),
+    );
   }
 
   async function loadReferences(append = false) {
@@ -1037,6 +1035,68 @@
     }
   }
 
+  function renderRankDistribution(ranks) {
+    const root = el('rank-distribution-chart');
+    const total = ranks.reduce((sum, rank) => sum + rank.n, 0);
+    const tracks = [...new Set(ranks.map((rank) => rank.rank_track))];
+    let selection = null;
+    root.innerHTML = `<label class="unit-field">Rank structure<select id="rank-chart-track"><option value="">All structures</option>${tracks
+      .filter(Boolean)
+      .map((track) => `<option>${esc(track)}</option>`)
+      .join(
+        '',
+      )}</select></label><p class="feature-note">${total} current members · Click a bar to see members. Percentages use the whole current roster.</p><div id="rank-chart-bars" class="rank-chart-bars"></div><section id="rank-chart-members" aria-live="polite"></section>`;
+    function draw() {
+      const track = el('rank-chart-track').value;
+      const shown = ranks
+        .map((rank, id) => ({ ...rank, id }))
+        .filter((rank) => !track || rank.rank_track === track);
+      const peak = Math.max(1, ...shown.map((rank) => rank.n));
+      el('rank-chart-bars').innerHTML =
+        shown
+          .map(
+            (rank) =>
+              `<button type="button" class="rank-chart-row" data-rank-index="${rank.id}" aria-pressed="${selection === rank.id}" title="${esc([rank.rank_track, rank.rank].filter(Boolean).join(' · ') || 'No rank assigned')}: ${rank.n} members"><span>${esc(rank.rank || 'No rank assigned')}<small>${esc(rank.rank_track || 'No structure')}</small></span><span class="rank-chart-track" aria-hidden="true"><span style="width:${(rank.n / peak) * 100}%"></span></span><strong>${rank.n}<small>${total ? Math.round((rank.n / total) * 100) : 0}%</small></strong></button>`,
+          )
+          .join('') || '<p>No current roster members.</p>';
+      for (const button of el('rank-chart-bars').querySelectorAll(
+        '[data-rank-index]',
+      ))
+        button.onclick = () => {
+          selection =
+            selection === Number(button.dataset.rankIndex)
+              ? null
+              : Number(button.dataset.rankIndex);
+          draw();
+        };
+      const rank = selection === null ? null : ranks[selection];
+      const members = rank
+        ? context.detail.roster.filter(
+            (member) =>
+              !member.archived &&
+              member.rank === rank.rank &&
+              member.rank_track === rank.rank_track,
+          )
+        : [];
+      el('rank-chart-members').innerHTML = rank
+        ? `<h3>${esc([rank.rank_track, rank.rank].filter(Boolean).join(' · ') || 'No rank assigned')}</h3><div class="rank-chart-member-list">${members.map((member) => `<button type="button" class="member-record-link" data-rank-member="${member.id}">${esc(member.game_name)}</button>`).join('') || '<p>Refresh the unit to load the current member list.</p>'}</div>`
+        : '';
+      for (const button of el('rank-chart-members').querySelectorAll(
+        '[data-rank-member]',
+      ))
+        button.onclick = () =>
+          document.dispatchEvent(
+            new CustomEvent('unit-open-member', {
+              detail: Number(button.dataset.rankMember),
+            }),
+          );
+    }
+    el('rank-chart-track').onchange = () => {
+      selection = null;
+      draw();
+    };
+    draw();
+  }
   async function loadAnalytics() {
     if (!context) return;
     const current = epoch,
@@ -1066,7 +1126,8 @@
     const last = measured.at(-1),
       moves = data.movements;
     el('unit-analytics-content').innerHTML =
-      `<div class="unit-summary"><span>Roster at period end <strong>${last?.total ?? '—'}</strong></span><span>Added <strong>${moves.added || 0}</strong></span><span>Archived <strong>${moves.archived || 0}</strong></span><span>Removed <strong>${moves.removed || 0}</strong></span><span>Restored <strong>${moves.restored || 0}</strong></span><span>Cohort retention <strong>${data.retention === null ? '—' : data.retention + '%'}</strong></span></div><p class="feature-note">Strength tracking began ${data.tracking_since ? esc(dateTime(data.tracking_since)) : 'with this feature'}. Earlier dates have no inferred strength. Retention means ${data.retained} of ${data.cohort} members present at the measured starting point remained on the roster at period end; returning members count as retained. Additions/removals describe panel roster changes, not inferred real-world enlistment dates.</p><div class="unit-dashboard-grid"><section class="unit-block"><h2>Recorded unit strength</h2>${measured.length ? `<svg class="strength-chart" viewBox="0 0 800 210" role="img" aria-label="Unit strength trend from ${esc(measured[0].day)} to ${esc(last.day)}, ending at ${last.total} members"><line x1="20" y1="180" x2="780" y2="180" stroke="currentColor" opacity=".3"/><polyline fill="none" stroke="var(--accent)" stroke-width="3" points="${points}"/>${dots}<text x="20" y="18" fill="currentColor">Peak: ${peak} members</text><text x="20" y="205" fill="currentColor">${esc(measured[0].day)}</text><text x="650" y="205" fill="currentColor">${esc(last.day)}</text></svg>` : '<p>No strength history in this period.</p>'}<details><summary>Daily strength data</summary><div class="unit-table analytics-table"><table><thead><tr><th>Date</th><th>Active</th><th>Reserve</th><th>LOA</th><th>Total</th></tr></thead><tbody>${data.strength.map((d) => `<tr><td>${d.day}</td><td>${d.active ?? '—'}</td><td>${d.reserve ?? '—'}</td><td>${d.loa ?? '—'}</td><td>${d.total ?? '—'}</td></tr>`).join('')}</tbody></table></div></details></section><section class="unit-block"><h2>Finalized attendance trend</h2><p class="feature-note">Rates count expected, finalized Present/Absent decisions. Unknown and Excused are excluded. Present totals also show optional participation.</p>${data.turnout.map((e) => `<div class="turnout-row"><strong>${esc(e.name)}</strong><small>${esc(new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: data.timezone }).format(new Date(e.starts * 1000)))} · ${e.present} present · ${e.unknown} unknown</small><progress max="100" value="${e.rate ?? 0}" aria-label="${esc(e.name)} attendance rate"></progress><span>${e.rate === null ? 'No counted decisions' : e.rate + '%'} · ${e.counted} counted</span></div>`).join('') || '<p>No finalized attendance in this period.</p>'}</section><section class="unit-block"><h2>Current rank distribution</h2>${data.ranks.map((r) => `<p>${esc([r.rank_track, r.rank].filter(Boolean).join(' · ') || 'No rank assigned')} <strong>${r.n}</strong></p>`).join('') || '<p>No current roster members.</p>'}</section></div>`;
+      `<div class="unit-summary"><span>Roster at period end <strong>${last?.total ?? '—'}</strong></span><span>Added <strong>${moves.added || 0}</strong></span><span>Archived <strong>${moves.archived || 0}</strong></span><span>Removed <strong>${moves.removed || 0}</strong></span><span>Restored <strong>${moves.restored || 0}</strong></span><span>Cohort retention <strong>${data.retention === null ? '—' : data.retention + '%'}</strong></span></div><p class="feature-note">Strength tracking began ${data.tracking_since ? esc(dateTime(data.tracking_since)) : 'with this feature'}. Earlier dates have no inferred strength. Retention means ${data.retained} of ${data.cohort} members present at the measured starting point remained on the roster at period end; returning members count as retained. Additions/removals describe panel roster changes, not inferred real-world enlistment dates.</p><div class="unit-dashboard-grid"><section class="unit-block"><h2>Recorded unit strength</h2>${measured.length ? `<svg class="strength-chart" viewBox="0 0 800 210" role="img" aria-label="Unit strength trend from ${esc(measured[0].day)} to ${esc(last.day)}, ending at ${last.total} members"><line x1="20" y1="180" x2="780" y2="180" stroke="currentColor" opacity=".3"/><polyline fill="none" stroke="var(--accent)" stroke-width="3" points="${points}"/>${dots}<text x="20" y="18" fill="currentColor">Peak: ${peak} members</text><text x="20" y="205" fill="currentColor">${esc(measured[0].day)}</text><text x="650" y="205" fill="currentColor">${esc(last.day)}</text></svg>` : '<p>No strength history in this period.</p>'}<details><summary>Daily strength data</summary><div class="unit-table analytics-table"><table><thead><tr><th>Date</th><th>Active</th><th>Reserve</th><th>LOA</th><th>Total</th></tr></thead><tbody>${data.strength.map((d) => `<tr><td>${d.day}</td><td>${d.active ?? '—'}</td><td>${d.reserve ?? '—'}</td><td>${d.loa ?? '—'}</td><td>${d.total ?? '—'}</td></tr>`).join('')}</tbody></table></div></details></section><section class="unit-block"><h2>Finalized attendance trend</h2><p class="feature-note">Rates count expected, finalized Present/Absent decisions. Unknown and Excused are excluded. Present totals also show optional participation.</p>${data.turnout.map((e) => `<div class="turnout-row"><strong>${esc(e.name)}</strong><small>${esc(new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: data.timezone }).format(new Date(e.starts * 1000)))} · ${e.present} present · ${e.unknown} unknown</small><progress max="100" value="${e.rate ?? 0}" aria-label="${esc(e.name)} attendance rate"></progress><span>${e.rate === null ? 'No counted decisions' : e.rate + '%'} · ${e.counted} counted</span></div>`).join('') || '<p>No finalized attendance in this period.</p>'}</section><section class="unit-block"><h2>Current rank distribution</h2><div id="rank-distribution-chart"></div></section></div>`;
+    renderRankDistribution(data.ranks);
   }
   async function refresh() {
     if (!context) return;
