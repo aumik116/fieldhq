@@ -159,6 +159,43 @@ window.UnitCatalog = (() => {
         });
       },
     );
+    if (existing) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'member-delete-button';
+      remove.textContent = 'Delete qualification…';
+      remove.onclick = async () => {
+        remove.disabled = true;
+        try {
+          const result = await write(
+            `/api/units/${unitId}/qualifications/delete`,
+            { name: existing.name, revision: detail.unit.revision },
+          );
+          if (!remove.isConnected || !UnitUX.canLeave()) return;
+          const impact = result.impact;
+          open(
+            'Delete ' + existing.name,
+            `<p>This permanently removes the qualification and its active awards. Historical change records remain.</p><ul><li>${impact.members.length} member awards, including former members</li><li>${impact.ranks.length} promotion requirements</li><li>${impact.reading_audiences} required-reading audiences</li><li>${impact.references.length} document reference labels</li></ul>${impact.ranks.length ? '<p class="unit-warn">Removing promotion requirements can make members eligible sooner. Promotions still require staff approval.</p>' : ''}<details><summary>Show affected members and rules</summary><p>${esc(impact.members.map((member) => member.name + (member.former ? ' (former)' : '')).join(', ') || 'No member awards.')}</p><p>${esc(impact.ranks.map((rank) => rank.structure + ' · ' + rank.rank).join(', ') || 'No rank requirements.')}</p><p>${esc(impact.references.join(', ') || 'No document references.')}</p></details><label class="unit-field">Type ${esc(existing.name)} to confirm<input name="qualification_delete_name" required autocomplete="off"></label><p class="feature-note">Archive instead if you want to retain active awards and requirements.</p>`,
+            async () => {
+              await write(`/api/units/${unitId}/qualifications/delete`, {
+                name: existing.name,
+                revision: detail.unit.revision,
+                confirmed: true,
+                confirm_name: form.elements.qualification_delete_name.value,
+              });
+            },
+          );
+          form.querySelector('[type="submit"]').textContent =
+            'Delete qualification';
+        } catch (error) {
+          const alert = form.querySelector('[role="alert"]');
+          if (alert) alert.textContent = error.message;
+        } finally {
+          remove.disabled = false;
+        }
+      };
+      form.querySelector('#unit-dialog-body').append(remove);
+    }
     baseline();
   }
   function structure(options, existing = null, duplicate = false) {

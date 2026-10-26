@@ -169,7 +169,7 @@
                     const title = has
                       ? `Awarded: ${award?.awarded_on || 'Unknown'} · Issuer: ${award?.issuer || 'Unknown'}${award?.notes ? ' · ' + award.notes : ''}`
                       : 'Not held';
-                    return `<td><button type="button" class="qualification-cell ${has ? 'qualification-held' : 'qualification-missing'}" data-qual-member="${m.id}" data-qual-name="${esc(c)}" title="${esc(title)}" aria-label="${esc(m.game_name + ' · ' + c + ' · ' + (has ? 'Held' : 'Missing'))}">${has ? '✓' : '—'}</button>${has && !el('matrix-checks').checked ? `<small>${esc(award?.awarded_on || 'Date unknown')}</small>` : ''}</td>`;
+                    return `<td><button type="button" class="qualification-cell ${has ? 'qualification-held' : 'qualification-missing'}" data-qual-member="${m.id}" data-qual-name="${esc(c)}" title="${esc(title)}" aria-label="${esc(m.game_name + ' · ' + c + ' · ' + (has ? 'Held' : 'Missing'))}">${has ? (award?.expires_on && award.expires_on < metadata.today ? 'Expired' : '✓') : '—'}</button>${has && !el('matrix-checks').checked ? `<small>${esc(award?.awarded_on || 'Date unknown')}${award?.expires_on ? ' · Expires ' + esc(award.expires_on) : ''}</small>` : ''}</td>`;
                   })
                   .join('')}</tr>`,
             )
@@ -222,6 +222,7 @@
             const values = Object.fromEntries(new FormData(form));
             await write(`${base()}/roster/${member.id}/qualifications`, {
               ...values,
+              member_token: member.edit_token,
               revision,
             });
           }
@@ -232,7 +233,7 @@
         has = held(member).includes(chosen),
         award = awards(member).find((a) => a.certificate === chosen);
       el('qualification-award-fields').innerHTML =
-        `<p>${has ? 'Currently held' : 'Not held'} · Issuer: ${esc(award?.issuer || (has ? 'Unknown — existing record' : 'Defaults to your name in this unit; enter the original instructor if needed'))}</p>${canEdit ? `<label class="unit-field">Action<select name="action">${has ? '<option value="update">Update award details</option><option value="revoke">Revoke qualification</option>' : '<option value="grant">Grant qualification</option>'}</select></label>` : ''}<label class="unit-field">Award date<input type="date" name="awarded_on" value="${esc(has ? award?.awarded_on || '' : metadata.today)}" max="${metadata.today}" ${canEdit ? '' : 'disabled'}></label><label class="unit-field">Issuing staff / instructor<input name="issuer" maxlength="120" value="${esc(has ? award?.issuer || '' : metadata.actor)}" ${canEdit ? '' : 'disabled'} placeholder="Unknown if left blank"></label><label class="unit-field">Award notes<textarea name="notes" maxlength="1000" ${canEdit ? '' : 'disabled'}>${esc(award?.notes || '')}</textarea></label>${canEdit ? '<label class="unit-field">Change / revocation reason<textarea name="reason" maxlength="1000"></textarea></label>' : ''}<p class="feature-note">Grant/revoke changes affect promotion readiness. Earlier grant and revocation entries remain in the member timeline. The issuing name changes only when you edit it; the timeline separately records who saved the change.</p>`;
+        `<p>${has ? 'Currently held' : 'Not held'} · Issuer: ${esc(award?.issuer || (has ? 'Unknown — existing record' : 'Defaults to your name in this unit; enter the original instructor if needed'))}</p>${canEdit ? `<label class="unit-field">Action<select name="action">${has ? '<option value="update">Update award details</option><option value="revoke">Revoke qualification</option>' : '<option value="grant">Grant qualification</option>'}</select></label>` : ''}<label class="unit-field">Award date<input type="date" name="awarded_on" value="${esc(has ? award?.awarded_on || '' : metadata.today)}" max="${metadata.today}" ${canEdit ? '' : 'disabled'}></label><label class="unit-field">Expires on (optional)<input type="date" name="expires_on" value="${esc(award?.expires_on || '')}" ${canEdit ? '' : 'disabled'}></label><label class="unit-field">Issuing staff / instructor<input name="issuer" maxlength="120" value="${esc(has ? award?.issuer || '' : metadata.actor)}" ${canEdit ? '' : 'disabled'} placeholder="Unknown if left blank"></label><label class="unit-field">Award notes<textarea name="notes" maxlength="1000" ${canEdit ? '' : 'disabled'}>${esc(award?.notes || '')}</textarea></label>${canEdit ? '<label class="unit-field">Change / revocation reason<textarea name="reason" maxlength="1000"></textarea></label>' : ''}<p class="feature-note">Grant/revoke changes affect promotion readiness. Earlier grant and revocation entries remain in the member timeline. The issuing name changes only when you edit it; the timeline separately records who saved the change.</p>`;
       if (canEdit) {
         const setRequired = () => {
           form.elements.awarded_on.required =
@@ -297,7 +298,7 @@
         members
           .map((m) => {
             const p = m.promotion;
-            return `<tr><td>${memberButton(m)}</td><td>${esc(m.rank || 'Not assigned')}</td><td>${esc(p.next_rank || 'No next rank')}</td><td>${p.eligible ? '<strong class="unit-good">Eligible for review</strong>' : 'Not eligible'}<small>${esc(p.next_date || (p.next_rank ? 'Set last promotion date' : 'Configure a rank path'))}</small></td><td>${esc(p.missing.join(', ') || (p.next_rank ? 'Qualifications met' : 'No advancement path'))}${p.next_date && p.next_date > metadata?.today ? '<small>Time requirement not met</small>' : ''}</td><td>${context.detail.can_edit ? `<button type="button" data-promote="${m.id}" ${p.eligible && metadata ? '' : 'disabled'}>Review promotion</button>` : 'View only'}</td></tr>`;
+            return `<tr><td>${memberButton(m)}</td><td>${esc(m.rank || 'Not assigned')}</td><td>${esc(p.next_rank || 'No next rank')}</td><td>${p.eligible ? '<strong class="unit-good">Eligible for review</strong>' : 'Not eligible'}<small>${esc(p.next_date || (p.next_rank ? 'Set last promotion date' : 'Configure a rank path'))}</small></td><td>${esc(p.missing.join(', ') || (p.next_rank ? 'Qualifications met' : 'No advancement path'))}${p.next_date && p.next_date > metadata?.today ? '<small>Time requirement not met</small>' : ''}</td><td>${context.detail.can_edit ? `<button type="button" data-promote="${m.id}" ${p.next_rank && metadata ? '' : 'disabled'}>Review promotion</button>` : 'View only'}</td></tr>`;
           })
           .join('') ||
         '<tr><td colspan="6" class="unit-empty">No members match this review queue.</td></tr>'
@@ -311,23 +312,50 @@
   }
   function promotionEditor(memberId) {
     if (saving || !metadata) return;
-    const member = context.detail.roster.find((m) => m.id === memberId),
+    const member = context.detail.roster.find((item) => item.id === memberId),
       revision = context.detail.unit.revision;
-    if (!member?.promotion.eligible || !context.detail.can_edit) return;
+    if (!member?.promotion.next_rank || !context.detail.can_edit) return;
     const target = member.promotion.next_rank;
     open(
       `Review promotion — ${member.game_name}`,
-      `<div class="unit-block"><p><strong>${esc(member.rank_track)}</strong></p><p>${esc(member.rank)} → <strong>${esc(target)}</strong></p><p>Last promotion date will become <strong>${metadata.today}</strong> (panel date).</p><p>Time and qualification requirements are met. The server rechecks eligibility when you confirm.</p></div><label class="unit-field">Staff review note<textarea name="reason" required maxlength="1000"></textarea></label><label><input type="checkbox" name="confirmed" required> I approve this promotion and the new promotion date.</label>`,
+      `<p>${esc(member.rank_track)} · ${esc(member.rank)} → <strong>${esc(target)}</strong></p><label class="unit-field">Effective promotion date<input type="date" name="effective_date" required max="${metadata.today}" value="${metadata.today}"></label><p class="feature-note">Use the actual effective date when catching up on paperwork. Time and recorded qualification dates are rechecked for that date.</p><div id="promotion-date-preview" role="status"></div><label class="unit-field">Staff review note<textarea name="reason" required maxlength="1000"></textarea></label><label><input type="checkbox" name="confirmed" required> I approve this promotion and its effective date.</label>`,
       async () => {
         await write(`${base()}/roster/${member.id}/promote`, {
           revision,
+          member_token: member.edit_token,
+          effective_date: form.elements.effective_date.value,
           confirm_rank: target,
           confirm_date: metadata.today,
-          reason: new FormData(form).get('reason'),
+          reason: form.elements.reason.value,
         });
       },
       'Confirm promotion',
     );
+    let request = 0;
+    async function preview() {
+      const serial = ++request,
+        button = form.querySelector('[type="submit"]'),
+        region = el('promotion-date-preview');
+      button.disabled = true;
+      try {
+        const data = await write(
+          `${base()}/roster/${member.id}/promotion-preview`,
+          { effective_date: form.elements.effective_date.value },
+        );
+        if (serial !== request || !region.isConnected) return;
+        const p = data.promotion;
+        region.textContent = p.eligible
+          ? `Eligible on ${data.effective_date}. Approval remains manual.`
+          : `Not eligible on this date. ${p.next_date ? 'Time requirement date: ' + p.next_date + '. ' : 'Set the previous promotion date. '}${p.missing.length ? 'Missing/invalid qualifications: ' + p.missing.join(', ') : ''}`;
+        button.disabled = !p.eligible;
+      } catch (error) {
+        if (serial === request && region.isConnected)
+          region.textContent = error.message;
+      }
+    }
+    form.elements.effective_date.onchange = preview;
+    preview();
+    baseline = sign();
   }
   function bulkEditor(initial = {}) {
     if (saving && !initial.fromPreview) return;
@@ -373,7 +401,7 @@
           : catalog;
       el('bulk-fields').innerHTML =
         action === 'grant' || action === 'revoke'
-          ? `<label class="unit-field">Qualification<select name="certificate" required>${available.map((c) => `<option ${c === initial.certificate ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>${!available.length ? '<p class="unit-warn">Create or restore a qualification in setup first.</p>' : ''}${action === 'grant' ? `<label class="unit-field">Award date<input type="date" name="awarded_on" required value="${esc(initial.awarded_on || metadata.today)}" max="${metadata.today}"></label><p class="feature-note">Members who already hold it keep their current award date and issuer.</p>` : ''}`
+          ? `<label class="unit-field">Qualification<select name="certificate" required>${available.map((c) => `<option ${c === initial.certificate ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>${!available.length ? '<p class="unit-warn">Create or restore a qualification in setup first.</p>' : ''}${action === 'grant' ? `<label class="unit-field">Award date<input type="date" name="awarded_on" required value="${esc(initial.awarded_on || metadata.today)}" max="${metadata.today}"></label><label class="unit-field">Instructor<input name="issuer" maxlength="120" value="${esc(initial.issuer || metadata.actor)}"></label><label class="unit-field">Expires on (optional)<input type="date" name="expires_on" value="${esc(initial.expires_on || '')}"></label><p class="feature-note">Members who already hold it keep their current award date, expiry and issuer. Renew existing awards through Manage qualifications.</p>` : ''}`
           : action === 'status'
             ? `<label class="unit-field">New status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${s === initial.status ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select></label><p class="feature-note">Changing status clears the previous LOA dates. Set date ranges in Edit member. Future event rosters update; past and active event expectations stay unchanged.</p>`
             : action === 'section'
@@ -427,7 +455,7 @@
           : s.certificates.split(';').filter(Boolean).join(', ') || 'None';
     open(
       'Review bulk changes',
-      `<p><strong>${changed}</strong> of ${preview.changes.length} selected members will change.</p><p class="member-record-note">Reason: ${esc(payload.reason)}</p>${payload.action === 'grant' ? `<p>Award date: ${esc(payload.awarded_on)}</p>` : ''}<div class="unit-table bulk-preview-table"><table><thead><tr><th>Member</th><th>Before</th><th>After</th></tr></thead><tbody>${preview.changes.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(describe(c.before))}</td><td>${esc(describe(c.after))}${JSON.stringify(c.before) === JSON.stringify(c.after) ? '<small>No change</small>' : ''}</td></tr>`).join('')}</tbody></table></div><button type="button" id="bulk-back">Back to selection</button><label class="bulk-confirm"><input type="checkbox" name="confirm" required> Apply exactly these changes to the listed members.</label>`,
+      `<p><strong>${changed}</strong> of ${preview.changes.length} selected members will change.</p><p class="member-record-note">Reason: ${esc(payload.reason)}</p>${payload.action === 'grant' ? `<p>Award date: ${esc(payload.awarded_on)} · Instructor: ${esc(payload.issuer || metadata.actor)} · Expiry: ${esc(payload.expires_on || 'None')}</p>` : ''}<div class="unit-table bulk-preview-table"><table><thead><tr><th>Member</th><th>Before</th><th>After</th></tr></thead><tbody>${preview.changes.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(describe(c.before))}</td><td>${esc(describe(c.after))}${JSON.stringify(c.before) === JSON.stringify(c.after) ? '<small>No change</small>' : ''}</td></tr>`).join('')}</tbody></table></div><button type="button" id="bulk-back">Back to selection</button><label class="bulk-confirm"><input type="checkbox" name="confirm" required> Apply exactly these changes to the listed members.</label>`,
       async () => {
         if (!changed)
           throw new Error(
@@ -504,7 +532,10 @@
     promotionEditor(e.detail),
   );
   document.addEventListener('unit-manage-qualification', (e) =>
-    qualificationEditor(e.detail),
+    qualificationEditor(
+      typeof e.detail === 'object' ? e.detail.member_id : e.detail,
+      typeof e.detail === 'object' ? e.detail.certificate : '',
+    ),
   );
   el('roster-bulk').onclick = () => bulkEditor();
   for (const id of [

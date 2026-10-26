@@ -215,13 +215,14 @@
       if (current === context.unitId) region.setAttribute('aria-busy', 'false');
     }
   }
-  function eventEditor(event = null) {
+  function eventEditor(event = null, duplicate = false) {
     if (saving) return;
     const futureVersions = eventDetail?.future_versions;
-    const editing = !!event,
+    const editing = !!event && !duplicate,
       tz = event?.timezone || zone(),
       start =
-        event?.starts || Math.ceil((Date.now() / 1000 + 3600) / 300) * 300;
+        (!duplicate && event?.starts) ||
+        Math.ceil((Date.now() / 1000 + 3600) / 300) * 300;
     try {
       new Intl.DateTimeFormat(undefined, { timeZone: tz });
     } catch (_) {
@@ -230,12 +231,37 @@
     }
     const linked =
       context.listing.units.find((u) => u.id === context.unitId)?.servers || [];
+    const containers = context.detail.structure.filter(
+      (node) => node.kind !== 'billet',
+    );
+    const selected = new Set(JSON.parse(event?.formation_ids || '[]'));
+    const formationPath = (id) => {
+      const names = [];
+      let node = containers.find((item) => item.id === id);
+      while (node) {
+        names.unshift(node.name);
+        node = containers.find((item) => item.id === node.parent_id);
+      }
+      return names.join(' / ');
+    };
+    const audience = `<fieldset class="unit-block"><legend>Event roster</legend><label class="unit-field">Invite<select name="audience_mode"><option value="all">Whole unit</option><option value="formations" ${selected.size ? 'selected' : ''}>Selected formations and their descendants</option></select></label><div id="event-formations">${containers.map((node) => `<label class="event-formation-choice"><input type="checkbox" name="formation_id" value="${node.id}" ${selected.has(node.id) ? 'checked' : ''}> ${esc(formationPath(node.id))}</label>`).join('') || '<p>Create formations in Manage structure first.</p>'}</div></fieldset>`;
     open(
-      editing ? 'Edit event' : 'Schedule event',
-      `<div class="unit-form-grid">${field('Event name', 'name', event?.name || '')}${field('Event type', 'category', event?.category || 'Operation')}${field('Starts (in event timezone)', 'starts', localValue(start, tz), 'datetime-local')}${field('Timezone', 'timezone', tz)}${field('Duration (minutes)', 'duration', event ? (event.ends - event.starts) / 60 : 120, 'number')}<label class="unit-field">Server<select name="server_id">${linked.map((id) => `<option value="${esc(id)}" ${event?.server_id === id ? 'selected' : ''}>${esc(serverName(id))}</option>`).join('')}</select></label>${field('Location / map', 'location', event?.location || '')}<label class="unit-field wide">Briefing (visible to unit members)<textarea name="briefing" maxlength="4000">${esc(event?.briefing || '')}</textarea></label>${!editing ? '<label class="unit-field">Repeat<select name="recurrence"><option value="none">Does not repeat</option><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="monthly">Monthly</option></select></label>' + field('Number of occurrences', 'count', 1, 'number') : event.recurrence !== 'none' ? '<label class="unit-field">Apply changes to<select name="scope"><option value="occurrence">This occurrence only</option><option value="future">This and later scheduled occurrences</option></select></label>' : ''}</div><label><input type="checkbox" name="tracked" ${event?.tracked === 0 ? '' : 'checked'}> Track UUID attendance</label><p class="feature-note">Event timezone preserves local start times across daylight-saving changes. Monthly repeats use the last day when needed. Roster changes update future event lists; the list freezes at the start. LOA is excused and Reserve is optional.</p>${!linked.length ? '<p class="unit-warn">Link a server in Unit settings before scheduling.</p>' : ''}`,
+      duplicate ? 'Duplicate event' : editing ? 'Edit event' : 'Schedule event',
+      `<div class="unit-form-grid">${field('Event name', 'name', event?.name || '')}${field('Event type', 'category', event?.category || 'Operation')}${field('Starts (in event timezone)', 'starts', localValue(start, tz), 'datetime-local')}${field('Timezone', 'timezone', tz)}<label class="unit-field">Set event end using<select name="end_mode"><option value="time">End date & time</option><option value="duration">Duration</option></select></label>${field('Ends (in event timezone)', 'ends', localValue(event ? start + (event.ends - event.starts) : start + 7200, tz), 'datetime-local')}${field('Duration (minutes)', 'duration', event ? (event.ends - event.starts) / 60 : 120, 'number')}<label class="unit-field">Server<select name="server_id" required>${event && !linked.includes(event.server_id) ? '<option value="" selected disabled>Choose a linked server</option>' : ''}${linked.map((id) => `<option value="${esc(id)}" ${event?.server_id === id ? 'selected' : ''}>${esc(serverName(id))}</option>`).join('')}</select></label>${field('Location / map', 'location', event?.location || '')}<label class="unit-field wide">Briefing (visible to unit members)<textarea name="briefing" maxlength="4000">${esc(event?.briefing || '')}</textarea></label>${!editing ? '<label class="unit-field">Repeat<select name="recurrence"><option value="none">Does not repeat</option><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="monthly">Monthly</option></select></label>' + field('Number of occurrences', 'count', 1, 'number') : event.recurrence !== 'none' ? '<label class="unit-field">Apply changes to<select name="scope"><option value="occurrence">This occurrence only</option><option value="future">This and later scheduled occurrences</option></select></label>' : ''}</div>${audience}<label><input type="checkbox" name="tracked" ${event?.tracked === 0 ? '' : 'checked'}> Track UUID attendance</label><p class="feature-note">Event timezone preserves local start times across daylight-saving changes. Monthly repeats use the last day when needed. Roster changes update future event lists; the list freezes at the start. LOA is excused and Reserve is optional.</p>${!linked.length ? '<p class="unit-warn">Link a server in Unit settings before scheduling.</p>' : ''}`,
       async () => {
         const data = Object.fromEntries(new FormData(form));
-        data.duration = Number(data.duration);
+        data.formation_ids =
+          data.audience_mode === 'formations'
+            ? [...form.querySelectorAll('[name="formation_id"]:checked')].map(
+                (input) => Number(input.value),
+              )
+            : [];
+        if (data.audience_mode === 'formations' && !data.formation_ids.length)
+          throw new Error('Select at least one formation.');
+        delete data.formation_id;
+        delete data.audience_mode;
+        if (data.end_mode === 'duration') data.duration = Number(data.duration);
+        delete data.end_mode;
         data.count = Number(data.count || 1);
         data.tracked = new FormData(form).has('tracked');
         if (editing)
@@ -248,12 +274,32 @@
         else await write(`${base()}/events`, data);
       },
     );
+    const audienceMode = () => {
+      const selected = form.elements.audience_mode.value === 'formations';
+      el('event-formations').hidden = !selected;
+      form
+        .querySelectorAll('[name="formation_id"]')
+        .forEach((input) => (input.disabled = !selected));
+    };
+    form.elements.audience_mode.onchange = audienceMode;
+    audienceMode();
     form.elements.name.required = true;
     form.elements.name.maxLength = 120;
     form.elements.category.required = true;
     form.elements.category.maxLength = 60;
     form.elements.starts.required = true;
     form.elements.timezone.required = true;
+    function endMode() {
+      const timed = form.elements.end_mode.value === 'time';
+      form.elements.ends.disabled = !timed;
+      form.elements.ends.required = timed;
+      form.elements.ends.closest('label').hidden = !timed;
+      form.elements.duration.disabled = timed;
+      form.elements.duration.required = !timed;
+      form.elements.duration.closest('label').hidden = timed;
+    }
+    form.elements.end_mode.onchange = endMode;
+    endMode();
     form.elements.duration.min = 5;
     form.elements.duration.max = 1440;
     form.elements.duration.step = 1;
@@ -291,7 +337,7 @@
       const c = data.coverage;
       open(
         e.name,
-        `<div class="event-detail-meta"><span>${esc(e.category)} · ${esc(serverName(e.server_id))}</span><strong>${esc(format(e.starts, e.timezone))} – ${esc(format(e.ends, e.timezone))}</strong><small>${esc(e.timezone)} · ${esc(e.state)}${e.recurrence !== 'none' ? ' · ' + esc(e.recurrence) + ' series' : ''}</small><span>${esc(e.location || 'No location set')}</span></div>${e.briefing ? `<p class="member-record-note">${esc(e.briefing)}</p>` : ''}<div class="unit-toolbar">${data.can_events && e.state === 'scheduled' ? `${e.starts > now ? '<button type="button" id="event-edit">Edit event</button>' : ''}<button type="button" id="event-cancel">Cancel event</button>` : ''}${data.can_attendance && e.tracked && e.ends <= now && e.state !== 'cancelled' ? `<button type="button" id="event-finalize">${e.state === 'finalized' ? 'Reopen for correction' : 'Finalize attendance'}</button>` : ''}<button type="button" id="event-reload">Refresh evidence</button></div>${e.tracked ? `<div class="unit-block ${c.needs_review ? 'unit-warn' : ''}"><strong>${e.starts > now ? 'Collector starts with the event' : c.needs_review ? 'Collector gaps — review required' : 'Collector observations received'}</strong><p>${c.successful} successful samples / ${c.samples} total · Largest gap ${Math.ceil(c.largest_gap_seconds / 60)} min</p><p>Last successful sample: ${c.last_success ? esc(format(c.last_success)) : 'None'}</p><small>Presence is sampled from the live UUID player list about every 30 seconds. Brief connections between samples may need manual confirmation. No observation means Unknown, never an automatic absence.</small></div><h3>Event roster</h3><div class="unit-table event-member-table"><table><thead><tr><th>Member</th><th>Expectation</th><th>UUID evidence</th><th>Outcome</th></tr></thead><tbody>${data.members.map((m) => `<tr><td>${esc(m.game_name)}<small>${esc(m.identity || 'No linked UUID at event start')}</small></td><td>${esc(m.exemption || 'Expected')}</td><td>${m.evidence ? `${esc(format(m.evidence.first_seen))}<small>Last seen ${esc(format(m.evidence.last_seen))} · ${m.evidence.samples} samples</small>` : 'Not observed'}</td><td>${review ? `<select name="attendance:${m.member_id}" data-attendance-member="${m.member_id}" data-initial="${m.resolved}" aria-label="Attendance for ${esc(m.game_name)}">${['present', 'absent', 'excused', 'unknown'].map((s) => `<option value="${s}" ${m.resolved === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select>` : `<span class="attendance-outcome outcome-${m.resolved}">${esc(m.resolved)}</span>`}${m.reason ? `<small>${esc(m.reason)}</small>` : ''}${m.manual ? '<small>Staff decision</small>' : ''}</td></tr>`).join('') || '<tr><td colspan="4">No members on this event’s roster.</td></tr>'}</tbody></table></div>${review ? '<label class="unit-field">Reason for attendance changes<textarea name="reason" maxlength="1000" placeholder="Required when changing outcomes"></textarea></label>' : ''}<details class="unit-block"><summary>Unlinked / non-roster UUIDs (${data.unlinked.length})</summary><p class="feature-note">These players are not credited to a member automatically. Link their recorded UUID in the roster for future events; correct this event manually if appropriate.</p>${data.unlinked.map((p) => `<p>${esc(p.name)}<small>${esc(p.identity)} · ${esc(format(p.first_seen))}</small></p>`).join('') || '<p>None observed.</p>'}</details>` : '<p>Attendance tracking is disabled for this event.</p>'}<details class="unit-block"><summary>Event and attendance audit (${data.audit.length}${data.audit.length === 200 ? '+' : ''})</summary>${data.audit.map((a) => `<div class="event-audit-row"><strong>${esc(a.actor)} · ${esc(a.action)}</strong><small>${esc(format(a.created_at))}${a.member_id ? ' · Member #' + a.member_id : ''}</small>${a.reason ? `<p>${esc(a.reason)}</p>` : ''}<details><summary>Before / after</summary><pre>${esc(JSON.stringify(a.before_value, null, 2))}\n→\n${esc(JSON.stringify(a.after_value, null, 2))}</pre></details></div>`).join('')}</details>`,
+        `<div class="event-detail-meta"><span>${esc(e.category)} · ${esc(serverName(e.server_id))}</span><strong>${esc(format(e.starts, e.timezone))} – ${esc(format(e.ends, e.timezone))}</strong><small>${esc(e.timezone)} · ${esc(e.state)}${e.recurrence !== 'none' ? ' · ' + esc(e.recurrence) + ' series' : ''}</small><span>${esc(e.location || 'No location set')}</span></div>${e.briefing ? `<p class="member-record-note">${esc(e.briefing)}</p>` : ''}<div class="unit-toolbar">${data.can_events && e.state === 'scheduled' ? `${e.starts > now ? '<button type="button" id="event-edit">Edit event</button>' : ''}<button type="button" id="event-cancel">Cancel event</button>` : ''}${data.can_attendance && e.tracked && e.ends <= now && e.state !== 'cancelled' ? `<button type="button" id="event-finalize">${e.state === 'finalized' ? 'Reopen for correction' : 'Finalize attendance'}</button>` : ''}${data.can_events ? '<button type="button" id="event-duplicate">Duplicate event</button>' : ''}<button type="button" id="event-reload">Refresh evidence</button></div>${e.tracked ? `<div class="unit-block ${c.needs_review ? 'unit-warn' : ''}"><strong>${e.starts > now ? 'Collector starts with the event' : c.needs_review ? 'Collector gaps — review required' : 'Collector observations received'}</strong><p>${c.successful} successful samples / ${c.samples} total · Largest gap ${Math.ceil(c.largest_gap_seconds / 60)} min</p><p>Last successful sample: ${c.last_success ? esc(format(c.last_success)) : 'None'}</p><small>Presence is sampled from the live UUID player list about every 30 seconds. Brief connections between samples may need manual confirmation. No observation means Unknown, never an automatic absence.</small></div><h3>Event roster</h3><div class="unit-table event-member-table"><table><thead><tr><th>Member</th><th>Expectation</th><th>UUID evidence</th><th>Outcome</th></tr></thead><tbody>${data.members.map((m) => `<tr><td>${esc(m.game_name)}<small>${esc(m.identity || 'No linked UUID at event start')}</small></td><td>${esc(m.exemption || 'Expected')}</td><td>${m.evidence ? `${esc(format(m.evidence.first_seen))}<small>Last seen ${esc(format(m.evidence.last_seen))} · ${m.evidence.samples} samples</small>` : 'Not observed'}</td><td>${review ? `<select name="attendance:${m.member_id}" data-attendance-member="${m.member_id}" data-initial="${m.resolved}" aria-label="Attendance for ${esc(m.game_name)}">${['present', 'absent', 'excused', 'unknown'].map((s) => `<option value="${s}" ${m.resolved === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select>` : `<span class="attendance-outcome outcome-${m.resolved}">${esc(m.resolved)}</span>`}${m.reason ? `<small>${esc(m.reason)}</small>` : ''}${m.manual ? '<small>Staff decision</small>' : ''}</td></tr>`).join('') || '<tr><td colspan="4">No members on this event’s roster.</td></tr>'}</tbody></table></div>${review ? '<label class="unit-field">Reason for attendance changes<textarea name="reason" maxlength="1000" placeholder="Required when changing outcomes"></textarea></label>' : ''}<details class="unit-block"><summary>Unlinked / non-roster UUIDs (${data.unlinked.length})</summary><p class="feature-note">These players are not credited to a member automatically. Link their recorded UUID in the roster for future events; correct this event manually if appropriate.</p>${data.unlinked.map((p) => `<p>${esc(p.name)}<small>${esc(p.identity)} · ${esc(format(p.first_seen))}</small></p>`).join('') || '<p>None observed.</p>'}</details>` : '<p>Attendance tracking is disabled for this event.</p>'}<details class="unit-block"><summary>Event and attendance audit (${data.audit.length}${data.audit.length === 200 ? '+' : ''})</summary>${data.audit.map((a) => `<div class="event-audit-row"><strong>${esc(a.actor)} · ${esc(a.action)}</strong><small>${esc(format(a.created_at))}${a.member_id ? ' · Member #' + a.member_id : ''}</small>${a.reason ? `<p>${esc(a.reason)}</p>` : ''}<details><summary>Before / after</summary><pre>${esc(JSON.stringify(a.before_value, null, 2))}\n→\n${esc(JSON.stringify(a.after_value, null, 2))}</pre></details></div>`).join('')}</details>`,
         review
           ? async () => {
               const changes = [
@@ -315,6 +361,9 @@
           : null,
       );
       el('event-edit')?.addEventListener('click', () => eventEditor(e));
+      el('event-duplicate')?.addEventListener('click', () => {
+        if (UnitUX.canLeave()) eventEditor(e, true);
+      });
       el('event-reload').onclick = () => {
         if (
           sign() !== baseline &&

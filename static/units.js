@@ -13,6 +13,7 @@
     rosterView = '',
     rosterUnit = null,
     activeTab = 'roster';
+  let recordGeneration = 0;
   const pageNotes = {
     home: 'Required reading, upcoming events, announcements and review reminders.',
     profile:
@@ -22,6 +23,7 @@
     dashboard: 'Staffing, upcoming operations and work awaiting review.',
     analytics: 'Recorded strength, retention and finalized attendance trends.',
     roster: 'Members, primary billets and individual records.',
+    meeting: 'Promotion reviews, vacancies, renewals and staff follow-ups.',
     qualifications:
       'Who holds each qualification, and where coverage is missing.',
     promotions: 'Review readiness and approve promotions manually.',
@@ -99,6 +101,11 @@
   form.onsubmit = async (e) => {
     e.preventDefault();
     if (dialogSaving) return;
+    if (dialog.dataset.record && form.querySelector('.record-note-editor')) {
+      el('unit-dialog-error').textContent =
+        'Save or cancel the note edits first.';
+      return;
+    }
     dialogSaving = true;
     try {
       await UnitUX.save(dialog, dialogSave, async (result) => {
@@ -117,7 +124,9 @@
   form.addEventListener('input', () => {
     if (dialog.dataset.record)
       form.querySelector('[type="submit"]').disabled =
-        dialogSaving || !form.elements.record_note?.value.trim();
+        dialogSaving ||
+        !!form.querySelector('.record-note-editor') ||
+        !form.elements.record_note?.value.trim();
   });
   function unitSettings(create = false) {
     const unit = create ? {} : detail.unit,
@@ -229,11 +238,14 @@
         : 'Assignments';
       el('structure-add-group').hidden = !detail.can_staff;
       el('structure-billet-types').hidden = !detail.can_staff;
+      el('structure-templates').hidden = !detail.can_staff;
       el('roster-structure').hidden = !detail.can_edit;
       el('roster-structure').textContent = detail.can_staff
         ? 'Manage structure'
         : 'Manage assignments';
       el('roster-export').hidden = detail.role === 'member';
+      el('unit-backup').hidden = !detail.can_staff;
+      el('unit-backup').href = `/api/units/${unitId}/backup`;
       el('roster-bulk').hidden = !detail.can_edit;
       el('roster-status').querySelector('[value="archived"]').hidden =
         detail.role === 'member';
@@ -269,11 +281,13 @@
       const params = new URLSearchParams(location.search);
       params.set('unit', unitId);
       history.replaceState(null, '', '/units?' + params);
+      return true;
     } catch (error) {
       if (requested === unitId) {
         el('unit-workspace').hidden = true;
         feedback(error.message);
       }
+      return false;
     } finally {
       if (requested === unitId)
         el('unit-workspace').setAttribute('aria-busy', 'false');
@@ -283,6 +297,7 @@
     const query = el('roster-search').value.trim().toLowerCase(),
       status = el('roster-status').value;
     renderGroupTabs();
+    UnitRoster.rendered(rosterView);
     const current = detail.roster.filter((m) => !m.archived);
     el('roster-summary').innerHTML =
       ['active', 'reserve', 'loa']
@@ -366,7 +381,7 @@
       rows
         .map((m) => {
           const p = m.promotion;
-          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button>${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}<small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td title="${esc(m.rank)}">${esc(m.rank_display || m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
+          return `<tr><td>${rosterView === 'unassigned' && detail.can_edit ? `<input type="checkbox" data-roster-select="${m.id}" aria-label="Select ${esc(m.game_name)}" ${UnitRoster.isSelected(m.id) ? 'checked' : ''}>` : ''}<button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button>${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}<small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td title="${esc(m.rank)}">${esc(m.rank_display || m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
         })
         .join('') ||
       '<tr><td colspan="8" class="unit-empty">No members match. Add a member to start.</td></tr>';
@@ -394,6 +409,7 @@
   });
   el('structure-search').oninput = renderStructure;
   el('structure-billet-types').onclick = billetTypesEditor;
+  el('structure-templates').onclick = formationTemplatesEditor;
   function structurePath(id) {
     const nodes = new Map((detail.structure || []).map((n) => [n.id, n]));
     const parts = [];
@@ -537,7 +553,13 @@
     baseline = signature();
   }
   function placementEditor(parentId = null, initialMember = null) {
-    const selected = new Set(initialMember ? [initialMember] : []),
+    const selected = new Set(
+        Array.isArray(initialMember)
+          ? initialMember
+          : initialMember
+            ? [initialMember]
+            : [],
+      ),
       members = detail.roster.filter((m) => !m.archived);
     openDialog(
       'Place members in a formation',
@@ -574,6 +596,7 @@
       ))
         row.hidden = !row.textContent.toLowerCase().includes(q);
     };
+    if (Array.isArray(initialMember)) form.elements.parent_id.required = true;
     count();
   }
   function memberLoginEditor(member) {
@@ -684,6 +707,7 @@
           structureEditor(node.kind, node.parent_id, node);
         },
         copy: copyStructureEditor,
+        template: saveFormationTemplate,
         remove: removeStructure,
         add(id) {
           structureEditor('section', id);
@@ -699,15 +723,22 @@
       },
     );
   }
+  let structureOrdering = false;
+  UnitUX.registerDraft({ dirty: () => false, busy: () => structureOrdering });
   async function orderStructure(id, direction) {
+    if (structureOrdering) return;
+    structureOrdering = true;
     try {
       await write(`/api/units/${unitId}/structure/${id}/order`, {
         direction,
         revision: detail.unit.revision,
       });
+      structureOrdering = false;
       await loadListing(unitId);
     } catch (error) {
       feedback(error.message);
+    } finally {
+      structureOrdering = false;
     }
   }
   function billetTypeOptions(selected = null) {
@@ -775,6 +806,88 @@
     el('billet-entry-add').onclick = row;
     baseline = signature();
   }
+  function saveFormationTemplate(node) {
+    openDialog(
+      'Save formation template',
+      `${field('Template name', 'name', node.name)}<p>Stores this formation and its child formations/billets. Members, assignments and callsigns are not copied.</p>`,
+      async () => {
+        await write(`/api/units/${unitId}/formation-templates`, {
+          name: values().name,
+          node_id: node.id,
+          revision: detail.unit.revision,
+        });
+      },
+    );
+  }
+  async function formationTemplatesEditor() {
+    const current = unitId;
+    try {
+      const result = await read(`/api/units/${unitId}/formation-templates`);
+      if (current !== unitId || !UnitUX.canLeave()) return;
+      if (!result.templates.length) {
+        openDialog(
+          'Formation templates',
+          '<p>No saved templates. Select a formation in Structure and choose Save as template.</p>',
+          async () => false,
+        );
+        form.querySelector('[type="submit"]').hidden = true;
+        return;
+      }
+      openDialog(
+        'Apply formation template',
+        `<label class="unit-field">Template<select name="template_id">${result.templates.map((item) => `<option value="${item.id}">${esc(item.name)} · ${item.formations} formations · ${item.billets} billets</option>`).join('')}</select></label>${field('New formation name', 'name', result.templates[0].name)}<label class="unit-field">Inside<select name="parent_id"><option value="">New top-level group</option>${detail.structure
+          .filter((node) => node.kind !== 'billet')
+          .map(
+            (node) =>
+              `<option value="${node.id}">${esc(structurePath(node.id))}</option>`,
+          )
+          .join(
+            '',
+          )}</select></label><p>Creates an empty layout with unfilled billets. No member assignments or callsigns are copied.</p><button type="button" id="template-delete">Delete selected saved template</button>`,
+        async () => {
+          const data = values(),
+            saved = await write(
+              `/api/units/${unitId}/formation-templates/${Number(data.template_id)}/apply`,
+              {
+                name: data.name,
+                parent_id: Number(data.parent_id) || null,
+                revision: detail.unit.revision,
+              },
+            );
+          structureSelection = saved.id;
+        },
+      );
+      form.elements.template_id.onchange = () => {
+        const selected = result.templates.find(
+          (item) => item.id === Number(form.elements.template_id.value),
+        );
+        form.elements.name.value = selected.name;
+      };
+      el('template-delete').onclick = async () => {
+        const selected = result.templates.find(
+          (item) => item.id === Number(form.elements.template_id.value),
+        );
+        if (
+          !confirm(
+            `Delete template ${selected.name}? Existing formations remain.`,
+          )
+        )
+          return;
+        try {
+          await write(
+            `/api/units/${unitId}/formation-templates/${selected.id}/delete`,
+            { revision: detail.unit.revision },
+          );
+          dialog.close();
+          await loadListing(unitId);
+        } catch (error) {
+          el('unit-dialog-error').textContent = error.message;
+        }
+      };
+    } catch (error) {
+      feedback(error.message);
+    }
+  }
   function copyStructureEditor(node) {
     const totals = UnitStructure.index(detail).totals.get(node.id);
     openDialog(
@@ -805,16 +918,23 @@
     );
   }
   async function memberRecord(memberId) {
-    const requestedUnit = unitId;
+    const requestedUnit = unitId,
+      recordToken = unitId + ':' + memberId + ':' + ++recordGeneration;
     const url = `/api/units/${requestedUnit}/roster/${memberId}/record`;
     try {
       const record = await read(url);
-      if (requestedUnit !== unitId || dialog.open) return;
+      if (
+        requestedUnit !== unitId ||
+        dialog.open ||
+        recordToken !== unitId + ':' + memberId + ':' + recordGeneration
+      )
+        return;
       const m = record.member,
         p = m.promotion;
+      m.catalog_snapshot = record.catalog;
       openDialog(
         `${m.game_name} — member record`,
-        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.assignment_path || m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>LOA dates</span><strong>${esc([m.loa_from || 'No start date', m.loa_until || 'No end date'].join(' → '))}</strong></div><div><span>Callsign</span><strong>${esc(m.effective_callsign || 'Not assigned')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary placement & qualifications</h3><p>${esc(m.assignment_path || m.billet_path || 'No primary placement assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status / LOA</option><option value="callsign">Callsign</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
+        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.assignment_path || m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>LOA dates</span><strong>${esc([m.loa_from || 'No start date', m.loa_until || 'No end date'].join(' → '))}</strong></div><div><span>Callsign</span><strong>${esc(m.effective_callsign || 'Not assigned')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary placement & qualifications</h3><p>${esc(m.assignment_path || m.billet_path || 'No primary placement assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status / LOA</option><option value="callsign">Callsign</option><option value="profile">Profile fields</option><option value="temporary">Temporary cover</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Staff with roster editing permission can delete a note after confirmation.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
         async () => {
           await write(url, { note: form.elements.record_note.value });
           form.elements.record_note.value = '';
@@ -839,13 +959,13 @@
         login.onclick = () => memberLoginEditor(m);
         el('unit-dialog-body').prepend(login);
       }
-      dialog.dataset.record = requestedUnit + ':' + memberId;
+      dialog.dataset.record = recordToken;
       button.disabled = true;
       read(`/api/units/${requestedUnit}/roster/${memberId}/attendance`)
         .then((data) => {
           if (
             !dialog.open ||
-            dialog.dataset.record !== requestedUnit + ':' + memberId ||
+            dialog.dataset.record !== recordToken ||
             !el('member-attendance-history')
           )
             return;
@@ -859,7 +979,7 @@
         })
         .catch((error) => {
           if (
-            dialog.dataset.record === requestedUnit + ':' + memberId &&
+            dialog.dataset.record === recordToken &&
             el('member-attendance-history')
           )
             el('member-attendance-history').textContent = error.message;
@@ -878,7 +998,7 @@
           if (
             number !== awardRequest ||
             !dialog.open ||
-            dialog.dataset.record !== requestedUnit + ':' + memberId
+            dialog.dataset.record !== recordToken
           )
             return;
           const root = el('member-award-history');
@@ -896,7 +1016,7 @@
         } catch (error) {
           if (
             number === awardRequest &&
-            dialog.dataset.record === requestedUnit + ':' + memberId &&
+            dialog.dataset.record === recordToken &&
             el('member-award-history')
           )
             el('member-award-history').textContent = error.message;
@@ -927,6 +1047,9 @@
               .filter(Boolean)
               .join(' · ') || 'No rank'
           );
+        if (kind === 'temporary')
+          return value ? JSON.stringify(value) : 'No temporary cover';
+        if (kind === 'profile') return JSON.stringify(value);
         if (kind === 'callsign')
           return value.effective_callsign || value.callsign || 'No callsign';
         if (kind === 'billet')
@@ -986,7 +1109,7 @@
           if (
             number !== timelineRequest ||
             !dialog.open ||
-            dialog.dataset.record !== requestedUnit + ':' + memberId
+            dialog.dataset.record !== recordToken
           )
             return;
           const root = el('member-change-timeline');
@@ -995,6 +1118,8 @@
             baseline: 'Existing record at upgrade',
             created: 'Member record created',
             callsign: 'Callsign changed',
+            profile: 'Profile fields changed',
+            temporary: 'Temporary cover changed',
             rank: 'Rank / promotion date changed',
             billet: 'Billet assignment / transfer',
             status: 'Membership status changed',
@@ -1015,7 +1140,7 @@
         } catch (error) {
           if (
             number === timelineRequest &&
-            dialog.dataset.record === requestedUnit + ':' + memberId &&
+            dialog.dataset.record === recordToken &&
             el('member-change-timeline')
           )
             el('member-change-timeline').textContent = error.message;
@@ -1037,11 +1162,15 @@
       function showNotes(data, append) {
         if (
           !dialog.open ||
-          dialog.dataset.record !== requestedUnit + ':' + memberId ||
+          dialog.dataset.record !== recordToken ||
           !el('member-record-history')
         )
           return;
         if (!append) el('member-record-history').replaceChildren();
+        else
+          el('member-record-history')
+            .querySelector('[data-notes-empty]')
+            ?.remove();
         for (const note of data.notes) {
           const item = document.createElement('article');
           item.className = 'unit-block';
@@ -1056,7 +1185,120 @@
           content.className = 'member-record-note';
           content.textContent = note.note;
           heading.append(author, date);
-          item.append(heading, content);
+          const edited = document.createElement('small');
+          function showEdited() {
+            edited.textContent = note.edited_at
+              ? `Edited by ${note.edited_by} · ${new Date(note.edited_at * 1000).toLocaleString()}`
+              : '';
+          }
+          showEdited();
+          item.append(edited);
+
+          if (record.can_write) {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.textContent = 'Edit note';
+            edit.onclick = () => {
+              if (dialogSaving || item.querySelector('.record-note-editor'))
+                return;
+              const editor = document.createElement('div');
+              editor.className = 'record-note-editor';
+              const label = document.createElement('label');
+              label.className = 'unit-field';
+              label.textContent = 'Edit note';
+              const input = document.createElement('textarea');
+              input.name = 'edit_note_' + note.id;
+              input.maxLength = 4000;
+              input.required = true;
+              input.rows = 5;
+              input.value = note.note;
+              label.append(input);
+              const save = document.createElement('button');
+              save.type = 'button';
+              save.textContent = 'Save note';
+              const cancel = document.createElement('button');
+              cancel.type = 'button';
+              cancel.textContent = 'Cancel';
+              function finish() {
+                editor.remove();
+                edit.disabled = false;
+                content.hidden = false;
+                form.dispatchEvent(new Event('input'));
+              }
+              cancel.onclick = () => {
+                if (!dialogSaving) finish();
+              };
+              save.onclick = async () => {
+                if (dialogSaving || !input.reportValidity()) return;
+                dialogSaving = true;
+                editor.inert = true;
+                try {
+                  const result = await write(`${url}/${note.id}/edit`, {
+                    note: input.value,
+                    version: note.version,
+                  });
+                  if (dialog.dataset.record !== recordToken) return;
+                  Object.assign(note, result);
+                  content.textContent = note.note;
+                  showEdited();
+                  finish();
+                  el('member-record-status').textContent = 'Note updated.';
+                } catch (error) {
+                  if (dialog.dataset.record === recordToken)
+                    el('unit-dialog-error').textContent = error.message;
+                } finally {
+                  dialogSaving = false;
+                  editor.inert = false;
+                  form.dispatchEvent(new Event('input'));
+                }
+              };
+              editor.append(label, save, cancel);
+              item.append(editor);
+              content.hidden = true;
+              edit.disabled = true;
+              input.focus();
+              form.dispatchEvent(new Event('input'));
+            };
+            heading.append(edit);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = 'Delete note';
+            remove.onclick = async () => {
+              if (
+                dialogSaving ||
+                !confirm(
+                  `Permanently delete this note by ${note.author_name}? This cannot be undone.`,
+                )
+              )
+                return;
+              dialogSaving = true;
+              remove.disabled = true;
+              try {
+                await write(`${url}/${note.id}/delete`, { confirmed: true });
+                if (dialog.dataset.record !== recordToken) return;
+                item.remove();
+                if (!el('member-record-history').children.length) {
+                  const empty = document.createElement('p');
+                  empty.dataset.notesEmpty = '';
+                  empty.textContent = before
+                    ? 'No notes on this page. Load older notes below.'
+                    : 'No staff notes yet.';
+                  el('member-record-history').append(empty);
+                }
+                el('member-record-status').textContent = 'Note deleted.';
+              } catch (error) {
+                if (dialog.dataset.record === recordToken)
+                  el('unit-dialog-error').textContent = error.message;
+              } finally {
+                dialogSaving = false;
+                remove.disabled = false;
+                form.dispatchEvent(new Event('input'));
+              }
+            };
+            heading.append(remove);
+          }
+
+          item.prepend(heading, content);
           el('member-record-history').append(item);
         }
         if (!el('member-record-history').children.length)
@@ -1071,7 +1313,7 @@
         try {
           showNotes(await read(url + '?before=' + before), true);
         } catch (error) {
-          if (dialog.dataset.record === requestedUnit + ':' + memberId)
+          if (dialog.dataset.record === recordToken)
             el('unit-dialog-error').textContent = error.message;
         } finally {
           button.disabled = false;
@@ -1162,7 +1404,7 @@
     }
     const qual = document.createElement('div');
     qual.className = 'unit-table';
-    qual.innerHTML = `<table><thead><tr><th>Qualification</th><th>Awarded</th><th>Instructor</th><th>Notes</th></tr></thead><tbody>${(record.qualifications || []).map((q) => `<tr><td>${esc(q.certificate)}</td><td>${esc(q.awarded_on || 'Unknown')}</td><td>${esc(q.issuer || 'Unknown')}</td><td>${esc(q.notes || '—')}</td></tr>`).join('') || '<tr><td colspan="4">No qualifications recorded.</td></tr>'}</tbody></table>`;
+    qual.innerHTML = `<table><thead><tr><th>Qualification</th><th>Awarded</th><th>Expires</th><th>Instructor</th><th>Notes</th></tr></thead><tbody>${(record.qualifications || []).map((q) => `<tr><td>${esc(q.certificate)}</td><td>${esc(q.awarded_on || 'Unknown')}</td><td>${esc(q.expires_on || 'No expiry')}</td><td>${esc(q.issuer || 'Unknown')}</td><td>${esc(q.notes || '—')}</td></tr>`).join('') || '<tr><td colspan="5">No qualifications recorded.</td></tr>'}</tbody></table>`;
     panes.get('Qualifications').prepend(qual);
     if (record.can_write) {
       const edit = document.createElement('button');
@@ -1185,6 +1427,33 @@
         );
       };
       panes.get('Overview').append(promote);
+    }
+    if (record.can_write) {
+      for (const [label, event] of [
+        ['Compare record versions', 'unit-compare-member'],
+        ['Temporary cover', 'unit-temporary-member'],
+        ['Add follow-up', 'unit-followup-member'],
+      ]) {
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.textContent = label;
+        action.onclick = () =>
+          document.dispatchEvent(new CustomEvent(event, { detail: member.id }));
+        panes
+          .get(label === 'Compare record versions' ? 'History' : 'Overview')
+          .append(action);
+      }
+    }
+    const covers = (detail.temporary_covers || []).filter(
+      (item) => item.member_id === member.id,
+    );
+    if (covers.length) {
+      const note = document.createElement('p');
+      note.textContent =
+        'Temporary cover: ' +
+        covers.map((item) => structurePath(item.billet_id)).join('; ') +
+        '. Primary placement remains unchanged.';
+      panes.get('Overview').append(note);
     }
     const access = panes.get('Access');
     if (member.panel_user_id) {
@@ -1243,7 +1512,7 @@
   }
 
   function memberEditor(member = {}) {
-    const catalog = detail.unit.catalog;
+    const catalog = member.catalog_snapshot || detail.unit.catalog;
     openDialog(
       member.id ? 'Edit roster member' : 'Add roster member',
       `<div class="unit-form-grid">${field('Game name', 'game_name', member.game_name || '')}${field('Discord handle', 'discord', member.discord || '')}${field('Personal callsign override (optional)', 'callsign', member.callsign || '')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity ? [member.identity] : [], member.identity || '', 'Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${(member.scheduled_status || member.status) === s ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s === 'active' ? 'Active' : 'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options(
@@ -1293,10 +1562,17 @@
               : null
             : (member.panel_user_id ?? null),
           revision: detail.unit.revision,
-          ...(member.id ? { id: member.id } : {}),
+          ...(member.id
+            ? { id: member.id, member_token: member.edit_token }
+            : {}),
         });
       },
     );
+    form.elements.game_name.required = true;
+    form.elements.game_name.oninput = () =>
+      form.elements.game_name.setCustomValidity(
+        form.elements.game_name.value.trim() ? '' : 'Enter a game name',
+      );
     function setRankOptions(selected = '') {
       const structure = (catalog.rank_structures || []).find(
         (s) => s.name === el('member-rank-track').value,
@@ -1382,7 +1658,13 @@
           if (player.identity === selected) continue;
           const option = document.createElement('option');
           option.value = player.identity;
-          option.textContent = `${player.name} · ${player.identity}`;
+          const used = detail.roster.find(
+            (item) =>
+              item.id !== member.id &&
+              item.identity?.toLowerCase() === player.identity.toLowerCase(),
+          );
+          option.disabled = !!used;
+          option.textContent = `${player.name} · ${player.identity}${used ? ' · Already linked to ' + used.game_name + (used.archived ? ' (former member)' : '') : ''}`;
           select.append(option);
         }
         el('identity-note').textContent = data.more
@@ -1399,9 +1681,21 @@
     };
     identities();
     el('member-identity').onchange = () => {
-      if (!form.elements.game_name.value) {
+      const used = detail.roster.find(
+        (item) =>
+          item.id !== member.id &&
+          item.identity &&
+          item.identity.toLowerCase() ===
+            el('member-identity').value.toLowerCase(),
+      );
+      el('member-identity').setCustomValidity(
+        used ? 'Already linked to ' + used.game_name : '',
+      );
+      if (!form.elements.game_name.value.trim()) {
         const option = el('member-identity').selectedOptions[0];
-        form.elements.game_name.value = option.textContent.split(' · ')[0];
+        if (el('member-identity').value && option)
+          form.elements.game_name.value = option.textContent.split(' · ')[0];
+        form.elements.game_name.oninput();
       }
     };
   }
@@ -1695,12 +1989,45 @@
         });
       },
     );
+  el('roster-print').onclick = () => {
+    if (!detail || !UnitUX.canLeave()) return;
+    const prefs = UnitStructure.config(detail).display;
+    openDialog(
+      'Print roster',
+      `<label class="unit-field">Layout<select name="print_layout"><option value="formations">Formation roster</option><option value="flat">All members</option></select></label><label><input type="checkbox" name="print_callsigns" ${prefs.callsigns ? 'checked' : ''}> Include callsigns</label><label><input type="checkbox" name="print_qualifications" ${prefs.qualifications ? 'checked' : ''}> Include qualifications</label><label><input type="checkbox" name="print_status" checked> Include Active / Reserve / LOA</label><p class="feature-note">Prints all current members. Staff notes, Discord handles, UUIDs and login details are excluded. Your browser can also save the printout as a PDF.</p>`,
+      () => {
+        UnitRosterPrint.print(detail, {
+          layout: form.elements.print_layout.value,
+          callsigns: form.elements.print_callsigns.checked,
+          qualifications: form.elements.print_qualifications.checked,
+          status: form.elements.print_status.checked,
+        });
+        return false;
+      },
+    );
+    form.querySelector('[type="submit"]').textContent = 'Print';
+  };
   el('roster-structure').onclick = () => selectTab('structure');
   el('structure-add-group').onclick = () => structureEditor('group');
   let brandDirty = false,
     brandSaving = false;
   const brandForm = el('unit-brand-form'),
     previewURLs = {};
+  const brandCrops = Object.fromEntries(
+    ['icon', 'banner'].map((kind) => [
+      kind,
+      UnitBrandCrop.create(
+        kind,
+        el('unit-' + kind + '-preview'),
+        () => {
+          brandDirty = true;
+        },
+        (message) => {
+          el('unit-brand-error').textContent = message;
+        },
+      ),
+    ]),
+  );
   function applyBranding() {
     brandDirty = false;
     const brand = detail.unit.branding || {},
@@ -1723,10 +2050,8 @@
     for (const kind of ['icon', 'banner']) {
       if (previewURLs[kind]) URL.revokeObjectURL(previewURLs[kind]);
       delete previewURLs[kind];
-      const img = el('unit-' + kind + '-preview');
-      img.hidden = !brand[kind];
-      if (brand[kind]) img.src = url(kind);
-      else img.removeAttribute('src');
+      if (brand[kind]) brandCrops[kind].set(url(kind));
+      else brandCrops[kind].clear();
     }
   }
   brandForm.oninput = () => {
@@ -1734,22 +2059,20 @@
   };
   for (const kind of ['icon', 'banner'])
     brandForm.elements[kind].onchange = () => {
-      const file = brandForm.elements[kind].files[0],
-        img = el('unit-' + kind + '-preview');
+      const file = brandForm.elements[kind].files[0];
       if (!file) return;
       if (
-        file.size > 4 * 1024 * 1024 ||
+        file.size > 20 * 1024 * 1024 ||
         !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
       ) {
         el('unit-brand-error').textContent =
-          'Choose a PNG, JPEG or WebP image up to 4 MB.';
+          'Choose a PNG, JPEG or WebP image up to 20 MB.';
         brandForm.elements[kind].value = '';
         return;
       }
       if (previewURLs[kind]) URL.revokeObjectURL(previewURLs[kind]);
       previewURLs[kind] = URL.createObjectURL(file);
-      img.src = previewURLs[kind];
-      img.hidden = false;
+      brandCrops[kind].set(previewURLs[kind], true);
       brandForm.elements['remove_' + kind].checked = false;
       el('unit-brand-error').textContent = '';
       brandDirty = true;
@@ -1763,8 +2086,15 @@
     if (button.disabled) return;
     button.disabled = true;
     brandSaving = true;
+    brandForm.inert = true;
     try {
       const data = new FormData(brandForm);
+      for (const kind of ['icon', 'banner']) {
+        // Only cropped replacements go to the server; untouched originals stay stored.
+        data.delete(kind);
+        if (!brandForm.elements['remove_' + kind].checked)
+          await brandCrops[kind].append(data);
+      }
       data.set('revision', detail.unit.revision);
       await readJson(await postForm(`/api/units/${unitId}/branding`, data));
       brandDirty = false;
@@ -1775,12 +2105,14 @@
       el('unit-brand-error').textContent = error.message;
     } finally {
       brandSaving = false;
+      brandForm.inert = false;
       button.disabled = false;
     }
   };
   UnitUX.registerDraft({
     dirty: () => brandDirty,
-    busy: () => brandSaving,
+    busy: () =>
+      brandSaving || Object.values(brandCrops).some((crop) => crop.busy()),
     discard: () => applyBranding(),
   });
   el('unit-demo').onclick = () => {
@@ -1819,6 +2151,94 @@
     loadUnit();
   };
   el('unit-refresh').onclick = () => loadListing();
+  UnitRoster.connect({
+    current: () => unitId,
+    view: () => rosterView,
+    render: renderRoster,
+    place: (ids) => placementEditor(null, ids),
+    openMember: memberRecord,
+    busy: () =>
+      loading ||
+      el('unit-workspace').getAttribute('aria-busy') === 'true' ||
+      [...document.querySelectorAll('dialog[open]')].some(
+        (region) => region !== dialog || !region.dataset.record,
+      ),
+    recordId: () =>
+      dialog.open && dialog.dataset.record
+        ? Number(dialog.dataset.record.split(':')[1])
+        : null,
+    refresh: async () => {
+      if (
+        loading ||
+        UnitUX.isBusy() ||
+        el('unit-workspace').getAttribute('aria-busy') === 'true'
+      )
+        return false;
+      if (!UnitUX.canLeave()) return false;
+      const id =
+        dialog.open && dialog.dataset.record
+          ? Number(dialog.dataset.record.split(':')[1])
+          : null;
+      const tab = dialog.querySelector(
+        '[role="tab"][aria-selected="true"]',
+      )?.id;
+      document
+        .querySelectorAll('dialog[open]')
+        .forEach((region) => region.close());
+      const refreshed = await loadUnit();
+      if (!refreshed) return false;
+      if (
+        id &&
+        detail.can_edit &&
+        detail.roster.some((member) => member.id === id)
+      ) {
+        await memberRecord(id);
+        if (tab) document.getElementById(tab)?.click();
+      }
+      return true;
+    },
+  });
+  UnitPersonnel.connect({
+    unit: () => unitId,
+    form,
+    open: openDialog,
+    write,
+    reload: () => loadListing(unitId),
+    member: memberRecord,
+    ensure: async (revision) => {
+      if (detail.unit.revision === revision) return true;
+      if (UnitUX.isBusy() || !UnitUX.canLeave()) return false;
+      document
+        .querySelectorAll('dialog[open]')
+        .forEach((region) => region.close());
+      return await loadUnit();
+    },
+    assign: (billet) => {
+      if (UnitUX.canLeave()) assignmentEditor(billet);
+    },
+    jump: (id) => {
+      if (!UnitUX.canLeave()) return;
+      document
+        .querySelectorAll('dialog[open]')
+        .forEach((region) => region.close());
+      rosterView = 'board';
+      el('roster-search').value = '';
+      el('roster-status').value = '';
+      selectTab('roster');
+      UnitStructure.jump(el('roster-hierarchy'), id);
+    },
+    qualification: (id, certificate) => {
+      if (!UnitUX.canLeave()) return;
+      document
+        .querySelectorAll('dialog[open]')
+        .forEach((region) => region.close());
+      document.dispatchEvent(
+        new CustomEvent('unit-manage-qualification', {
+          detail: { member_id: id, certificate },
+        }),
+      );
+    },
+  });
   read('/api/me')
     .then((account) => {
       window.unitAccount = account;

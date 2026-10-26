@@ -17,6 +17,7 @@ TOPICS={
     'admin-activity':('server','activity-history'), 'admin-notifications':('server','server-notifications'),
     'account':('server','your-account-and-theme'), 'setup':('server','4-'),
     'unit-home':('staff','member-home-and-self-service'), 'unit-profile':('staff','member-home-and-self-service'), 'unit-dashboard':('staff','3-'), 'unit-roster':('staff','4-'), 'unit-structure':('staff','5-'),
+    'unit-meeting':('staff','meeting-agenda'),
     'unit-qualifications':('staff','grant-or-correct-a-qualification'), 'unit-promotions':('staff','review-a-promotion'),
     'unit-events':('staff','create-an-event'), 'unit-attendance':('staff','review-correct-and-finalize'),
     'unit-references':('staff','sops-and-loadouts'), 'unit-awards':('staff','awards'),

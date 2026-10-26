@@ -11,6 +11,9 @@ def initialize(db):
         conn.execute(
             "CREATE TABLE IF NOT EXISTS unit_billet_types(id INTEGER PRIMARY KEY AUTOINCREMENT,unit_id INTEGER NOT NULL,name TEXT NOT NULL COLLATE NOCASE,UNIQUE(unit_id,name))"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS unit_formation_templates(id INTEGER PRIMARY KEY AUTOINCREMENT,unit_id INTEGER NOT NULL,name TEXT NOT NULL,layout TEXT NOT NULL,UNIQUE(unit_id,name))"
+        )
         columns = {r["name"] for r in conn.execute("PRAGMA table_info(unit_structure)")}
         if "billet_type_id" not in columns:
             conn.execute("ALTER TABLE unit_structure ADD COLUMN billet_type_id INTEGER")
@@ -35,7 +38,15 @@ def initialize(db):
 def install(
     api, db, access, revision, endpoints, structure_node, roster_state, record_change
 ):
-    names = {"unit_structure_copy", "unit_structure_billets", "unit_billet_types_save"}
+    names = {
+        "unit_structure_copy",
+        "unit_structure_billets",
+        "unit_billet_types_save",
+        "unit_formation_templates",
+        "unit_formation_template_save",
+        "unit_formation_template_apply",
+        "unit_formation_template_delete",
+    }
     endpoints.update(names)
     api.PANEL_WIDE_ENDPOINTS.update(names)
     from panel_features import MUTATIONS
@@ -290,3 +301,208 @@ def install(
                 ),
                 400,
             )
+
+    @api.app.get("/api/units/<int:unit_id>/formation-templates")
+    def unit_formation_templates(unit_id):
+        with db() as conn:
+            access(conn, unit_id, "staff")
+            templates = []
+            for row in conn.execute(
+                "SELECT * FROM unit_formation_templates WHERE unit_id=? ORDER BY name",
+                (unit_id,),
+            ):
+                layout = json.loads(row["layout"])
+                templates.append(
+                    dict(
+                        id=row["id"],
+                        name=row["name"],
+                        formations=sum(node["kind"] != "billet" for node in layout),
+                        billets=sum(node["kind"] == "billet" for node in layout),
+                    )
+                )
+        return jsonify(templates=templates)
+
+    @api.app.post("/api/units/<int:unit_id>/formation-templates")
+    def unit_formation_template_save(unit_id):
+        try:
+            data = request.get_json()
+            name = text(data.get("name"), "Template name", 80, True)
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                access(conn, unit_id, "staff")
+                revision(conn, unit_id, data)
+                source = structure_node(conn, unit_id, data.get("node_id"))
+                if source["kind"] == "billet":
+                    raise ValueError("Save a formation and its billets as a template")
+                if (
+                    conn.execute(
+                        "SELECT count(*) FROM unit_formation_templates WHERE unit_id=?",
+                        (unit_id,),
+                    ).fetchone()[0]
+                    >= 50
+                ):
+                    raise ValueError("Keep at most 50 templates per unit")
+                nodes = [
+                    dict(row)
+                    for row in conn.execute(
+                        "SELECT * FROM unit_structure WHERE unit_id=? ORDER BY sort_order,id",
+                        (unit_id,),
+                    )
+                ]
+                children = {}
+                for node in nodes:
+                    children.setdefault(node["parent_id"], []).append(node)
+                layout = []
+
+                def collect(node, parent=None):
+                    index = len(layout)
+                    layout.append(
+                        dict(name=node["name"], kind=node["kind"], parent=parent)
+                    )
+                    for child in children.get(node["id"], []):
+                        collect(child, index)
+
+                collect(dict(source))
+                identity = conn.execute(
+                    "INSERT INTO unit_formation_templates(unit_id,name,layout) VALUES(?,?,?)",
+                    (unit_id, name, json.dumps(layout)),
+                ).lastrowid
+            g.audit_details = dict(
+                unit_id=unit_id, name=name, change="formation template saved"
+            )
+            return jsonify(ok=True, id=identity)
+        except (ValueError, sqlite3.IntegrityError) as exc:
+            return (
+                jsonify(
+                    ok=False,
+                    error=(
+                        str(exc)
+                        if isinstance(exc, ValueError)
+                        else "Choose a unique template name"
+                    ),
+                ),
+                400,
+            )
+
+    @api.app.post(
+        "/api/units/<int:unit_id>/formation-templates/<int:template_id>/apply"
+    )
+    def unit_formation_template_apply(unit_id, template_id):
+        try:
+            data = request.get_json()
+            name = text(data.get("name"), "Formation name", 80, True)
+            if not 1 <= template_id <= 9223372036854775807:
+                raise ValueError("Choose a valid template")
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                access(conn, unit_id, "staff")
+                revision(conn, unit_id, data)
+                source = conn.execute(
+                    "SELECT * FROM unit_formation_templates WHERE unit_id=? AND id=?",
+                    (unit_id, template_id),
+                ).fetchone()
+                if not source:
+                    raise ValueError("Template not found in this unit")
+                layout = json.loads(source["layout"])
+                parent_id = data.get("parent_id")
+                ancestors = 0
+                if parent_id is not None:
+                    parent = structure_node(conn, unit_id, parent_id)
+                    if parent["kind"] == "billet":
+                        raise ValueError("Choose a group or formation as destination")
+                    while parent:
+                        ancestors += 1
+                        parent = (
+                            structure_node(conn, unit_id, parent["parent_id"])
+                            if parent["parent_id"] is not None
+                            else None
+                        )
+                depth = []
+                for index, node in enumerate(layout):
+                    depth.append(
+                        0 if node["parent"] is None else depth[node["parent"]] + 1
+                    )
+                if ancestors + max(depth) > 6:
+                    raise ValueError("Use at most six levels below a group")
+                capacity(conn, unit_id, len(layout))
+                ids = {}
+                for index, node in enumerate(layout):
+                    destination = parent_id if index == 0 else ids[node["parent"]]
+                    kind = (
+                        ("group" if parent_id is None else "section")
+                        if index == 0
+                        else node["kind"]
+                    )
+                    title = name if index == 0 else node["name"]
+                    type_id = None
+                    if kind == "billet":
+                        definition = conn.execute(
+                            "SELECT id,name FROM unit_billet_types WHERE unit_id=? AND name=?",
+                            (unit_id, title),
+                        ).fetchone()
+                        if definition:
+                            type_id = definition["id"]
+                            title = definition["name"]
+                        else:
+                            if (
+                                conn.execute(
+                                    "SELECT count(*) FROM unit_billet_types WHERE unit_id=?",
+                                    (unit_id,),
+                                ).fetchone()[0]
+                                >= 200
+                            ):
+                                raise ValueError("Keep at most 200 saved billet types")
+                            type_id = conn.execute(
+                                "INSERT INTO unit_billet_types(unit_id,name) VALUES(?,?)",
+                                (unit_id, title),
+                            ).lastrowid
+                    ids[index] = conn.execute(
+                        "INSERT INTO unit_structure(unit_id,parent_id,kind,name,sort_order,billet_type_id) VALUES(?,?,?,?,?,?)",
+                        (
+                            unit_id,
+                            destination,
+                            kind,
+                            title,
+                            next_order(conn, unit_id, destination),
+                            type_id,
+                        ),
+                    ).lastrowid
+            g.audit_details = dict(
+                unit_id=unit_id,
+                name=name,
+                template_id=template_id,
+                change="formation template applied",
+            )
+            return jsonify(ok=True, id=ids[0])
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+
+    @api.app.post(
+        "/api/units/<int:unit_id>/formation-templates/<int:template_id>/delete"
+    )
+    def unit_formation_template_delete(unit_id, template_id):
+        try:
+            if not 1 <= template_id <= 9223372036854775807:
+                raise ValueError("Choose a valid template")
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                access(conn, unit_id, "staff")
+                revision(conn, unit_id, request.get_json())
+                source = conn.execute(
+                    "SELECT name FROM unit_formation_templates WHERE unit_id=? AND id=?",
+                    (unit_id, template_id),
+                ).fetchone()
+                if not source:
+                    raise ValueError("Template not found in this unit")
+                conn.execute(
+                    "DELETE FROM unit_formation_templates WHERE unit_id=? AND id=?",
+                    (unit_id, template_id),
+                )
+            g.audit_details = dict(
+                unit_id=unit_id,
+                name=source["name"],
+                change="formation template deleted",
+            )
+            return jsonify(ok=True)
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400

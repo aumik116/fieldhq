@@ -1,6 +1,50 @@
 // Formation and billet views. Mutations and permission checks stay with the unit workspace/API.
 window.UnitStructure = {
   expanded: new Map(),
+  configs: new Map(),
+  config(detail) {
+    const key = `fieldhq.roster.${window.unitAccount?.id || 'local'}.${detail.unit.id}`;
+    if (!this.configs.has(key)) {
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem(key) || '{}') || {};
+      } catch (error) {}
+      const display = { callsigns: true, qualifications: false, status: true };
+      for (const name of Object.keys(display))
+        if (typeof saved.display?.[name] === 'boolean')
+          display[name] = saved.display[name];
+      const expanded = {};
+      for (const [id, value] of Object.entries(saved.expanded || {}))
+        if (/^\d+$/.test(id) && typeof value === 'boolean')
+          expanded[id] = value;
+      this.configs.set(key, { key, display, expanded });
+    }
+    return this.configs.get(key);
+  },
+  saveConfig(detail) {
+    const config = this.config(detail);
+    for (const [id, value] of this.expanded)
+      if (id.startsWith(detail.unit.id + ':'))
+        config.expanded[id.split(':')[1]] = value;
+    try {
+      localStorage.setItem(
+        config.key,
+        JSON.stringify({ display: config.display, expanded: config.expanded }),
+      );
+    } catch (error) {}
+  },
+  jump(root, id) {
+    const target = root.querySelector(`#roster-formation-${Number(id)}`);
+    if (!target) return;
+    let region = target;
+    while (region && region !== root) {
+      if (region.tagName === 'DETAILS') region.open = true;
+      region = region.parentElement;
+    }
+    const heading = target.querySelector('summary');
+    heading.focus();
+    heading.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
   index(detail) {
     const nodes = detail.structure || [],
       byId = new Map(nodes.map((n) => [n.id, n])),
@@ -82,6 +126,34 @@ window.UnitStructure = {
       return `<tr><td><button type="button" class="member-record-link" data-structure-action="select" data-node="${node.id}">${esc(node.name)}</button><small>${node.kind === 'billet' ? 'Named billet' : this.summary(totals.get(node.id))}</small></td><td>${node.kind === 'billet' ? (person ? `<button type="button" class="member-record-link" data-structure-action="record" data-member="${person.id}">${esc([person.rank, person.game_name].filter(Boolean).join(' '))}</button>` : '<span class="billet-open">Open</span>') : '—'}</td><td class="formation-actions">${node.kind === 'billet' ? `<button type="button" data-structure-action="assign" data-node="${node.id}">${person ? 'Change' : 'Assign'}</button>` : `<button type="button" data-structure-action="place" data-node="${node.id}">Add members</button>`}<button type="button" data-structure-action="edit" data-node="${node.id}">Edit</button><button type="button" data-structure-action="up" data-node="${node.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(node.name)} up">↑</button><button type="button" data-structure-action="down" data-node="${node.id}" ${i === childNodes.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(node.name)} down">↓</button></td></tr>`;
     };
     root.innerHTML = `<div class="formation-builder"><nav class="formation-navigator" aria-label="Structure items">${tree(null) || '<p>No matching items.</p>'}</nav><section class="unit-block formation-inspector"><div class="formation-heading"><div><small>${esc(selected.kind === 'billet' ? 'Named billet' : 'Formation layout')}</small><h3>${esc(selected.name)}</h3><p>${esc(this.summary(summary))}</p></div><div class="formation-actions"><button type="button" data-structure-action="edit" data-node="${selected.id}">Edit / move</button><button type="button" data-structure-action="copy" data-node="${selected.id}">Copy empty layout</button><button type="button" data-structure-action="remove" data-node="${selected.id}">Remove</button></div></div>${selected.kind === 'billet' ? `<p>${assigned ? esc(assigned.game_name) : 'This billet is open.'}</p><button type="button" data-structure-action="assign" data-node="${selected.id}">${assigned ? 'Change assignment' : 'Assign member'}</button>` : `<div class="unit-toolbar"><button type="button" data-structure-action="add" data-node="${selected.id}">Add formation</button><button type="button" data-structure-action="billets" data-node="${selected.id}">Add billets</button><button type="button" data-structure-action="place" data-node="${selected.id}">Assign members without billets</button></div><div class="unit-table"><table><thead><tr><th>Formation / billet</th><th>Occupant</th><th>Actions</th></tr></thead><tbody>${childNodes.map(row).join('') || '<tr><td colspan="3">No named billets or smaller formations yet.</td></tr>'}</tbody></table></div><section class="formation-direct"><h4>Members assigned directly · ${members.length}</h4><p class="feature-note">These members belong here without occupying a named billet.</p>${members.map((m) => `<p><button type="button" class="member-record-link" data-structure-action="record" data-member="${m.id}">${esc([m.rank, m.game_name].filter(Boolean).join(' '))}</button> <button type="button" data-structure-action="move-member" data-member="${m.id}">Move / unassign</button></p>`).join('') || '<p>No members assigned directly.</p>'}</section>`}</section></div>`;
+    if (detail.can_staff) {
+      const siblings = children.get(selected.parent_id) || [],
+        position = siblings.findIndex((node) => node.id === selected.id);
+      for (const [direction, label, disabled] of [
+        ['up', 'Move up', position === 0],
+        ['down', 'Move down', position === siblings.length - 1],
+      ]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.disabled = disabled;
+        button.dataset.structureAction = direction;
+        button.dataset.node = selected.id;
+        root
+          .querySelector('.formation-inspector .formation-actions')
+          .append(button);
+      }
+    }
+    if (detail.can_staff && selected.kind !== 'billet') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Save as template';
+      button.dataset.structureAction = 'save-template';
+      button.dataset.node = selected.id;
+      root
+        .querySelector('.formation-inspector .formation-actions')
+        .append(button);
+    }
     root.onclick = (event) => {
       const button = event.target.closest('[data-structure-action]');
       if (!button || button.disabled) return;
@@ -93,6 +165,9 @@ window.UnitStructure = {
           break;
         case 'edit':
           actions.edit(node);
+          break;
+        case 'save-template':
+          actions.template(node);
           break;
         case 'copy':
           actions.copy(node);
@@ -153,12 +228,33 @@ window.UnitStructure = {
           .join(' ')
           .toLowerCase()
           .includes(state.query));
+    const config = this.config(detail),
+      display = config.display;
     const person = (member) =>
-      `${detail.role === 'member' ? esc(member.game_name) : `<button type="button" class="member-record-link" data-board-action="record" data-member="${member.id}">${esc(member.game_name)}</button>`}${member.effective_callsign ? `<small>${esc(member.effective_callsign)}</small>` : ''}${member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
+      `${detail.role === 'member' ? esc(member.game_name) : `<button type="button" class="member-record-link" data-board-action="record" data-member="${member.id}">${esc(member.game_name)}</button>`}${display.callsigns && member.effective_callsign ? `<small>${esc(member.effective_callsign)}</small>` : ''}${
+        display.qualifications && member.certificates
+          ? `<small>${esc(
+              member.certificates
+                .split(';')
+                .map(
+                  (name) =>
+                    name +
+                    ((member.expired_certificates || []).includes(name)
+                      ? ' (expired)'
+                      : ''),
+                )
+                .join(', '),
+            )}</small>`
+          : ''
+      }${display.status && member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
     const counts = (node) => {
       const value = totals.get(node.id);
       return `${value.members} member${value.members === 1 ? '' : 's'}${value.slots ? ` · ${value.filled}/${value.slots} billets filled${value.slots > value.filled ? ` · ${value.slots - value.filled} open` : ''}` : ''}`;
     };
+    for (const [id, value] of Object.entries(config.expanded)) {
+      const key = detail.unit.id + ':' + id;
+      if (!this.expanded.has(key)) this.expanded.set(key, value);
+    }
     const expanded = this.expanded,
       key = (id) => `${detail.unit.id}:${id}`;
     function parents(node) {
@@ -188,7 +284,15 @@ window.UnitStructure = {
           })
           .map((slot) => {
             const member = occupants.get(slot.id);
-            return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td title="${member ? esc(member.rank) : ''}">${member ? esc(member.rank_display || member.rank || '—') : '—'}</td><td>${member ? person(member) : detail.can_edit ? `<button type="button" class="member-record-link billet-open" data-board-action="assign" data-node="${slot.id}" aria-label="Assign ${esc(slot.name)}">— Open —</button>` : '<span class="billet-open">— Open —</span>'}</td></tr>`;
+            return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td title="${member ? esc(member.rank) : ''}">${member ? esc(member.rank_display || member.rank || '—') : '—'}</td><td>${member ? person(member) : detail.can_edit ? `<button type="button" class="member-record-link billet-open" data-board-action="assign" data-node="${slot.id}" aria-label="Assign ${esc(slot.name)}">— Open —</button>` : '<span class="billet-open">— Open —</span>'}${(
+              detail.temporary_covers || []
+            )
+              .filter((item) => item.billet_id === slot.id)
+              .map(
+                (item) =>
+                  `<small>Temporary cover: ${esc(item.game_name)}</small>`,
+              )
+              .join('')}</td></tr>`;
           })
           .join('') +
         (direct.get(node.id) || [])
@@ -222,8 +326,10 @@ window.UnitStructure = {
     root.innerHTML = `<div class="unit-toolbar roster-disclosure-controls"><button type="button" data-board-action="expand">Expand all</button><button type="button" data-board-action="collapse">Collapse all</button></div><div class="roster-formations">${groups.map((node) => formation(node)).join('') || '<p class="unit-empty">No matching formations. Use All members for the flat roster.</p>'}</div>`;
     root.querySelectorAll('[data-formation]').forEach((region) => {
       region.ontoggle = () => {
-        if (!state.query && !state.status)
+        if (!state.query && !state.status) {
           expanded.set(key(Number(region.dataset.formation)), region.open);
+          UnitStructure.saveConfig(detail);
+        }
       };
     });
     root.onclick = (event) => {
@@ -237,6 +343,7 @@ window.UnitStructure = {
           root.querySelectorAll('[data-formation]').forEach((region) => {
             region.open = button.dataset.boardAction === 'expand';
             expanded.set(key(Number(region.dataset.formation)), region.open);
+            UnitStructure.saveConfig(detail);
           });
           break;
         case 'parent': {

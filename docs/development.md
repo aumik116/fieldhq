@@ -7,6 +7,7 @@
 - `unit_sops.py`: SOP/loadout schema and migration, document routes, publishing, revision history and attachments.
 - `unit_resources.py`: awards, campaigns and measured roster analytics.
 - `unit_members.py`: member self-service, required-reading acknowledgements, document reviews, announcements and RSVPs.
+- `unit_collaboration.py`: unit-scoped snapshots and paged roster history. Tokens include roster revisions, notes and saved event changes; the browser polls while visible and preserves drafts.
 - `unit_structure.py`: reusable billet types, slot creation and empty layout copies. Schema initialization runs before roster history baselines.
 - `unit_demo.py`: panel-admin creation of an opt-in editable fictional company; no accounts or game-server links.
 - `unit_login_management.py`: Member-only unit suspensions and scoped password resets; shared accounts require panel administration.
@@ -42,3 +43,10 @@ python3 -m black unit_common.py unit_sops.py units.py unit_resources.py unit_mem
 ```
 
 New Python runtime modules must be added to `PANEL_PY_FILES` in `install.sh`, so fresh installations and updates deploy the same files. When shared JavaScript interfaces change, update the relevant script cache versions together.
+
+`static/unit-roster.js` handles saved-change refresh, the roster feed and unassigned-member selection. `UnitStructure` stores per-browser display/disclosure preferences. Member edit tokens cover record fields, awards/history and primary placement; legacy requests retain unit-wide revision checks.
+
+
+### Personnel and collaboration modules
+
+`unit_collaboration.py` provides permission-checked polling tokens and the staff change feed. `unit_personnel.py` provides unit-scoped vacancies, dated temporary cover, follow-up agenda, timeline comparison and ZIP recovery exports. `static/unit-roster.js` handles saved-change refresh and roster preferences; `static/unit-personnel.js` extends existing dialogs and sidebar pages. Member edits use record tokens; structural/agenda changes retain unit revision checks. Event audiences are stored as formation IDs and snapshot invited members before the start. Qualification expiry preserves awards/history while excluding expired awards from promotion readiness. No automatic promotions or backup restore endpoint are provided.

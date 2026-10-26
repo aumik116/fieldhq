@@ -13,7 +13,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import abort, g, jsonify, request
 
 from functools import partial
-from unit_common import roster_status, UUID, actor, can as unit_can, text
+from unit_common import (
+    effective_certificates,
+    roster_status,
+    UUID,
+    actor,
+    can as unit_can,
+    text,
+)
 
 OUTCOMES = ("present", "absent", "excused", "unknown")
 
@@ -55,6 +62,13 @@ def install(api, db, access, panel_admin, promotion, endpoints):
         """
         )
 
+    with db() as conn:
+        if "formation_ids" not in {
+            row["name"] for row in conn.execute("PRAGMA table_info(unit_events)")
+        }:
+            conn.execute(
+                "ALTER TABLE unit_events ADD COLUMN formation_ids TEXT NOT NULL DEFAULT '[]'"
+            )
     names = {
         "unit_operations",
         "unit_events_save",
@@ -116,10 +130,42 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             .date()
             .isoformat()
         )
+        audience = set(json.loads(event.get("formation_ids", "[]")))
+        invited = None
+        if audience:
+            nodes = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT id,parent_id FROM unit_structure WHERE unit_id=?",
+                    (event["unit_id"],),
+                )
+            ]
+            for _ in range(7):
+                audience.update(
+                    node["id"] for node in nodes if node["parent_id"] in audience
+                )
+            invited = {
+                row["member_id"]
+                for row in conn.execute(
+                    "SELECT member_id,billet_id AS node FROM unit_primary_slots WHERE unit_id=? UNION ALL SELECT member_id,parent_id AS node FROM unit_member_placements WHERE unit_id=?",
+                    (event["unit_id"], event["unit_id"]),
+                )
+                if row["node"] in audience
+            }
+            invited.update(
+                row["member_id"]
+                for row in conn.execute(
+                    "SELECT member_id,billet_id FROM unit_temporary_assignments WHERE unit_id=? AND cancelled=0 AND starts_on<=? AND (ends_on='' OR ends_on>=?)",
+                    (event["unit_id"], local_day, local_day),
+                )
+                if row["billet_id"] in audience
+            )
         for member in conn.execute(
             "SELECT * FROM unit_roster WHERE unit_id=? AND archived=0",
             (event["unit_id"],),
         ).fetchall():
+            if invited is not None and member["id"] not in invited:
+                continue
             if member["joined_on"] and member["joined_on"] > local_day:
                 continue
             exempt = (
@@ -183,7 +229,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
 
     api.observe_unit_attendance = observe
 
-    def local_start(raw, tz):
+    def local_start(raw, tz, label="start"):
         try:
             value = datetime.fromisoformat(raw)
             if value.tzinfo is not None:
@@ -196,7 +242,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             return value
         except (ValueError, TypeError, OverflowError):
             raise ValueError(
-                "Choose a valid local start time; daylight-saving skipped times cannot be used"
+                f"Choose a valid local {label} time; daylight-saving skipped times cannot be used"
             ) from None
 
     def event_values(conn, unit_id, data):
@@ -212,9 +258,19 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                 "Choose an IANA timezone such as America/New_York"
             ) from None
         start = local_start(data.get("starts"), tz)
-        duration = data.get("duration")
-        if type(duration) is not int or not 5 <= duration <= 1440:
-            raise ValueError("Duration must be 5–1440 whole minutes")
+        end_local = None
+        if "ends" in data:
+            end_local = local_start(data["ends"], tz, "end")
+            elapsed = end_local.timestamp() - start.timestamp()
+            if not 300 <= elapsed <= 86400:
+                raise ValueError(
+                    "End time must be 5 minutes to 24 hours after the start"
+                )
+            wall_length = end_local.replace(tzinfo=None) - start.replace(tzinfo=None)
+        else:
+            duration = data.get("duration")
+            if type(duration) is not int or not 5 <= duration <= 1440:
+                raise ValueError("Duration must be 5–1440 whole minutes")
         if (
             start.timestamp() < time.time() + 60
             or start.timestamp() > time.time() + 366 * 86400
@@ -233,6 +289,23 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             raise ValueError("Choose a server linked to this unit")
         if type(data.get("tracked", True)) is not bool:
             raise ValueError("Choose whether to track attendance")
+        formation_ids = data.get("formation_ids", [])
+        if (
+            not isinstance(formation_ids, list)
+            or len(formation_ids) > 100
+            or any(type(key) is not int for key in formation_ids)
+        ):
+            raise ValueError("Choose up to 100 formations")
+        valid = {
+            row["id"]
+            for row in conn.execute(
+                "SELECT id FROM unit_structure WHERE unit_id=? AND kind!='billet'",
+                (unit_id,),
+            )
+        }
+        if any(key not in valid for key in formation_ids):
+            raise ValueError("Choose formations from this unit")
+        formation_ids = sorted(set(formation_ids))
         recurrence = data.get("recurrence", "none")
         if recurrence not in ("none", "weekly", "biweekly", "monthly"):
             raise ValueError("Choose a supported recurrence")
@@ -242,6 +315,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
         if recurrence == "none":
             count = 1
         dates = []
+        end_times = {}
         for index in range(count):
             if recurrence == "monthly":
                 month = start.year * 12 + start.month - 1 + index
@@ -258,7 +332,20 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             value = local_start(value.replace(tzinfo=None).isoformat(), tz)
             if value.timestamp() > time.time() + 366 * 86400:
                 raise ValueError("Keep recurring events within the next year")
-            dates.append(value.timestamp())
+            timestamp = value.timestamp()
+            end = (
+                local_start(
+                    (value.replace(tzinfo=None) + wall_length).isoformat(), tz, "end"
+                ).timestamp()
+                if end_local is not None
+                else timestamp + duration * 60
+            )
+            if not 300 <= end - timestamp <= 86400:
+                raise ValueError(
+                    "Each event must end 5 minutes to 24 hours after it starts"
+                )
+            dates.append(timestamp)
+            end_times[timestamp] = end
         return (
             dict(
                 name=name,
@@ -269,9 +356,10 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                 timezone=tz_name,
                 tracked=int(data.get("tracked", True)),
                 recurrence=recurrence,
+                formation_ids=json.dumps(formation_ids),
             ),
             dates,
-            duration * 60,
+            end_times,
         )
 
     @api.app.post("/api/units/<int:unit_id>/events")
@@ -281,7 +369,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             with db() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 access(conn, unit_id, "events")
-                values, starts, duration = event_values(conn, unit_id, data)
+                values, starts, end_times = event_values(conn, unit_id, data)
                 if (
                     conn.execute(
                         "SELECT count(*) FROM unit_events WHERE unit_id=? AND starts>? AND state='scheduled'",
@@ -295,7 +383,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                 ids = []
                 for start in starts:
                     event_id = conn.execute(
-                        "INSERT INTO unit_events(unit_id,series_id,name,category,briefing,location,server_id,starts,ends,timezone,tracked,recurrence,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO unit_events(unit_id,series_id,name,category,briefing,location,server_id,starts,ends,timezone,tracked,recurrence,created_at,formation_ids) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             unit_id,
                             series,
@@ -305,11 +393,12 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                             values["location"],
                             values["server_id"],
                             start,
-                            start + duration,
+                            end_times[start],
                             values["timezone"],
                             values["tracked"],
                             values["recurrence"],
                             time.time(),
+                            values["formation_ids"],
                         ),
                     ).lastrowid
                     event = event_row(conn, unit_id, event_id)
@@ -523,7 +612,10 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                                 event["recurrence"] if scope == "future" else "none"
                             ),
                         )
-                        values, starts, duration = event_values(conn, unit_id, payload)
+                        payload.setdefault(
+                            "formation_ids", json.loads(event["formation_ids"])
+                        )
+                        values, starts, end_times = event_values(conn, unit_id, payload)
                         for target, start in zip(slots, starts):
                             if (
                                 target["state"] != "scheduled"
@@ -531,7 +623,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                             ):
                                 continue
                             conn.execute(
-                                "UPDATE unit_events SET name=?,category=?,briefing=?,location=?,server_id=?,starts=?,ends=?,timezone=?,tracked=?,version=version+1 WHERE id=?",
+                                "UPDATE unit_events SET name=?,category=?,briefing=?,location=?,server_id=?,starts=?,ends=?,timezone=?,tracked=?,formation_ids=?,version=version+1 WHERE id=?",
                                 (
                                     values["name"],
                                     values["category"],
@@ -539,9 +631,10 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                                     values["location"],
                                     values["server_id"],
                                     start,
-                                    start + duration,
+                                    end_times[start],
                                     values["timezone"],
                                     values["tracked"],
+                                    values["formation_ids"],
                                     target["id"],
                                 ),
                             )
@@ -879,6 +972,9 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             ]
             for member in roster:
                 member["status"] = roster_status(member)
+                member["active_certificates"] = effective_certificates(
+                    conn, unit_id, member
+                )
             assigned = {
                 r[0]
                 for r in conn.execute(

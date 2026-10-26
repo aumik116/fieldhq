@@ -197,6 +197,8 @@ Assigned structure/rank names cannot be renamed or removed until roster records 
 
 Each rank also has an optional **Rank abbreviation (shown on rosters)** field, such as Sergeant → Sgt. Rosters show the abbreviation when set and otherwise use the full rank name. Hover over the roster rank to see the full name. Abbreviations can be changed even when the rank is assigned; full names continue identifying ranks for progression rules. Roster CSV exports include the abbreviation separately.
 
+To permanently remove a qualification, open **Qualifications setup → Edit details / archive → Delete qualification**. Review affected member awards, promotion requirements, required-reading audiences and document labels, then type its exact name and confirm. Deletion removes active awards and requirements, including former members’ awards; historical change records and published document history remain. Removing a requirement can make someone eligible sooner, but promotions remain manual. Removing the last required-reading audience stops that assignment; it does not assign the document to everyone. Use Archive to preserve existing awards and rules.
+
 ### Grant or correct a qualification
 
 1. Open **Roster → Qualifications**.
@@ -232,6 +234,24 @@ The panel rechecks eligibility and record changes before applying. A stale recor
 
 Rank paths, time requirements and qualification names are maintained by permitted administrators in **Resources → Rank & qualification setup**.
 
+### Bulk placement, display options and saved-change collaboration
+
+In **Roster → Unassigned**, tick members or use **Select shown**, then **Place selected in formation**. Choose a destination group, platoon, squad or team and save. Members are placed directly in the formation without filling named billets. The existing member editor and slot controls still handle individual billet assignments.
+
+**Formation display options** controls callsigns, qualification lists and Reserve/LOA labels beneath names. Display choices and expanded/collapsed formations are saved per browser, account and unit; they do not change other staff’s layout or unit data.
+
+**Recent roster changes** is a collapsible staff-only feed of member additions, promotions, placements, qualification changes, notes and setup changes. It identifies the author, offers member-record links, and loads older history on request. Members retain read-only roster access and do not see this feed or staff notes.
+
+Saved unit changes sync about every three seconds while the page is visible. Clean rosters and member records refresh automatically. Unsaved editors, active saves and other open dialogs remain intact and display an update notice. **Refresh saved changes** uses the normal discard guard. Member edits, qualification edits and promotion approvals check the member’s version, allowing staff to edit different members independently; competing edits to the same person must be reopened and reviewed. Multi-member assignments and setup edits still use the unit revision to protect all affected records. This syncs saved changes, not simultaneous typing.
+
+### Reusable formation templates
+
+Administrators select a formation in **Structure** and choose **Save as template**. Templates store the formation hierarchy and named billets, with no people or callsigns. **Formation templates** applies a saved layout as a new top-level group or beneath an existing formation. Choose the new formation’s name and destination. Existing layouts and members remain untouched. Deleting a saved template leaves formations previously created from it intact. Templates belong to their unit.
+
+### Event end time
+
+Event setup defaults to **End date & time** in the selected event timezone. Enter the start and end explicitly, including the next date for an overnight event. **Set event end using → Duration** remains available. Events must last five minutes to 24 hours. With explicit end times, recurring events preserve local start/end clock times; duration mode preserves elapsed minutes. Invalid daylight-saving skipped times are rejected. Editing a recurring series uses the existing occurrence/future-series confirmation and version checks.
+
 ## 7. Events and attendance
 
 ### Create an event
@@ -240,7 +260,7 @@ With event permission:
 
 1. Open **Operations → Events** and choose **New event**.
 2. Select this unit's linked server.
-3. Enter the local start time, explicit timezone and duration.
+3. Enter the local start time, explicit timezone and end date/time (or choose Duration).
 4. Enable attendance tracking if attendance should count.
 5. Set recurrence if needed and save.
 6. Review the calendar entry.
@@ -433,3 +453,53 @@ Formation rosters are collapsible: companies/platoons start open and deeper form
 Analytics includes an interactive current-rank bar chart. Filter by rank structure, then click a bar to see matching member names and open their staff records. Counts and percentages describe the current roster, independently of the historical date range.
 
 Panel-wide login administration opens on its own **Panel users** page at `/admin/users`, accessible from the header to panel administrators. It is independent of the selected unit and never appears below a roster. Unit administrators continue using their unit’s **Accounts & access** page for local role management.
+
+
+## 12. Personnel tools
+
+### Search and vacancy overview
+
+Roster search also shows up to 50 matching members across the unit with their full formation path. Choose **Go to formation** to open that branch. Existing roster view/status filters remain available. Members can use read-only search; staff can open records.
+
+Choose **Vacancies** for a list of open named billets, their formation paths and any temporary cover. Choose **Assign** to fill a billet or jump to its formation. A temporary cover does not count as a permanently filled billet.
+
+### Backdated promotions and qualification renewal
+
+Promotion review includes an **Effective promotion date**, defaulting to today. Staff can record an earlier effective date; the panel checks time in rank and recorded award/expiry dates on that date. It cannot predate the previous promotion or be in the future. Approval and a staff note are still required. Editing the member's previous promotion date remains available when entering records from sheets.
+
+In **Manage qualifications**, an award can have an optional **Expires on** date. Leave it blank for a permanent qualification. Expired awards stay in the member record and timeline but do not satisfy promotion requirements after their expiry. Renew an award by updating its award and expiry dates; the timeline retains the previous values. Awards with unknown original dates cannot establish a precise historical award date.
+
+New member forms require a game name. Recorded UUID choices show when another current or former member already uses that identity; the server also rejects duplicate UUIDs in the same unit. Different units keep independent records.
+
+### Compare member records
+
+Open a member record and choose **Compare record versions**. Select two timeline versions, or compare a version with the current record. Changed fields are highlighted; **Include unchanged** shows the rest. Fields not captured by an older version are marked **Not recorded**. Historical comparisons reflect what the panel recorded, not an invented reconstruction of data from before tracking was available.
+
+### Temporary cover
+
+Choose **Temporary cover** on the roster or in a member record. Select a member, a billet and inclusive start/end dates; an empty end means until cancelled. This leaves the member's primary billet or direct formation placement intact. A member or billet cannot have overlapping temporary covers. Active covers appear below the billet's occupant/open slot. Staff can cancel current or upcoming cover. Archiving a member or deleting the covered formation cancels affected cover.
+
+### Event formation audiences
+
+Event setup offers **Whole unit** or **Selected formations and their descendants**. Selected audiences include primary billet occupants, directly placed troops and dated temporary cover in those branches. Future event rosters follow placement changes; the list freezes at event start. Members see formation-specific events they are invited to. Change upcoming event audiences before deleting a formation they reference.
+
+### Meeting agenda
+
+Open **Roster → Meeting agenda** for promotion reviews, open billets, qualifications expired or expiring within 30 days, and staff follow-ups. Follow-ups can refer to a member or the whole unit, with notes and an optional due date. Edit, complete or reopen them during the meeting. The agenda never approves promotions or changes attendance automatically.
+
+### Export a unit backup
+
+Unit administrators can choose **Download unit backup** from the unit toolbar. The ZIP contains unit-scoped records, catalog, CSV roster, history, notes, event data, documents and attachment files. It includes private staff information, so store it appropriately. Login passwords and game-server binaries are excluded. This is a manual recovery/export archive; there is no restore wizard. Account IDs and linked servers need mapping when moving data to another installation.
+
+Staff with roster editing permission can choose **Delete note** beside a dated member-record note. Confirm to permanently remove that note; its text is removed and the activity log records who deleted it. Other notes and member history remain.
+
+In **Customization**, choose an icon or banner and drag its preview to frame the image. Use **Zoom** to enlarge it or **Reset crop** to recenter. Arrow keys reposition the image; Shift moves farther. Existing branding can be adjusted without uploading again. Icons save as square images; the banner preview follows the current header shape and may crop differently on other screen sizes. **Save branding** saves the cropped image; **Reset changes** discards unsaved adjustments. Source images can be PNG/JPEG/WebP up to 20 MB and 40 megapixels; the panel uploads only the cropped result (up to 4 MB). Keep your original file if you may want a different crop later.
+
+
+### Bulk awards, ordering, editing, printing and event copies
+
+- **Bulk qualifications:** Open **Bulk edit → Grant qualification**. Select members, qualification, award date, instructor and optional expiry, then review and confirm. Existing holders keep their award details; renew those individually in Manage qualifications.
+- **Formation order:** In **Manage structure**, select any group, formation or billet and use **Move up / Move down** to reorder it among its siblings. Child rows also have arrow buttons. Use **Edit / move** to change its parent. Existing assignments move with the structure.
+- **Edit notes:** Staff with roster editing access can choose **Edit note** beside a dated note, change the text, then **Save note** or **Cancel**. Original author/date stay visible, with an edited-by name and time. Saving rejects a note changed by another staff member so their edit is not overwritten.
+- **Print roster:** Choose **Print roster**, select formation or flat layout, and optionally include callsigns, qualifications and status. It prints all current members and open billets in formation order. Private notes, Discord handles, UUIDs and account details are excluded. Use the browser's print dialog to print or save a PDF.
+- **Duplicate event:** Open an event and choose **Duplicate event**. The new-event form copies its briefing, server, event type, location, tracking setting and formation audience, with a new future start time. Choose the intended date/end and save. Attendance, RSVPs, audit history and recurrence are not copied; the original event remains unchanged. A copied event uses the current roster for its new date.

@@ -2,6 +2,8 @@
 
 from contextlib import contextmanager
 import csv
+import hashlib
+import hmac
 from datetime import date, timedelta
 import io
 import json
@@ -15,6 +17,7 @@ from unit_common import (
     STAFF_CAPABILITIES as STAFF_CAPABILITIES,
     UUID as UUID,
     actor,
+    effective_certificates,
     roster_status,
     text,
     unit_role_capabilities,
@@ -161,6 +164,18 @@ def install(api):
 
         """
         )
+        note_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(unit_member_notes)")
+        }
+        for name, declaration in [
+            ("edited_at", "REAL"),
+            ("edited_by", "TEXT NOT NULL DEFAULT ''"),
+            ("version", "INTEGER NOT NULL DEFAULT 0"),
+        ]:
+            if name not in note_columns:
+                conn.execute(
+                    f"ALTER TABLE unit_member_notes ADD COLUMN {name} {declaration}"
+                )
         if (
             "'member'"
             not in conn.execute(
@@ -272,6 +287,7 @@ def install(api):
             abort(404, description="Unit not found")
         if membership["role"] == "member" and request.endpoint not in {
             "unit_detail",
+            "unit_collab_state",
             "unit_branding_image",
             "unit_library",
             "unit_reference",
@@ -402,6 +418,8 @@ def install(api):
         "unit_position_rename",
         "unit_member_record",
         "unit_member_note_save",
+        "unit_member_note_delete",
+        "unit_member_note_edit",
         "unit_member_login_create",
         "unit_roster_delete",
         "unit_structure_save",
@@ -415,6 +433,8 @@ def install(api):
     api.PANEL_WIDE_ENDPOINTS.update(endpoints)
     from panel_features import MUTATIONS
 
+    MUTATIONS["unit_member_note_edit"] = "view"
+    MUTATIONS["unit_member_note_delete"] = "view"
     MUTATIONS["unit_staff_save"] = "view"
     MUTATIONS["unit_member_login_create"] = "view"
     MUTATIONS["unit_placement_save"] = "view"
@@ -834,6 +854,9 @@ def install(api):
                     ),
                     None,
                 )
+                member["active_certificates"] = effective_certificates(
+                    conn, unit_id, member
+                )
                 result = promotion(member, catalog)
             return jsonify(
                 ok=True,
@@ -895,7 +918,8 @@ def install(api):
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
 
-    def promotion(member, catalog):
+    def promotion(member, catalog, on=None):
+        member = dict(member)
         structure = next(
             (
                 s
@@ -909,7 +933,7 @@ def install(api):
         target = ranks.get(current.get("next_rank"))
         if not target:
             return dict(next_rank="", next_date="", missing=[], eligible=False)
-        held = set(member["certificates"].split(";"))
+        held = set(member.get("active_certificates", member["certificates"].split(";")))
         missing = sorted(set(target["certificates"]) - held)
         due = (
             (
@@ -925,7 +949,7 @@ def install(api):
             missing=missing,
             eligible=bool(
                 due
-                and due <= date.today().isoformat()
+                and due <= (on or date.today().isoformat())
                 and not missing
                 and not member["archived"]
             ),
@@ -964,6 +988,13 @@ def install(api):
             for track in catalog.get("rank_structures", [])
             for rank in track["ranks"]
         }
+        history = {
+            row["member_id"]: row["version"]
+            for row in conn.execute(
+                "SELECT member_id,max(id) AS version FROM unit_roster_history WHERE unit_id=? GROUP BY member_id",
+                (unit_id,),
+            )
+        }
         by_id = {row["id"]: row for row in structure}
         slots = {
             row["member_id"]: row["billet_id"]
@@ -987,7 +1018,39 @@ def install(api):
                 node = by_id.get(node["parent_id"])
             return " / ".join(parts)
 
+        expiries = {}
+        for row in conn.execute(
+            "SELECT member_id,certificate,expires_on FROM unit_qualification_awards WHERE unit_id=? AND expires_on!=''",
+            (unit_id,),
+        ):
+            expiries.setdefault(row["member_id"], {})[row["certificate"]] = row[
+                "expires_on"
+            ]
         for member in members:
+            member["qualification_expiries"] = expiries.get(member["id"], {})
+            member["expired_certificates"] = [
+                name
+                for name, expiry in member["qualification_expiries"].items()
+                if expiry < date.today().isoformat()
+            ]
+            member["active_certificates"] = effective_certificates(
+                conn, unit_id, member
+            )
+            payload = {field: member[field] for field in FIELDS}
+            payload.update(
+                catalog=catalog,
+                id=member["id"],
+                unit_id=unit_id,
+                archived=member["archived"],
+                panel_user_id=member["panel_user_id"],
+                updated_at=member["updated_at"],
+                history=history.get(member["id"], 0),
+                billet=slots.get(member["id"]),
+                placement=placements.get(member["id"]),
+            )
+            member["edit_token"] = hashlib.sha256(
+                json.dumps(payload, sort_keys=True).encode()
+            ).hexdigest()
             member["rank_abbreviation"] = abbreviations.get(
                 (member["rank_track"], member["rank"]), ""
             )
@@ -1010,6 +1073,22 @@ def install(api):
                 formation_id=formation["id"] if formation else None,
                 formation_path=path(formation),
             )
+
+    def member_revision(conn, unit_id, data, member_id):
+        expected = data.get("member_token")
+        if expected is None:
+            revision(conn, unit_id, data)
+            return
+        if not isinstance(expected, str) or len(expected) != 64:
+            raise ValueError("Reopen the member record before saving")
+        member = dict(find_member(conn, unit_id, member_id))
+        decorate_slots(conn, unit_id, [member])
+        if not hmac.compare_digest(expected, member["edit_token"]):
+            abort(
+                409,
+                description="This member changed while you were editing. Your changes were not saved. Reopen the record and review the latest version.",
+            )
+        conn.execute("UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,))
 
     def assign_slot(conn, unit_id, member_id, billet_id):
         member = find_member(conn, unit_id, member_id)
@@ -1091,6 +1170,7 @@ def install(api):
                         before,
                         dict(history_reason=reason or "Direct formation placement"),
                     )
+                sync_event_roster(conn, unit_id)
             g.audit_details = dict(
                 unit_id=unit_id,
                 member_ids=ids,
@@ -1226,6 +1306,7 @@ def install(api):
                         before,
                         dict(history_reason="Roster structure renamed or moved"),
                     )
+                sync_event_roster(conn, unit_id)
             g.audit_details = dict(
                 unit_id=unit_id,
                 structure_id=identity,
@@ -1256,6 +1337,16 @@ def install(api):
                         (unit_id, node_id, unit_id),
                     )
                 ]
+                for event in conn.execute(
+                    "SELECT name,formation_ids FROM unit_events WHERE unit_id=? AND starts>? AND state='scheduled'",
+                    (unit_id, time.time()),
+                ):
+                    if set(json.loads(event["formation_ids"])) & set(ids):
+                        raise ValueError(
+                            "Update the formation audience for "
+                            + event["name"]
+                            + " before removing this formation"
+                        )
                 marks = ",".join("?" for _ in ids)
                 released = [
                     row[0]
@@ -1277,6 +1368,10 @@ def install(api):
                     (unit_id, *ids),
                 )
                 conn.execute(
+                    f"UPDATE unit_temporary_assignments SET cancelled=1 WHERE unit_id=? AND billet_id IN ({marks})",
+                    (unit_id, *ids),
+                )
+                conn.execute(
                     f"DELETE FROM unit_structure WHERE unit_id=? AND id IN ({marks})",
                     (unit_id, *ids),
                 )
@@ -1290,6 +1385,7 @@ def install(api):
                             history_reason="Roster structure removed: " + node["name"]
                         ),
                     )
+                sync_event_roster(conn, unit_id)
             g.audit_details = dict(
                 unit_id=unit_id,
                 removed_structure=ids,
@@ -1434,6 +1530,7 @@ def install(api):
                             + (" · " + strategy if conflict else "")
                         ),
                     )
+                sync_event_roster(conn, unit_id)
             g.audit_details = dict(
                 unit_id=unit_id,
                 billet_id=billet,
@@ -1536,6 +1633,7 @@ def install(api):
     @api.app.get("/api/units/<int:unit_id>")
     def unit_detail(unit_id):
         with db() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             unit = access(conn, unit_id)
             expired = conn.execute(
                 "SELECT id FROM unit_roster WHERE unit_id=? AND status='loa' AND loa_until!='' AND loa_until<? AND archived=0",
@@ -1591,6 +1689,8 @@ def install(api):
                             "placement_id",
                             "assignment_path",
                             "effective_callsign",
+                            "expired_certificates",
+                            "qualification_expiries",
                         )
                     }
                     for m in roster
@@ -1607,6 +1707,21 @@ def install(api):
                     unit=dict(
                         public_unit, catalog={}, branding=branding(conn, unit_id)
                     ),
+                    temporary_covers=[
+                        {
+                            key: item[key]
+                            for key in (
+                                "id",
+                                "member_id",
+                                "billet_id",
+                                "game_name",
+                                "starts_on",
+                                "ends_on",
+                            )
+                        }
+                        for item in personnel_coverage(conn, unit_id)
+                    ],
+                    sync_token=collaboration_snapshot(conn, unit_id)["token"],
                     role="member",
                     structure=structure_rows(conn, unit_id),
                     roster=public_roster,
@@ -1658,7 +1773,24 @@ def install(api):
                 if admin
                 else []
             )
+            temporary_covers = [
+                {
+                    key: item[key]
+                    for key in (
+                        "id",
+                        "member_id",
+                        "billet_id",
+                        "game_name",
+                        "starts_on",
+                        "ends_on",
+                    )
+                }
+                for item in personnel_coverage(conn, unit_id)
+            ]
+            sync_token = collaboration_snapshot(conn, unit_id)["token"]
         return jsonify(
+            temporary_covers=temporary_covers,
+            sync_token=sync_token,
             unit=dict(unit, catalog=catalog, branding=unit_brand),
             billet_types=billet_types,
             structure=structure,
@@ -1695,7 +1827,7 @@ def install(api):
             rows = [
                 dict(r)
                 for r in conn.execute(
-                    "SELECT id,author_name,created_at,note FROM unit_member_notes WHERE unit_id=? AND member_id=? AND (?=0 OR id<?) ORDER BY id DESC LIMIT 51",
+                    "SELECT id,author_name,created_at,note,edited_at,edited_by,version FROM unit_member_notes WHERE unit_id=? AND member_id=? AND (?=0 OR id<?) ORDER BY id DESC LIMIT 51",
                     (unit_id, member_id, before, before),
                 )
             ]
@@ -1706,7 +1838,7 @@ def install(api):
             qualifications = [
                 dict(row)
                 for row in conn.execute(
-                    "SELECT certificate,awarded_on,issuer,notes FROM unit_qualification_awards WHERE unit_id=? AND member_id=? ORDER BY certificate",
+                    "SELECT certificate,awarded_on,expires_on,issuer,notes FROM unit_qualification_awards WHERE unit_id=? AND member_id=? ORDER BY certificate",
                     (unit_id, member_id),
                 )
             ]
@@ -1716,6 +1848,7 @@ def install(api):
                 or "roster" in unit_role_capabilities(membership["role"])
             )
         return jsonify(
+            catalog=json.loads(unit["catalog"]),
             member=dict(
                 member, promotion=promotion(member, json.loads(unit["catalog"]))
             ),
@@ -1804,6 +1937,91 @@ def install(api):
             return jsonify(ok=True, id=identity)
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
+
+    @api.app.post(
+        "/api/units/<int:unit_id>/roster/<int:member_id>/record/<int:note_id>/edit"
+    )
+    def unit_member_note_edit(unit_id, member_id, note_id):
+        data = request.get_json()
+        try:
+            if not isinstance(data, dict) or type(data.get("version")) is not int:
+                raise ValueError("Reload the note before editing")
+            note = text(data.get("note"), "Record note", 4000, True)
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                access(conn, unit_id, "roster")
+                find_member(conn, unit_id, member_id)
+                if not 1 <= note_id <= 9223372036854775807:
+                    abort(404, description="Note not found")
+                previous = conn.execute(
+                    "SELECT version FROM unit_member_notes WHERE unit_id=? AND member_id=? AND id=?",
+                    (unit_id, member_id, note_id),
+                ).fetchone()
+                if not previous:
+                    abort(404, description="Note not found in this member record")
+                if previous["version"] != data["version"]:
+                    abort(
+                        409,
+                        description="This note changed. Reopen the member record before editing.",
+                    )
+                edited_at = time.time()
+                edited_by = actor(conn, unit_id)
+                conn.execute(
+                    "UPDATE unit_member_notes SET note=?,edited_at=?,edited_by=?,version=version+1 WHERE unit_id=? AND member_id=? AND id=?",
+                    (note, edited_at, edited_by, unit_id, member_id, note_id),
+                )
+                conn.execute(
+                    "UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,)
+                )
+            g.audit_details = dict(
+                unit_id=unit_id,
+                member_id=member_id,
+                note_id=note_id,
+                change="record note edited",
+            )
+            return jsonify(
+                ok=True,
+                note=note,
+                edited_at=edited_at,
+                edited_by=edited_by,
+                version=data["version"] + 1,
+            )
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+
+    @api.app.post(
+        "/api/units/<int:unit_id>/roster/<int:member_id>/record/<int:note_id>/delete"
+    )
+    def unit_member_note_delete(unit_id, member_id, note_id):
+        data = request.get_json()
+        if not isinstance(data, dict) or data.get("confirmed") is not True:
+            return jsonify(ok=False, error="Confirm note deletion"), 400
+        with db() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            access(conn, unit_id, "roster")
+            find_member(conn, unit_id, member_id)
+            if not 1 <= note_id <= 9223372036854775807:
+                abort(404, description="Note not found in this member record")
+            note = conn.execute(
+                "SELECT id,author_name FROM unit_member_notes WHERE unit_id=? AND member_id=? AND id=?",
+                (unit_id, member_id, note_id),
+            ).fetchone()
+            if not note:
+                abort(404, description="Note not found in this member record")
+            conn.execute(
+                "DELETE FROM unit_member_notes WHERE unit_id=? AND member_id=? AND id=?",
+                (unit_id, member_id, note_id),
+            )
+            # Invalidate collaboration tokens even when deleting an older note.
+            conn.execute("UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,))
+        g.audit_details = dict(
+            unit_id=unit_id,
+            member_id=member_id,
+            note_id=note_id,
+            author=note["author_name"],
+            change="record note deleted",
+        )
+        return jsonify(ok=True)
 
     def recorded(conn, unit_id):
         links = [
@@ -1927,8 +2145,11 @@ def install(api):
             with db() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 access(conn, unit_id, "roster")
-                revision(conn, unit_id, data)
                 member_id = data.get("id")
+                if member_id is None:
+                    revision(conn, unit_id, data)
+                else:
+                    member_revision(conn, unit_id, data, member_id)
                 existing = conn.execute(
                     "SELECT * FROM unit_roster WHERE id=? AND unit_id=?",
                     (member_id, unit_id),
@@ -2011,6 +2232,10 @@ def install(api):
                         ),
                     )
                 if data.get("archived", False):
+                    conn.execute(
+                        "UPDATE unit_temporary_assignments SET cancelled=1 WHERE unit_id=? AND member_id=?",
+                        (unit_id, member_id),
+                    )
                     conn.execute(
                         "DELETE FROM unit_member_placements WHERE unit_id=? AND member_id=?",
                         (unit_id, member_id),
@@ -2105,6 +2330,10 @@ def install(api):
                 )
                 conn.execute(
                     "DELETE FROM unit_roster WHERE unit_id=? AND id=?",
+                    (unit_id, member_id),
+                )
+                conn.execute(
+                    "UPDATE unit_temporary_assignments SET cancelled=1 WHERE unit_id=? AND member_id=?",
                     (unit_id, member_id),
                 )
                 record_strength(conn, unit_id, previous_state, None)
@@ -2322,8 +2551,14 @@ def install(api):
     )
     from unit_login_management import install as install_login_management
     from unit_demo import install as install_demo
+    from unit_collaboration import install as install_collaboration
+    from unit_personnel import (
+        install as install_personnel,
+        initialize as initialize_personnel,
+    )
 
     initialize_structure(db)
+    initialize_personnel(db)
     # Register schemas and route dependencies before accepting requests.
     record_strength = install_resources(
         api, db, access, revision, panel_admin, endpoints
@@ -2344,6 +2579,7 @@ def install(api):
         record_strength,
         sync_event_roster,
         assign_placement,
+        member_revision,
     )
     required_reading = install_members(
         api, db, access, revision, panel_admin, endpoints
@@ -2363,6 +2599,22 @@ def install(api):
         api, db, access, revision, endpoints, find_member, panel_admin
     )
     install_demo(api, db, panel_admin, endpoints, record_roster_change, record_strength)
+    personnel_coverage = install_personnel(
+        api,
+        db,
+        access,
+        revision,
+        endpoints,
+        find_member,
+        structure_node,
+        decorate_slots,
+        roster_state,
+        promotion,
+        sync_event_roster,
+    )
+    collaboration_snapshot = install_collaboration(
+        api, db, access, panel_admin, endpoints
+    )
 
 
 # Keep established imports available to integrations while sharing their definitions.

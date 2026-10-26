@@ -16,7 +16,7 @@
       rel="stylesheet"
       href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=catalog-setup-1" /><link
+      href="/static/panel.css?v=roster-polish-1" /><link
       rel="stylesheet"
       href="/static/help.css?v=manuals-3"
   /></head>
@@ -155,6 +155,16 @@
             ><svg class="ui-icon" aria-hidden="true">
               <use href="/static/icons.svg#online"></use></svg
             >Promotions</button
+          ><button
+            class="panel-tab"
+            role="tab"
+            aria-selected="false"
+            tabindex="-1"
+            aria-controls="unit-meeting"
+            id="unit-tab-meeting"
+            data-unit-tab="meeting"
+            hidden
+            >Meeting agenda</button
           ><button
             class="panel-tab"
             role="tab"
@@ -313,9 +323,16 @@
       ></p
       ><div class="unit-toolbar"
         ><button id="unit-refresh">Refresh</button
+        ><a id="unit-backup" class="manager-link" hidden
+          >Download unit backup (ZIP)</a
         ><button id="unit-settings" hidden>Unit settings</button></div
       >
       <section id="unit-workspace" hidden
+        ><div id="unit-live-status" class="unit-block" role="status" hidden
+          ><span id="unit-live-message"></span
+          ><button type="button" id="unit-live-refresh" hidden
+            >Refresh saved changes</button
+          ></div
         ><div class="unit-section-heading"
           ><h2 id="unit-section-title">Roster</h2
           ><p id="unit-section-note" class="feature-note"></p></div
@@ -327,9 +344,10 @@
           ><form id="unit-brand-form" class="unit-block"
             ><h3>Unit branding</h3
             ><p class="feature-note"
-              >Shown across this unit’s workspace. PNG, JPEG or WebP, up to 4 MB
-              per image. Square icons and wide banners (around 1600 × 320) work
-              best.</p
+              >Shown across this unit’s workspace. PNG, JPEG or WebP, up to 20
+              MB per source image (40 megapixels maximum). Drag and zoom the
+              previews to crop square icons and wide banners. Save branding
+              applies the crop.</p
             ><label class="unit-field"
               >Short description<input
                 name="description"
@@ -478,7 +496,44 @@
             ><button id="roster-structure" hidden>Manage structure</button
             ><button id="roster-add" class="btn-save" hidden>Add member</button
             ><button type="button" id="roster-bulk" hidden>Bulk edit…</button
+            ><button type="button" id="roster-vacancies" hidden
+              >Open billets</button
+            ><button type="button" id="roster-temporary" hidden
+              >Temporary cover</button
+            ><button type="button" id="roster-print">Print roster</button
             ><a id="roster-export" class="manager-link">Export CSV</a></div
+          ><p class="feature-note"
+            >Saved changes sync about every 3 seconds while this page is
+            visible. Unsaved forms are kept.</p
+          ><details class="roster-display-options"
+            ><summary>Formation display options</summary
+            ><label
+              ><input type="checkbox" id="roster-show-callsigns" checked />
+              Callsigns</label
+            ><label
+              ><input type="checkbox" id="roster-show-qualifications" />
+              Qualifications</label
+            ><label
+              ><input type="checkbox" id="roster-show-status" checked /> Reserve
+              / LOA labels</label
+            ></details
+          ><div id="roster-selection-bar" class="unit-toolbar" hidden
+            ><strong id="roster-selected-count">0 selected</strong
+            ><button type="button" id="roster-select-shown">Select shown</button
+            ><button type="button" id="roster-place-selected" disabled
+              >Place selected in formation</button
+            ><button type="button" id="roster-clear-selection"
+              >Clear selection</button
+            ></div
+          ><details id="roster-change-feed"
+            ><summary>Recent roster changes</summary
+            ><button type="button" id="roster-feed-refresh">Refresh feed</button
+            ><p id="roster-feed-status" role="status"></p
+            ><div id="roster-feed-entries"></div
+            ><button type="button" id="roster-feed-more" hidden
+              >Load older changes</button
+            ></details
+          ><div id="roster-search-results" class="unit-block" hidden></div
           ><div id="roster-hierarchy" hidden></div
           ><div class="unit-table" id="roster-member-list"
             ><table
@@ -491,11 +546,22 @@
               ><tbody id="roster-rows"></tbody></table></div
           ><p class="feature-note"
             >Promotion dates are eligibility estimates, subject to required
-            qualifications and staff review. LOA stays in effect until staff
-            change the status. Attendance is recorded only during scheduled,
+            qualifications and staff review. Dated LOA returns members to Active
+            after its end date. Attendance is recorded only during scheduled,
             attendance-tracked events.</p
           ></section
         >
+        <section
+          id="unit-meeting"
+          role="tabpanel"
+          aria-labelledby="unit-tab-meeting"
+          hidden
+          ><div class="unit-toolbar"
+            ><button type="button" id="meeting-refresh">Refresh agenda</button
+            ><button type="button" id="meeting-add">Add follow-up</button></div
+          ><p id="meeting-status" role="status"></p
+          ><div id="meeting-content"></div
+        ></section>
         <section
           id="unit-qualifications"
           role="tabpanel"
@@ -693,6 +759,8 @@
           ><button id="structure-add-group" class="btn-save">Add group</button
           ><button type="button" id="structure-billet-types"
             >Billet types</button
+          ><button type="button" id="structure-templates" hidden
+            >Formation templates</button
           ><label class="unit-field"
             >Find formation or billet<input
               type="search"
@@ -797,13 +865,17 @@
     >
     <script src="/static/api.js?v=cleanup-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script
-    ><script src="/static/unit-ux.js?v=formations-1"></script
-    ><script src="/static/unit-events.js?v=formations-1"></script
-    ><script src="/static/roster-tools.js?v=rank-abbreviations-1"></script
+    ><script src="/static/unit-ux.js?v=roster-collaboration-1"></script
+    ><script src="/static/unit-events.js?v=roster-polish-1"></script
+    ><script src="/static/roster-tools.js?v=roster-polish-1"></script
     ><script src="/static/unit-resources.js?v=roster-chart-1"></script
-    ><script src="/static/unit-members.js?v=unit-roster-4"></script
-    ><script src="/static/unit-structure.js?v=rank-abbreviations-1"></script
-    ><script src="/static/unit-catalog.js?v=rank-abbreviations-1"></script
-    ><script src="/static/units.js?v=rank-abbreviations-1"></script
+    ><script src="/static/unit-members.js?v=personnel-tools-1"></script
+    ><script src="/static/unit-structure.js?v=roster-polish-1"></script
+    ><script src="/static/unit-catalog.js?v=qualification-delete-1"></script
+    ><script src="/static/unit-roster.js?v=roster-polish-1"></script
+    ><script src="/static/unit-personnel.js?v=personnel-tools-1"></script
+    ><script src="/static/unit-brand-crop.js?v=branding-crop-1"></script
+    ><script src="/static/unit-roster-print.js?v=roster-polish-1"></script
+    ><script src="/static/units.js?v=roster-polish-1"></script
     ><script src="/static/help.js?v=manuals-3"></script></body
 ></html>

@@ -177,13 +177,30 @@ def install(api, db, access, revision, panel_admin, endpoints):
             events = [
                 dict(r)
                 for r in conn.execute(
-                    "SELECT e.id,e.name,e.category,e.briefing,e.location,e.starts,e.ends,e.timezone,e.version,r.answer AS rsvp FROM unit_events e LEFT JOIN unit_event_rsvps r ON r.event_id=e.id AND r.unit_id=e.unit_id AND r.user_id=? AND r.member_id=? AND r.event_version=e.version WHERE e.unit_id=? AND e.state='scheduled' AND e.ends>? ORDER BY e.starts,e.id LIMIT 50",
-                    (g.user["id"], member["id"] if member else -1, unit_id, now),
+                    "SELECT e.id,e.name,e.category,e.briefing,e.location,e.starts,e.ends,e.timezone,e.version,r.answer AS rsvp FROM unit_events e LEFT JOIN unit_event_rsvps r ON r.event_id=e.id AND r.unit_id=e.unit_id AND r.user_id=? AND r.member_id=? AND r.event_version=e.version WHERE e.unit_id=? AND e.state='scheduled' AND e.ends>? AND (e.formation_ids='[]' OR ? OR EXISTS(SELECT 1 FROM unit_event_members em WHERE em.event_id=e.id AND em.member_id=?)) ORDER BY e.starts,e.id LIMIT 50",
+                    (
+                        g.user["id"],
+                        member["id"] if member else -1,
+                        unit_id,
+                        now,
+                        int(can_events),
+                        member["id"] if member else -1,
+                    ),
                 )
             ]
+            invited_events = {
+                row[0]
+                for row in conn.execute(
+                    'SELECT m.event_id FROM unit_event_members m JOIN unit_events e ON e.id=m.event_id WHERE e.unit_id=? AND m.member_id=? AND e.state=? AND e.starts>?',
+                    (unit_id, member["id"] if member else -1, "scheduled", now),
+                )
+            }
             for event in events:
                 event["can_rsvp"] = bool(
-                    member and not member["archived"] and event["starts"] > now
+                    member
+                    and not member["archived"]
+                    and event["starts"] > now
+                    and event["id"] in invited_events
                 )
                 if can_events:
                     event["responses"] = [
@@ -246,7 +263,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
             qualifications = [
                 dict(r)
                 for r in conn.execute(
-                    "SELECT certificate,awarded_on FROM unit_qualification_awards WHERE unit_id=? AND member_id=? ORDER BY certificate",
+                    "SELECT certificate,awarded_on,expires_on FROM unit_qualification_awards WHERE unit_id=? AND member_id=? ORDER BY certificate",
                     (unit_id, member["id"]),
                 )
             ]
@@ -346,6 +363,11 @@ def install(api, db, access, revision, panel_admin, endpoints):
             ).fetchone()
             if not event:
                 abort(404, description="Event not found")
+            if not conn.execute(
+                "SELECT 1 FROM unit_event_members WHERE event_id=? AND member_id=?",
+                (event_id, member["id"]),
+            ).fetchone():
+                abort(403, description="You are not on this event’s selected roster")
             if (
                 event["state"] != "scheduled"
                 or event["starts"] <= time.time()

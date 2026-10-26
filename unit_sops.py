@@ -366,6 +366,13 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
 
     def related_details(conn, unit_id, row, member=False):
         result = []
+        qualifications = set(
+            json.loads(
+                conn.execute(
+                    "SELECT catalog FROM units WHERE id=?", (unit_id,)
+                ).fetchone()[0]
+            ).get("certificates", [])
+        )
         for entry in json.loads(row.get("related", "[]")):
             item = dict(entry)
             if item["kind"] == "sop":
@@ -396,6 +403,11 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
                     continue
                 item["title"] = target["name"]
             else:
+                if (
+                    item["kind"] == "qualification"
+                    and item["name"] not in qualifications
+                ):
+                    continue
                 item["title"] = item["name"]
             result.append(item)
         return result

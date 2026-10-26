@@ -4,6 +4,9 @@ window.UnitUX = {
   registerDraft(draft) {
     unitDrafts.push(draft);
   },
+  isBusy() {
+    return unitDrafts.some((draft) => draft.busy?.());
+  },
   hasDraft() {
     return unitDrafts.some((draft) => draft.dirty());
   },

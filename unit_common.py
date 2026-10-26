@@ -156,3 +156,29 @@ def roster_status(member, on=None):
     start = member["loa_from"] if "loa_from" in member.keys() else ""
     end = member["loa_until"]
     return "active" if (start and day < start) or (end and day > end) else "loa"
+
+
+def effective_certificates(conn, unit_id, member, on=None):
+    """Recorded awards remain in history; only date-valid awards satisfy requirements."""
+    day = on or date.today().isoformat()
+    awards = {
+        row["certificate"]: row
+        for row in conn.execute(
+            "SELECT * FROM unit_qualification_awards WHERE unit_id=? AND member_id=?",
+            (unit_id, member["id"]),
+        )
+    }
+    return [
+        name
+        for name in member["certificates"].split(";")
+        if name
+        and (
+            name not in awards
+            or (
+                (not awards[name]["awarded_on"] or awards[name]["awarded_on"] <= day)
+                and (
+                    not awards[name]["expires_on"] or awards[name]["expires_on"] >= day
+                )
+            )
+        )
+    ]

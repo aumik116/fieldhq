@@ -7,7 +7,7 @@ import time
 
 from flask import abort, g, jsonify, request
 
-from unit_common import actor as author, text
+from unit_common import actor as author, text, effective_certificates
 
 
 def install(
@@ -23,6 +23,7 @@ def install(
     record_strength,
     sync_event_roster,
     assign_placement,
+    member_revision,
 ):
     def state(conn, unit_id, member_id):
         row = conn.execute(
@@ -38,6 +39,11 @@ def install(
             for key in (
                 "id",
                 "game_name",
+                "discord",
+                "identity",
+                "joined_on",
+                "notes",
+                "panel_user_id",
                 "rank",
                 "rank_track",
                 "last_promo",
@@ -82,6 +88,17 @@ def install(
         except (ValueError, TypeError):
             raise ValueError("Choose an award date on or before today") from None
 
+    def expiry_date(value, awarded_on):
+        if not value:
+            return ""
+        try:
+            value = date.fromisoformat(value).isoformat()
+        except (ValueError, TypeError):
+            raise ValueError("Choose a valid expiry date") from None
+        if awarded_on and value < awarded_on:
+            raise ValueError("Expiry must be on or after the award date")
+        return value
+
     def record_change(conn, unit_id, member_id, before, data=None):
         data = data or {}
         after = state(conn, unit_id, member_id)
@@ -91,6 +108,17 @@ def install(
         previous = before or {}
         for kind, keys in [
             ("rank", ("rank_track", "rank", "last_promo")),
+            (
+                "profile",
+                (
+                    "game_name",
+                    "discord",
+                    "identity",
+                    "joined_on",
+                    "notes",
+                    "panel_user_id",
+                ),
+            ),
             ("billet", ("billet_id", "billet_path", "placement_id", "placement_path")),
             ("status", ("status", "archived", "loa_from", "loa_until")),
             ("callsign", ("callsign", "effective_callsign")),
@@ -133,8 +161,15 @@ def install(
                 or None
             )
             conn.execute(
-                "INSERT INTO unit_qualification_awards VALUES(?,?,?,?,?,?)",
+                "INSERT INTO unit_qualification_awards(unit_id,member_id,certificate,awarded_on,issuer,notes) VALUES(?,?,?,?,?,?)",
                 (unit_id, member_id, certificate, awarded_on, issuer, notes),
+            )
+            expires_on = expiry_date(
+                data.get("qualification_expires_on", ""), awarded_on
+            )
+            conn.execute(
+                "UPDATE unit_qualification_awards SET expires_on=? WHERE unit_id=? AND member_id=? AND certificate=?",
+                (expires_on, unit_id, member_id, certificate),
             )
             history(
                 conn,
@@ -144,6 +179,7 @@ def install(
                 None,
                 dict(
                     certificate=certificate,
+                    expires_on=expires_on,
                     awarded_on=awarded_on,
                     issuer=issuer,
                     notes=notes,
@@ -168,6 +204,13 @@ def install(
             CREATE INDEX IF NOT EXISTS unit_roster_history_member ON unit_roster_history(unit_id,member_id,id);
         """
         )
+        if "expires_on" not in {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(unit_qualification_awards)")
+        }:
+            conn.execute(
+                "ALTER TABLE unit_qualification_awards ADD COLUMN expires_on TEXT NOT NULL DEFAULT ''"
+            )
         conn.execute("BEGIN IMMEDIATE")
         # Existing data is a baseline, not evidence of when or by whom it was awarded.
         for member in conn.execute(
@@ -189,7 +232,7 @@ def install(
                 )
             for certificate in filter(None, member["certificates"].split(";")):
                 conn.execute(
-                    "INSERT OR IGNORE INTO unit_qualification_awards VALUES(?,?,?,NULL,NULL,?)",
+                    "INSERT OR IGNORE INTO unit_qualification_awards(unit_id,member_id,certificate,awarded_on,issuer,notes) VALUES(?,?,?,NULL,NULL,?)",
                     (
                         member["unit_id"],
                         member["id"],
@@ -202,7 +245,9 @@ def install(
         "unit_roster_tools",
         "unit_roster_timeline",
         "unit_qualification_save",
+        "unit_qualification_delete",
         "unit_member_promote",
+        "unit_promotion_preview",
         "unit_roster_bulk_preview",
         "unit_roster_bulk_apply",
     }
@@ -215,6 +260,7 @@ def install(
             name: "view"
             for name in (
                 "unit_qualification_save",
+                "unit_qualification_delete",
                 "unit_member_promote",
                 "unit_roster_bulk_apply",
             )
@@ -249,7 +295,16 @@ def install(
         except ValueError:
             return jsonify(ok=False, error="Choose a valid timeline cursor"), 400
         kind = request.args.get("kind", "all")
-        if kind not in ("all", "rank", "billet", "qualification", "status", "callsign"):
+        if kind not in (
+            "all",
+            "rank",
+            "billet",
+            "qualification",
+            "status",
+            "callsign",
+            "profile",
+            "temporary",
+        ):
             return jsonify(ok=False, error="Choose a valid timeline filter"), 400
         with db() as conn:
             access(conn, unit_id)
@@ -268,6 +323,174 @@ def install(
             entries=rows[:50], next_before=rows[49]["id"] if len(rows) > 50 else None
         )
 
+    @api.app.post("/api/units/<int:unit_id>/qualifications/delete")
+    def unit_qualification_delete(unit_id):
+        try:
+            data = request.get_json()
+            name = text(data.get("name"), "Qualification", 80, True)
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                unit = access(conn, unit_id, "staff")
+                if (
+                    type(data.get("revision")) is not int
+                    or data["revision"] != unit["revision"]
+                ):
+                    abort(
+                        409,
+                        description="This unit changed. Reopen the deletion preview.",
+                    )
+                catalog = json.loads(unit["catalog"])
+                if name not in catalog.get("certificates", []):
+                    raise ValueError("Qualification not found in this unit")
+                members = [
+                    dict(row)
+                    for row in conn.execute(
+                        "SELECT id,game_name,certificates,archived FROM unit_roster WHERE unit_id=?",
+                        (unit_id,),
+                    )
+                    if name in row["certificates"].split(";")
+                ]
+                ranks = [
+                    dict(structure=track["name"], rank=rank["name"])
+                    for track in catalog.get("rank_structures", [])
+                    for rank in track["ranks"]
+                    if name in rank["certificates"]
+                ]
+                rules = []
+                for row in conn.execute(
+                    "SELECT reference_id,targets FROM unit_document_rules WHERE unit_id=?",
+                    (unit_id,),
+                ):
+                    old = json.loads(row["targets"])
+                    new = [
+                        target
+                        for target in old
+                        if not (
+                            target["kind"] == "qualification"
+                            and target.get("name") == name
+                        )
+                    ]
+                    if new != old:
+                        rules.append((row["reference_id"], new))
+                references = []
+                for row in conn.execute(
+                    "SELECT id,title,related,published_value FROM unit_references WHERE unit_id=?",
+                    (unit_id,),
+                ):
+                    related = json.loads(row["related"])
+                    new = [
+                        item
+                        for item in related
+                        if not (
+                            item["kind"] == "qualification" and item.get("name") == name
+                        )
+                    ]
+                    published = (
+                        json.loads(row["published_value"]).get("related", "[]")
+                        if row["published_value"]
+                        else "[]"
+                    )
+                    published_related = (
+                        json.loads(published)
+                        if isinstance(published, str)
+                        else published
+                    )
+                    if new != related or any(
+                        item["kind"] == "qualification" and item.get("name") == name
+                        for item in published_related
+                    ):
+                        references.append((row["id"], row["title"], new))
+                impact = dict(
+                    members=[
+                        dict(
+                            id=member["id"],
+                            name=member["game_name"],
+                            former=bool(member["archived"]),
+                        )
+                        for member in members
+                    ],
+                    ranks=ranks,
+                    reading_audiences=len(rules),
+                    references=[row[1] for row in references],
+                )
+                if data.get("confirmed") is not True:
+                    g.audit_details = dict(
+                        unit_id=unit_id,
+                        qualification=name,
+                        change="qualification deletion preview",
+                    )
+                    return jsonify(ok=True, impact=impact)
+                if data.get("confirm_name") != name:
+                    raise ValueError(
+                        "Type the exact qualification name to confirm deletion"
+                    )
+                revision(conn, unit_id, data)
+                for member in members:
+                    before = state(conn, unit_id, member["id"])
+                    certificates = ";".join(
+                        value
+                        for value in member["certificates"].split(";")
+                        if value and value != name
+                    )
+                    conn.execute(
+                        "UPDATE unit_roster SET certificates=?,updated_at=? WHERE unit_id=? AND id=?",
+                        (certificates, time.time(), unit_id, member["id"]),
+                    )
+                    record_change(
+                        conn,
+                        unit_id,
+                        member["id"],
+                        before,
+                        dict(
+                            history_reason="Qualification deleted from unit catalog: "
+                            + name
+                        ),
+                    )
+                conn.execute(
+                    "DELETE FROM unit_qualification_awards WHERE unit_id=? AND certificate=?",
+                    (unit_id, name),
+                )
+                catalog["certificates"] = [
+                    value for value in catalog["certificates"] if value != name
+                ]
+                catalog["qualification_details"] = [
+                    value
+                    for value in catalog.get("qualification_details", [])
+                    if value["name"] != name
+                ]
+                for track in catalog.get("rank_structures", []):
+                    for rank in track["ranks"]:
+                        rank["certificates"] = [
+                            value for value in rank["certificates"] if value != name
+                        ]
+                conn.execute(
+                    "UPDATE units SET catalog=? WHERE id=?",
+                    (json.dumps(catalog), unit_id),
+                )
+                for reference_id, targets in rules:
+                    conn.execute(
+                        "UPDATE unit_document_rules SET targets=? WHERE unit_id=? AND reference_id=?",
+                        (json.dumps(targets), unit_id, reference_id),
+                    )
+                for reference_id, title, related in references:
+                    conn.execute(
+                        "UPDATE unit_references SET related=? WHERE unit_id=? AND id=?",
+                        (json.dumps(related), unit_id, reference_id),
+                    )
+                sync_event_roster(conn, unit_id)
+            g.audit_details = dict(
+                unit_id=unit_id,
+                qualification=name,
+                change="qualification deleted",
+                member_awards=len(members),
+                rank_requirements=len(ranks),
+                reading_audiences=len(rules),
+                references=len(references),
+            )
+            return jsonify(ok=True)
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+
     @api.app.post("/api/units/<int:unit_id>/roster/<int:member_id>/qualifications")
     def unit_qualification_save(unit_id, member_id):
         data = request.get_json()
@@ -275,7 +498,7 @@ def install(
             with db() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 unit = access(conn, unit_id, "roster")
-                revision(conn, unit_id, data)
+                member_revision(conn, unit_id, data, member_id)
                 before = state(conn, unit_id, member_id)
                 certificate = text(data.get("certificate"), "Qualification", 80, True)
                 if certificate not in json.loads(unit["catalog"]).get(
@@ -312,6 +535,9 @@ def install(
                         (unit_id, member_id, certificate),
                     ).fetchone()
                     awarded_on = award_date(data.get("awarded_on"), allow_unknown=True)
+                    expires_on = expiry_date(
+                        data.get("expires_on", old["expires_on"]), awarded_on
+                    )
                     notes = text(data.get("notes", ""), "Award notes", 1000)
                     issuer = (
                         text(
@@ -322,13 +548,27 @@ def install(
                         or None
                     )
                     conn.execute(
-                        "UPDATE unit_qualification_awards SET awarded_on=?,notes=?,issuer=? WHERE unit_id=? AND member_id=? AND certificate=?",
-                        (awarded_on, notes, issuer, unit_id, member_id, certificate),
+                        "UPDATE unit_qualification_awards SET awarded_on=?,notes=?,issuer=?,expires_on=? WHERE unit_id=? AND member_id=? AND certificate=?",
+                        (
+                            awarded_on,
+                            notes,
+                            issuer,
+                            expires_on,
+                            unit_id,
+                            member_id,
+                            certificate,
+                        ),
                     )
-                    if (old["awarded_on"], old["issuer"], old["notes"]) != (
+                    if (
+                        old["awarded_on"],
+                        old["issuer"],
+                        old["notes"],
+                        old["expires_on"],
+                    ) != (
                         awarded_on,
                         issuer,
                         notes,
+                        expires_on,
                     ):
                         history(
                             conn,
@@ -338,6 +578,7 @@ def install(
                             dict(old),
                             dict(
                                 certificate=certificate,
+                                expires_on=expires_on,
                                 awarded_on=awarded_on,
                                 issuer=issuer,
                                 notes=notes,
@@ -359,6 +600,7 @@ def install(
                         dict(
                             history_reason=reason,
                             qualification_awarded_on=data.get("awarded_on"),
+                            qualification_expires_on=data.get("expires_on", ""),
                             qualification_notes=data.get("notes", ""),
                             qualification_issuer=data.get(
                                 "issuer", author(conn, unit_id)
@@ -376,6 +618,39 @@ def install(
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
 
+    def promotion_at(conn, unit_id, member, catalog, raw_date):
+        effective = award_date(raw_date or date.today().isoformat())
+        if member["last_promo"] and effective < member["last_promo"]:
+            raise ValueError("Promotion cannot predate the previous promotion")
+        member = dict(member)
+        member["active_certificates"] = effective_certificates(
+            conn, unit_id, member, effective
+        )
+        result = promotion(member, catalog, effective)
+        return effective, result
+
+    @api.app.post("/api/units/<int:unit_id>/roster/<int:member_id>/promotion-preview")
+    def unit_promotion_preview(unit_id, member_id):
+        try:
+            with db() as conn:
+                unit = access(conn, unit_id, "roster")
+                member = conn.execute(
+                    "SELECT * FROM unit_roster WHERE unit_id=? AND id=?",
+                    (unit_id, member_id),
+                ).fetchone()
+                if not member:
+                    abort(404, description="Member not found")
+                effective, ready = promotion_at(
+                    conn,
+                    unit_id,
+                    member,
+                    json.loads(unit["catalog"]),
+                    request.get_json().get("effective_date"),
+                )
+            return jsonify(ok=True, effective_date=effective, promotion=ready)
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+
     @api.app.post("/api/units/<int:unit_id>/roster/<int:member_id>/promote")
     def unit_member_promote(unit_id, member_id):
         data = request.get_json()
@@ -383,14 +658,20 @@ def install(
             with db() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 unit = access(conn, unit_id, "roster")
-                revision(conn, unit_id, data)
+                member_revision(conn, unit_id, data, member_id)
                 member = conn.execute(
                     "SELECT * FROM unit_roster WHERE unit_id=? AND id=?",
                     (unit_id, member_id),
                 ).fetchone()
                 if not member:
                     abort(404, description="Member not found in this unit")
-                ready = promotion(dict(member), json.loads(unit["catalog"]))
+                effective, ready = promotion_at(
+                    conn,
+                    unit_id,
+                    member,
+                    json.loads(unit["catalog"]),
+                    data.get("effective_date"),
+                )
                 if (
                     not ready["eligible"]
                     or data.get("confirm_rank") != ready["next_rank"]
@@ -405,7 +686,7 @@ def install(
                     "UPDATE unit_roster SET rank=?,last_promo=?,updated_at=? WHERE unit_id=? AND id=?",
                     (
                         ready["next_rank"],
-                        date.today().isoformat(),
+                        effective,
                         time.time(),
                         unit_id,
                         member_id,
@@ -471,7 +752,9 @@ def install(
                     )
                 ):
                     raise ValueError("Restore this qualification before awarding it")
-                award_date(data.get("awarded_on"))
+                awarded_on = award_date(data.get("awarded_on"))
+                expiry_date(data.get("expires_on", ""), awarded_on)
+                text(data.get("issuer", ""), "Issuing staff name", 120)
             for change in changes:
                 held = set(filter(None, change["before"]["certificates"].split(";")))
                 if action == "grant":
@@ -557,6 +840,8 @@ def install(
             reason=reason,
             certificate=data.get("certificate"),
             awarded_on=data.get("awarded_on"),
+            expires_on=data.get("expires_on", ""),
+            issuer=data.get("issuer", ""),
             status=data.get("status"),
             section_id=data.get("section_id"),
             changes=changes,
@@ -622,6 +907,9 @@ def install(
                         dict(
                             history_reason=data["reason"],
                             qualification_awarded_on=data.get("awarded_on"),
+                            qualification_expires_on=data.get("expires_on", ""),
+                            qualification_issuer=data.get("issuer")
+                            or author(conn, unit_id),
                         ),
                     )
                 sync_event_roster(conn, unit_id)
