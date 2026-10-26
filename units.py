@@ -141,6 +141,10 @@ def install(api):
                 parent_id INTEGER, kind TEXT NOT NULL CHECK(kind IN ('group','section','billet')),
                 name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0);
             CREATE INDEX IF NOT EXISTS unit_structure_parent ON unit_structure(unit_id,parent_id,sort_order);
+            CREATE TABLE IF NOT EXISTS unit_member_placements (
+                unit_id INTEGER NOT NULL, member_id INTEGER PRIMARY KEY,
+                parent_id INTEGER NOT NULL);
+            CREATE INDEX IF NOT EXISTS unit_member_placements_parent ON unit_member_placements(unit_id,parent_id);
             CREATE TABLE IF NOT EXISTS unit_primary_slots (
                 unit_id INTEGER NOT NULL, member_id INTEGER PRIMARY KEY,
                 billet_id INTEGER NOT NULL UNIQUE);
@@ -384,11 +388,13 @@ def install(api):
         "unit_position_rename",
         "unit_member_record",
         "unit_member_note_save",
+        "unit_member_login_create",
         "unit_roster_delete",
         "unit_structure_save",
         "unit_structure_delete",
         "unit_structure_order",
         "unit_primary_assign",
+        "unit_placement_save",
         "unit_branding_save",
         "unit_branding_image",
     }
@@ -396,6 +402,9 @@ def install(api):
     from panel_features import MUTATIONS
 
     MUTATIONS["unit_staff_save"] = "view"
+    MUTATIONS["unit_member_login_create"] = "view"
+    MUTATIONS["unit_placement_save"] = "view"
+    MUTATIONS["unit_primary_assign"] = "view"
     MUTATIONS["unit_branding_save"] = "view"
 
     @api.app.errorhandler(400)
@@ -766,7 +775,7 @@ def install(api):
         ]
 
     def structure_node(conn, unit_id, node_id, kind=None):
-        if type(node_id) is not int:
+        if type(node_id) is not int or not 1 <= node_id <= 9223372036854775807:
             raise ValueError("Choose a valid structure item")
         node = conn.execute(
             "SELECT * FROM unit_structure WHERE unit_id=? AND id=?", (unit_id, node_id)
@@ -780,23 +789,41 @@ def install(api):
             structure if structure is not None else structure_rows(conn, unit_id)
         )
         by_id = {row["id"]: row for row in structure}
-        assignments = {
+        slots = {
             row["member_id"]: row["billet_id"]
             for row in conn.execute(
                 "SELECT * FROM unit_primary_slots WHERE unit_id=?", (unit_id,)
             )
         }
+        placements = {
+            row["member_id"]: row["parent_id"]
+            for row in conn.execute(
+                "SELECT * FROM unit_member_placements WHERE unit_id=?", (unit_id,)
+            )
+        }
+
+        def path(node):
+            parts = []
+            seen = set()
+            while node and node["id"] not in seen:
+                seen.add(node["id"])
+                parts.insert(0, node["name"])
+                node = by_id.get(node["parent_id"])
+            return " / ".join(parts)
+
         for member in members:
-            slot = by_id.get(assignments.get(member["id"]))
-            path = []
-            current = slot
-            while current:
-                path.append(current["name"])
-                current = by_id.get(current["parent_id"])
+            slot = by_id.get(slots.get(member["id"]))
+            placement = by_id.get(placements.get(member["id"])) if not slot else None
+            formation = by_id.get(slot["parent_id"]) if slot else placement
             member.update(
                 billet_id=slot["id"] if slot else None,
                 billet_name=slot["name"] if slot else "",
-                billet_path=" / ".join(reversed(path)),
+                billet_path=path(slot),
+                placement_id=placement["id"] if placement else None,
+                placement_path=path(placement),
+                assignment_path=path(slot or placement),
+                formation_id=formation["id"] if formation else None,
+                formation_path=path(formation),
             )
 
     def assign_slot(conn, unit_id, member_id, billet_id):
@@ -817,6 +844,10 @@ def install(api):
                     description="This billet is already filled. Unassign its current member first.",
                 )
         conn.execute(
+            "DELETE FROM unit_member_placements WHERE unit_id=? AND member_id=?",
+            (unit_id, member_id),
+        )
+        conn.execute(
             "DELETE FROM unit_primary_slots WHERE unit_id=? AND member_id=?",
             (unit_id, member_id),
         )
@@ -825,6 +856,65 @@ def install(api):
                 "INSERT INTO unit_primary_slots VALUES(?,?,?)",
                 (unit_id, member_id, billet_id),
             )
+
+    def assign_placement(conn, unit_id, member_id, parent_id):
+        member = find_member(conn, unit_id, member_id)
+        if parent_id is not None:
+            target = structure_node(conn, unit_id, parent_id)
+            if target["kind"] == "billet":
+                raise ValueError("Choose a formation rather than a billet")
+            if member["archived"]:
+                raise ValueError("Restore this member before assigning a formation")
+        conn.execute(
+            "DELETE FROM unit_primary_slots WHERE unit_id=? AND member_id=?",
+            (unit_id, member_id),
+        )
+        conn.execute(
+            "DELETE FROM unit_member_placements WHERE unit_id=? AND member_id=?",
+            (unit_id, member_id),
+        )
+        if parent_id is not None:
+            conn.execute(
+                "INSERT INTO unit_member_placements VALUES(?,?,?)",
+                (unit_id, member_id, parent_id),
+            )
+
+    @api.app.post("/api/units/<int:unit_id>/placement")
+    def unit_placement_save(unit_id):
+        try:
+            data = request.get_json()
+            ids = data.get("member_ids", [])
+            if (
+                not isinstance(ids, list)
+                or not 1 <= len(ids) <= 500
+                or any(type(key) is not int for key in ids)
+                or len(set(ids)) != len(ids)
+            ):
+                raise ValueError("Choose 1–500 distinct roster members")
+            reason = text(data.get("reason", ""), "Assignment reason", 1000)
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                access(conn, unit_id, "roster")
+                revision(conn, unit_id, data)
+                for member_id in ids:
+                    before = roster_state(conn, unit_id, member_id)
+                    assign_placement(conn, unit_id, member_id, data.get("parent_id"))
+                    record_roster_change(
+                        conn,
+                        unit_id,
+                        member_id,
+                        before,
+                        dict(history_reason=reason or "Direct formation placement"),
+                    )
+            g.audit_details = dict(
+                unit_id=unit_id,
+                member_ids=ids,
+                parent_id=data.get("parent_id"),
+                change="formation placement",
+            )
+            return jsonify(ok=True, moved=len(ids))
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
 
     @api.app.post("/api/units/<int:unit_id>/structure")
     def unit_structure_save(unit_id):
@@ -848,8 +938,8 @@ def install(api):
                     {
                         r[0]: roster_state(conn, unit_id, r[0])
                         for r in conn.execute(
-                            "SELECT member_id FROM unit_primary_slots WHERE unit_id=?",
-                            (unit_id,),
+                            "SELECT member_id FROM unit_primary_slots WHERE unit_id=? UNION SELECT member_id FROM unit_member_placements WHERE unit_id=?",
+                            (unit_id, unit_id),
                         ).fetchall()
                     }
                     if old
@@ -863,12 +953,8 @@ def install(api):
                         raise ValueError("Groups must be at the top level")
                 else:
                     target = structure_node(conn, unit_id, parent)
-                    if target["kind"] not in (
-                        ("group", "section") if kind == "section" else ("section",)
-                    ):
-                        raise ValueError(
-                            "Sections belong inside groups or sections; billets belong inside sections"
-                        )
+                    if target["kind"] not in (("group", "section")):
+                        raise ValueError("Choose a group or section as the parent")
                     ancestors = []
                     while target:
                         if target["id"] == identity:
@@ -964,8 +1050,8 @@ def install(api):
                 released = [
                     row[0]
                     for row in conn.execute(
-                        f"SELECT member_id FROM unit_primary_slots WHERE unit_id=? AND billet_id IN ({marks})",
-                        (unit_id, *ids),
+                        f"SELECT member_id FROM unit_primary_slots WHERE unit_id=? AND billet_id IN ({marks}) UNION SELECT member_id FROM unit_member_placements WHERE unit_id=? AND parent_id IN ({marks})",
+                        (unit_id, *ids, unit_id, *ids),
                     )
                 ]
                 previous_states = {
@@ -974,6 +1060,10 @@ def install(api):
                 }
                 conn.execute(
                     f"DELETE FROM unit_primary_slots WHERE unit_id=? AND billet_id IN ({marks})",
+                    (unit_id, *ids),
+                )
+                conn.execute(
+                    f"DELETE FROM unit_member_placements WHERE unit_id=? AND parent_id IN ({marks})",
                     (unit_id, *ids),
                 )
                 conn.execute(
@@ -1049,41 +1139,102 @@ def install(api):
                 structure_node(conn, unit_id, billet, "billet")
                 if member is not None and type(member) is not int:
                     raise ValueError("Choose a roster member")
-                affected = (
-                    member
-                    if member is not None
-                    else next(
-                        (
-                            r[0]
-                            for r in conn.execute(
-                                "SELECT member_id FROM unit_primary_slots WHERE unit_id=? AND billet_id=?",
-                                (unit_id, billet),
-                            )
-                        ),
-                        None,
+                occupant_row = conn.execute(
+                    "SELECT member_id FROM unit_primary_slots WHERE unit_id=? AND billet_id=?",
+                    (unit_id, billet),
+                ).fetchone()
+                occupant = occupant_row["member_id"] if occupant_row else None
+                if "expected_occupant" in data and (
+                    data["expected_occupant"] is not None
+                    and type(data["expected_occupant"]) is not int
+                    or data["expected_occupant"] != occupant
+                ):
+                    abort(
+                        409, description="This billet changed. Reopen the assignment."
                     )
+                strategy = data.get("conflict", "error")
+                if strategy not in ("error", "replace", "swap"):
+                    raise ValueError("Choose a valid assignment action")
+                reason = text(data.get("reason", ""), "Assignment reason", 1000)
+                conflict = (
+                    member is not None and occupant is not None and occupant != member
                 )
-                before = (
-                    roster_state(conn, unit_id, affected)
-                    if affected is not None
-                    else None
-                )
+                source = None
+                source_placement = None
+                if member is not None:
+                    incoming = find_member(conn, unit_id, member)
+                    if incoming["archived"]:
+                        raise ValueError(
+                            "Restore this member before assigning a billet"
+                        )
+                    previous = conn.execute(
+                        "SELECT billet_id FROM unit_primary_slots WHERE unit_id=? AND member_id=?",
+                        (unit_id, member),
+                    ).fetchone()
+                    source = previous["billet_id"] if previous else None
+                    direct = conn.execute(
+                        "SELECT parent_id FROM unit_member_placements WHERE unit_id=? AND member_id=?",
+                        (unit_id, member),
+                    ).fetchone()
+                    source_placement = direct["parent_id"] if direct else None
+                if conflict:
+                    if strategy == "error":
+                        abort(
+                            409,
+                            description="This billet is filled. Choose Swap or Move current member to Unassigned.",
+                        )
+                    if data.get("confirmed") is not True:
+                        raise ValueError("Confirm how the current member will be moved")
+                    if (
+                        strategy == "swap"
+                        and source is None
+                        and source_placement is None
+                    ):
+                        raise ValueError(
+                            "A swap needs the incoming member to have a primary placement"
+                        )
+                affected = {key for key in (member, occupant) if key is not None}
+                before = {key: roster_state(conn, unit_id, key) for key in affected}
                 if member is None:
                     conn.execute(
                         "DELETE FROM unit_primary_slots WHERE unit_id=? AND billet_id=?",
                         (unit_id, billet),
                     )
                 else:
+                    if conflict:
+                        conn.execute(
+                            "DELETE FROM unit_primary_slots WHERE unit_id=? AND member_id IN (?,?)",
+                            (unit_id, member, occupant),
+                        )
                     assign_slot(conn, unit_id, member, billet)
-                if affected is not None:
+                    if conflict and strategy == "swap":
+                        if source is not None:
+                            assign_slot(conn, unit_id, occupant, source)
+                        else:
+                            assign_placement(conn, unit_id, occupant, source_placement)
+                for key in affected:
                     record_roster_change(
                         conn,
                         unit_id,
-                        affected,
-                        before,
-                        dict(history_reason="Primary billet assignment"),
+                        key,
+                        before[key],
+                        dict(
+                            history_reason=reason
+                            or "Primary billet assignment"
+                            + (" · " + strategy if conflict else "")
+                        ),
                     )
-            g.audit_details = dict(unit_id=unit_id, billet_id=billet, member_id=member)
+            g.audit_details = dict(
+                unit_id=unit_id,
+                billet_id=billet,
+                member_id=member,
+                displaced_member=occupant if conflict else None,
+                action=(
+                    strategy
+                    if conflict
+                    else "assign" if member is not None else "unassign"
+                ),
+            )
             return jsonify(ok=True)
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
@@ -1299,6 +1450,61 @@ def install(api):
             or "awards" in unit_role_capabilities(membership["role"]),
         )
 
+    @api.app.post("/api/units/<int:unit_id>/roster/<int:member_id>/login")
+    def unit_member_login_create(unit_id, member_id):
+        data = request.get_json()
+        try:
+            if data.get("role", "member") != "member" or any(
+                key in data for key in ("panel_admin", "access_all", "server_roles")
+            ):
+                raise ValueError("This action creates a Member login only")
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                access(conn, unit_id, "roster")
+                revision(conn, unit_id, data)
+                member = find_member(conn, unit_id, member_id)
+                if member["archived"]:
+                    raise ValueError(
+                        "Restore this roster member before creating a login"
+                    )
+                if member["panel_user_id"] is not None:
+                    abort(409, description="This member already has a linked login")
+                username = text(data.get("username"), "Username", 32, True)
+                user_id = api.create_unit_login(
+                    conn,
+                    username,
+                    data.get("password"),
+                    unit_id=unit_id,
+                    allow_unit_staff=True,
+                )
+                conn.execute(
+                    "INSERT INTO unit_staff(unit_id,user_id,role,capabilities) VALUES(?,?,'member','[]')",
+                    (unit_id, user_id),
+                )
+                conn.execute(
+                    "UPDATE unit_roster SET panel_user_id=?,updated_at=? WHERE unit_id=? AND id=?",
+                    (user_id, time.time(), unit_id, member_id),
+                )
+            g.audit_details = dict(
+                unit_id=unit_id,
+                member_id=member_id,
+                username=username,
+                change="member login created",
+            )
+            return jsonify(ok=True, username=username)
+        except (ValueError, sqlite3.IntegrityError) as exc:
+            return (
+                jsonify(
+                    ok=False,
+                    error=(
+                        str(exc)
+                        if isinstance(exc, ValueError)
+                        else "This username or member link is already in use"
+                    ),
+                ),
+                400,
+            )
+
     @api.app.post("/api/units/<int:unit_id>/roster/<int:member_id>/record")
     def unit_member_note_save(unit_id, member_id):
         data = request.get_json()
@@ -1511,9 +1717,15 @@ def install(api):
                     )
                 if data.get("archived", False):
                     conn.execute(
+                        "DELETE FROM unit_member_placements WHERE unit_id=? AND member_id=?",
+                        (unit_id, member_id),
+                    )
+                    conn.execute(
                         "DELETE FROM unit_primary_slots WHERE unit_id=? AND member_id=?",
                         (unit_id, member_id),
                     )
+                elif "placement_id" in data:
+                    assign_placement(conn, unit_id, member_id, data["placement_id"])
                 elif "billet_id" in data:
                     assign_slot(conn, unit_id, member_id, data["billet_id"])
                 record_roster_change(conn, unit_id, member_id, previous_state, data)
@@ -1590,6 +1802,10 @@ def install(api):
                 )
                 conn.execute(
                     "DELETE FROM unit_resource_audit WHERE unit_id=? AND member_id=?",
+                    (unit_id, member_id),
+                )
+                conn.execute(
+                    "DELETE FROM unit_member_placements WHERE unit_id=? AND member_id=?",
                     (unit_id, member_id),
                 )
                 conn.execute(
@@ -1765,6 +1981,7 @@ def install(api):
                 "archived",
                 "primary_billet",
                 "primary_billet_path",
+                "direct_formation_path",
                 "next_rank",
                 "next_eligible_date",
                 "missing_qualifications",
@@ -1777,6 +1994,7 @@ def install(api):
                 + [
                     export_cell(row["billet_name"]),
                     export_cell(row["billet_path"]),
+                    export_cell(row["placement_path"]),
                     export_cell(result["next_rank"]),
                     result["next_date"],
                     export_cell(";".join(result["missing"])),
@@ -1795,6 +2013,7 @@ def install(api):
     from roster_tools import install as install_roster_tools
     from unit_members import install as install_members
     from unit_sops import install as install_sops
+    from unit_structure import install as install_structure
 
     # Register schemas and route dependencies before accepting requests.
     record_strength = install_resources(
@@ -1815,11 +2034,13 @@ def install(api):
         endpoints,
         record_strength,
         sync_event_roster,
+        assign_placement,
     )
     required_reading = install_members(
         api, db, access, revision, panel_admin, endpoints
     )
     install_sops(api, db, access, revision, panel_admin, endpoints, required_reading)
+    install_structure(api, db, access, revision, endpoints, structure_node)
 
 
 # Keep established imports available to integrations while sharing their definitions.

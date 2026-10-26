@@ -79,7 +79,11 @@ def install(api, db, access, revision, panel_admin, endpoints):
     def applies(conn, unit_id, member, targets):
         positions = set()
         if member and not member["archived"]:
-            positions.add(member["position"])
+            positions.update(
+                position.strip()
+                for position in member["position"].split(";")
+                if position.strip()
+            )
             slot = conn.execute(
                 "SELECT s.name FROM unit_primary_slots p JOIN unit_structure s ON s.id=p.billet_id AND s.unit_id=p.unit_id WHERE p.unit_id=? AND p.member_id=?",
                 (unit_id, member["id"]),
@@ -253,8 +257,8 @@ def install(api, db, access, revision, panel_admin, endpoints):
                 )
             ]
             assigned = conn.execute(
-                "SELECT billet_id FROM unit_primary_slots WHERE unit_id=? AND member_id=?",
-                (unit_id, member["id"]),
+                "SELECT billet_id FROM unit_primary_slots WHERE unit_id=? AND member_id=? UNION ALL SELECT parent_id FROM unit_member_placements WHERE unit_id=? AND member_id=? LIMIT 1",
+                (unit_id, member["id"], unit_id, member["id"]),
             ).fetchone()
             by_id = {p["id"]: p for p in positions}
             path = []

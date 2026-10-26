@@ -50,3 +50,7 @@ Extend existing jobs, preflight checks, notifications, scheduling, configuration
 - Keep role-based access and unit isolation intact.
 - Approved design: all permitted unit pages remain visible beneath sidebar headings. All Servers keeps its counters, table and charts. Hosting / Units remain in the top bar, with Help and account controls on the right.
 - Attention strip: real server errors, unavailable status and disk free below 20%, each with an action. Hide it when clear. Restart-needed and active-job indicators require reliable data before being added.
+
+## Local regression progress
+
+The [25 October local regression report](regression-2026-10-25.md) records passing targeted backend, compatibility, DOM and HTTP checks, one repaired reading-audience bug, and unresolved broad-suite failures. Reconcile those failures and complete browser/production verification before marking the release checks complete.

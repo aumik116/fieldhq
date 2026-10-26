@@ -90,13 +90,14 @@ console.log('Frontend refresh and configuration-layout regressions passed');
   const calls = [], feedback = {textContent:''};
   const context = vm.createContext({busy:new Set(), feedback, Headers, Request, URL, URLSearchParams,
     location:{href:'https://panel.test/servers?server=unrelated',origin:'https://panel.test',search:'?server=unrelated'},
-    document:{dispatchEvent(){}}, CustomEvent:class {},
+    document:{dispatchEvent(){},addEventListener(){}}, CustomEvent:class {},
     confirm:()=>true, refresh:async()=>{},
     fetch:async(url,options)=>{calls.push({url,options});return {ok:true,status:200,json:async()=>({ok:true})};}});
   context.window = context;
   vm.runInContext(source('api.js'),context);
   vm.runInContext('CSRF="token";',context);
   vm.runInContext(between(source('servers.js'),'  async function action(', '  function render('),context);
+  context.PanelUI={confirm:async()=>true};
   for (const id of ['training','everon','']) await context.action({id,name:id || 'Existing'},'restart',{disabled:false});
   assert.equal(calls[0].options.headers.get('X-Server-ID'),'training');
   assert.equal(calls[1].options.headers.get('X-Server-ID'),'everon');
@@ -106,28 +107,20 @@ console.log('Frontend refresh and configuration-layout regressions passed');
   console.log('Overview controls preserve per-server targets and CSRF');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 
-// The access summary must distinguish server control from panel administration.
+// The current account editor summarizes panel authority, units and hosting scope.
 {
-  const choice = {dataset:{server:'training'},value:'operator',selectedOptions:[{textContent:'Start, stop and read logs'}]};
-  const fields = {
-    'user-all-servers':{checked:false},
-    'user-server-access':{querySelectorAll:()=>[choice]},
-    'user-role':{selectedOptions:[{textContent:'Full server administration'}]},
-    'user-panel-admin':{value:'staff'},'user-enabled':{checked:true},
-    'user-access-summary':{textContent:''}
-  };
-  const context=vm.createContext({byId:id=>fields[id],accountServers:[{id:'training',name:'Training'}]});
-  vm.runInContext(between(source('features.js'),'function updateUserAccessSummary()', 'function resetUserForm()'),context);
-  context.updateUserAccessSummary();
-  assert.equal(fields['user-access-summary'].textContent,'Training: Start, stop and read logs. Cannot manage panel users.');
-  fields['user-all-servers'].checked=true; context.updateUserAccessSummary();
-  assert.match(fields['user-access-summary'].textContent,/Every current and future server: Full server administration/);
-  assert.match(fields['user-access-summary'].textContent,/Cannot manage panel users/);
-  fields['user-panel-admin'].value='admin'; context.updateUserAccessSummary();
-  assert.match(fields['user-access-summary'].textContent,/Can manage panel users and grant access to any server/);
-  fields['user-enabled'].checked=false; context.updateUserAccessSummary();
-  assert.match(fields['user-access-summary'].textContent,/Account disabled: cannot sign in/);
-  console.log('Permission summaries explain server scope, panel privileges and disabled accounts');
+  const values=new Map([['panel_admin','staff'],['unit:1','member'],['server:training','operator']]);
+  const summary={textContent:''},form={};
+  const context=vm.createContext({form,user:null,userEditorData:{units:[{id:1}],servers:[{id:'training'}]},userEditorEl:()=>summary,FormData:class {constructor(){return values;}}});
+  const editor=source('user-editor.js');
+  vm.runInContext(between(editor,'    form.oninput = () => {','    form.onsubmit ='),context);
+  form.oninput();
+  assert.equal(summary.textContent,'Staff · 1 units · 1 server assignments');
+  values.set('access_all','on');form.oninput();
+  assert.match(summary.textContent,/all servers/);
+  values.set('panel_admin','admin');form.oninput();
+  assert.match(summary.textContent,/Panel administrator/);
+  console.log('Account editor summarizes panel authority, unit memberships and hosting scope');
 }
 
 // Storage uses decimal units rather than relabeling binary GiB values.

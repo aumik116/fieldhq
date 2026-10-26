@@ -5273,3 +5273,113 @@ html[data-theme] #unit-sidebar [hidden] {
     border-top: 1px solid var(--border);
   }
 }
+
+/* Formation builder and assignment board use the workspace's theme colors. */
+.formation-builder,
+.formation-board {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.formation-navigator,
+.formation-pool {
+  max-height: 70vh;
+  overflow: auto;
+}
+.formation-nav-branch .formation-nav-branch {
+  margin-left: 12px;
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+.formation-navigator button {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 5px;
+  white-space: normal;
+}
+.formation-navigator button[aria-current='page'] {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+.formation-navigator small,
+.formation-pool small,
+.formation-member-picker small {
+  display: block;
+}
+.formation-inspector,
+.formation-board-groups {
+  min-width: 0;
+}
+.formation-heading,
+.formation-member-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.formation-heading h3 {
+  margin: 4px 0;
+}
+.formation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.formation-board-section {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.formation-board-section .formation-board-section {
+  margin-top: 12px;
+}
+.formation-direct {
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.formation-pool article {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+.formation-pool article .formation-actions {
+  margin-top: 8px;
+}
+.formation-selection {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+.formation-member-picker {
+  max-height: 350px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  padding: 10px;
+}
+.formation-member-picker label {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  padding: 8px;
+}
+.formation-member-picker label[hidden] {
+  display: none;
+}
+@media (max-width: 900px) {
+  .formation-builder,
+  .formation-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .formation-navigator,
+  .formation-pool {
+    max-height: 320px;
+  }
+  .formation-board-section {
+    padding: 10px;
+  }
+}
+
+.formation-board-readonly { grid-template-columns: minmax(0, 1fr); }

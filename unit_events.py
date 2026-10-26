@@ -880,8 +880,8 @@ def install(api, db, access, panel_admin, promotion, endpoints):
             assigned = {
                 r[0]
                 for r in conn.execute(
-                    "SELECT member_id FROM unit_primary_slots WHERE unit_id=?",
-                    (unit_id,),
+                    "SELECT member_id FROM unit_primary_slots WHERE unit_id=? UNION SELECT member_id FROM unit_member_placements WHERE unit_id=?",
+                    (unit_id, unit_id),
                 )
             }
             slots = conn.execute(
@@ -903,7 +903,14 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                     active=sum(m["status"] == "active" for m in roster),
                     reserve=sum(m["status"] == "reserve" for m in roster),
                     loa=sum(m["status"] == "loa" for m in roster),
-                    vacancies=max(0, slots - len(assigned)),
+                    vacancies=max(
+                        0,
+                        slots
+                        - conn.execute(
+                            "SELECT count(*) FROM unit_primary_slots WHERE unit_id=?",
+                            (unit_id,),
+                        ).fetchone()[0],
+                    ),
                     unassigned=sum(m["id"] not in assigned for m in roster),
                 ),
                 eligible=eligible,

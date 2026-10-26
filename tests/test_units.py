@@ -114,10 +114,10 @@ class UnitTests(unittest.TestCase):
         second=self.member(b).json['id']
         path=f'/api/units/{a}/roster/{first}/record'
         self.create('record-viewer','viewer')
-        self.assertTrue(self.change(a,'staff',dict(username='record-viewer',role='staff')).json['ok'])
+        self.assertTrue(self.change(a,'staff',dict(username='record-viewer',role='member')).json['ok'])
         viewer=self.login('record-viewer')
-        self.assertEqual(viewer.get(path).json['member']['notes'],'Existing summary')
-        self.assertFalse(viewer.get(path).json['can_write'])
+        self.assertEqual(self.admin.get(path).json['member']['notes'],'Existing summary')
+        self.assertEqual(viewer.get(path).status_code,403)
         self.assertEqual(self.post(viewer,path,dict(note='Not allowed')).status_code,403)
         self.assertEqual(viewer.get(f'/api/units/{b}/roster/{second}/record').status_code,404)
         self.assertEqual(self.admin.get(f'/api/units/{a}/roster/{second}/record').status_code,404)
@@ -261,7 +261,8 @@ class UnitTests(unittest.TestCase):
         self.assertIsNone(self.admin.get(record).json['member']['billet_id'])
         self.assertEqual(self.change(unit,'assignment',dict(member_id=member,billet_id=slot)).status_code,400)
         self.assertTrue(self.change(unit,'staff',dict(username='structure-staff',role='staff',capabilities=[])).json['ok'])
-        self.assertEqual(self.change(unit,'assignment',dict(member_id=another,billet_id=slot),staff).status_code,403)
+        # Legacy empty capability lists cannot revoke the standard Staff role.
+        self.assertEqual(self.change(unit,'assignment',dict(member_id=another,billet_id=slot),staff).status_code,200)
         self.assertTrue(self.change(unit,'staff',dict(username='structure-staff',role='staff',capabilities=['roster'])).json['ok'])
         self.assertTrue(self.change(unit,'assignment',dict(member_id=another,billet_id=slot),staff).json['ok'])
         self.assertTrue(self.change(unit,f'roster/{another}/delete',dict(confirm_name='Ranger')).json['ok'])

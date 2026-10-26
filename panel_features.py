@@ -339,10 +339,10 @@ def install(api):
             raise ValueError("Passwords must contain at least 10 characters and at most 72 UTF-8 bytes")
         return bcrypt.hashpw(value.encode(), bcrypt.gensalt()).decode()
 
-    def create_unit_login(conn, username, password, unit_id=None):
+    def create_unit_login(conn, username, password, unit_id=None, allow_unit_staff=False):
         if 'users' not in g.panel_permissions:
             membership = conn.execute('SELECT role FROM unit_staff WHERE unit_id=? AND user_id=?', (unit_id, g.user['id'])).fetchone()
-            if not membership or membership['role'] != 'admin':
+            if not membership or membership['role'] not in (('admin', 'staff') if allow_unit_staff else ('admin',)):
                 abort(403, description='Only panel or unit administrators can create login accounts')
         if not isinstance(username, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{3,32}', username):
             raise ValueError('Use a 3–32 character username: letters, numbers, _, . or -')

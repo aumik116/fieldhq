@@ -16,7 +16,7 @@
       rel="stylesheet"
       href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=cleanup-2" /><link
+      href="/static/panel.css?v=formations-1" /><link
       rel="stylesheet"
       href="/static/help.css?v=manuals-3"
   /></head>
@@ -458,7 +458,7 @@
             ><input
               type="search"
               id="roster-search"
-              placeholder="Search name, rank, billet, Discord or UUID"
+              placeholder="Search name, rank, formation, billet, Discord or UUID"
               aria-label="Search roster"
             /><select id="roster-status" aria-label="Membership status"
               ><option value="">All current members</option
@@ -480,7 +480,7 @@
               ><thead
                 ><tr
                   ><th>Member</th><th>Status</th><th>Rank / paygrade</th
-                  ><th>Primary billet</th><th>Qualifications</th
+                  ><th>Primary placement</th><th>Qualifications</th
                   ><th>Last promotion</th><th>Next promotion eligibility</th
                   ><th></th></tr></thead
               ><tbody id="roster-rows"></tbody></table></div
@@ -523,7 +523,7 @@
               >Sort<select id="matrix-sort"
                 ><option value="name">Name</option
                 ><option value="rank">Rank structure / rank</option
-                ><option value="section">Primary billet</option></select
+                ><option value="section">Primary placement</option></select
               ></label
             ><label
               ><input type="checkbox" id="matrix-checks" /> Checkmarks
@@ -681,9 +681,15 @@
           hidden
           ><p class="feature-note"
             >Create groups for roster tabs, sections for formations or teams,
-            and one billet slot per position. Members hold one primary billet.
-            Removing structure unassigns members and keeps their records.</p
+            and named billet slots where needed. Members can hold a billet or
+            belong directly to any formation. Removing structure unassigns
+            members and keeps their records.</p
           ><button id="structure-add-group" class="btn-save">Add group</button
+          ><label class="unit-field"
+            >Find formation or billet<input
+              type="search"
+              id="structure-search"
+              placeholder="Search structure" /></label
           ><div id="structure-tree"></div></section
         ><section
           id="unit-catalog"
@@ -796,12 +802,13 @@
     >
     <script src="/static/api.js?v=cleanup-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script
-    ><script src="/static/user-editor.js?v=cleanup-2"></script
-    ><script src="/static/unit-ux.js?v=cleanup-2"></script
-    ><script src="/static/unit-events.js?v=cleanup-2"></script
-    ><script src="/static/roster-tools.js?v=cleanup-2"></script
-    ><script src="/static/unit-resources.js?v=cleanup-2"></script
-    ><script src="/static/unit-members.js?v=cleanup-2"></script
-    ><script src="/static/units.js?v=cleanup-2"></script
+    ><script src="/static/user-editor.js?v=formations-1"></script
+    ><script src="/static/unit-ux.js?v=formations-1"></script
+    ><script src="/static/unit-events.js?v=formations-1"></script
+    ><script src="/static/roster-tools.js?v=formations-1"></script
+    ><script src="/static/unit-resources.js?v=formations-1"></script
+    ><script src="/static/unit-members.js?v=formations-1"></script
+    ><script src="/static/unit-structure.js?v=formations-1"></script
+    ><script src="/static/units.js?v=formations-1"></script
     ><script src="/static/help.js?v=manuals-3"></script></body
 ></html>

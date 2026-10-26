@@ -22,6 +22,7 @@ def install(
     endpoints,
     record_strength,
     sync_event_roster,
+    assign_placement,
 ):
     def state(conn, unit_id, member_id):
         row = conn.execute(
@@ -44,6 +45,9 @@ def install(
                 "certificates",
                 "billet_id",
                 "billet_path",
+                "placement_id",
+                "placement_path",
+                "assignment_path",
             )
         }
 
@@ -82,7 +86,7 @@ def install(
         previous = before or {}
         for kind, keys in [
             ("rank", ("rank_track", "rank", "last_promo")),
-            ("billet", ("billet_id", "billet_path")),
+            ("billet", ("billet_id", "billet_path", "placement_id", "placement_path")),
             ("status", ("status", "archived")),
         ]:
             old = {k: previous.get(k) for k in keys}
@@ -513,7 +517,13 @@ def install(
                         parts.append(parent["name"])
                         parent = by_id.get(parent["parent_id"])
                     path = " / ".join(reversed(parts))
-                change["after"].update(billet_id=billet_id, billet_path=path)
+                change["after"].update(
+                    billet_id=billet_id,
+                    billet_path=path,
+                    placement_id=None,
+                    placement_path="",
+                    assignment_path=path,
+                )
         else:
             raise ValueError(
                 "Choose qualification grant/revoke, status, section move or unassign"
@@ -573,6 +583,10 @@ def install(
                             member_id,
                         ),
                     )
+                    if before["placement_id"] != after["placement_id"]:
+                        assign_placement(
+                            conn, unit_id, member_id, after["placement_id"]
+                        )
                     if before["billet_id"] != after["billet_id"]:
                         assign_slot(conn, unit_id, member_id, after["billet_id"])
                     record_change(

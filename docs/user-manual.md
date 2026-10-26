@@ -529,9 +529,15 @@ Use the flat roster for a simple list. Use Structure when you want an organizati
 
 In **Administration → Structure**, create the groups and sections you need, then add billets. Assign a member through the slot controls or their **Primary billet** field.
 
-Each member has one primary billet. Empty billets remain visible and contribute to open/filled counts. Assigning a member to a different billet leaves their old one open. Rank and qualification requirements do not restrict assignments.
+Each member has one primary placement: a named billet or direct membership in a formation. Every group, platoon, squad, team or staff formation supports both. Empty named billets contribute to vacancy counts; directly assigned members do not consume billets. Rank and qualification requirements do not restrict assignments. Use the Assignment board to select unassigned members, fill billets or place several members directly. For an occupied billet, choose Swap placements or leave the displaced member unassigned, then confirm.
 
 Review the consequences before removing a group, section or billet. These tools change organization and assignments; permanent member deletion is a separate roster action.
+
+### Formation builder and Member logins
+
+In **Structure**, select a formation in the navigator to edit or move it, add smaller formations, or add several billets using `Name | count` lines. **Copy empty layout** duplicates the structure without its member assignments. Removing a branch leaves its members unassigned and retains their records. The **All members** roster remains available for units that do not use formations.
+
+Unit Staff can use **Create login** beside an active roster member or inside their record. Enter a username and initial password; the panel creates and links a **Member** account for this unit only. Hand the credentials and the panel’s `/login` address to the member. This action cannot grant Staff, administrator or hosting permissions. Existing linked accounts are managed through Accounts & access by administrators.
 
 ## 15. Qualifications and promotions
 

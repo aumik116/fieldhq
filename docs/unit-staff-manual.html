@@ -132,12 +132,13 @@ status and low panel-disk space, with links to the affected server or
 Storage; it is hidden when clear. Panel administrators can open
 <strong>Panel users</strong> directly from the landing page.</p>
 <h3 id="member-home-and-self-service">Member home and self-service</h3>
-<p>Members use the same <code>/login</code> page as staff. A unit
-administrator creates the account under <strong>Administration →
-Accounts &amp; access</strong> and links it to the correct roster
-member. Members land on <strong>Overview → My unit</strong>. Staff can
-open the same page to manage announcements, see document review
-reminders, and inspect event RSVPs.</p>
+<p>Members use the same <code>/login</code> page as staff. Unit Staff
+can create a linked Member account using <strong>Create login</strong>
+on an active roster record. Unit administrators can also create accounts
+under <strong>Administration → Accounts &amp; access</strong>. Members
+land on <strong>Overview → My unit</strong>. Staff can open the same
+page to manage announcements, see document review reminders, and inspect
+event RSVPs.</p>
 <ul>
 <li><strong>Required reading:</strong> staff open an SOP and choose
 <strong>Reading &amp; review</strong>. Assign everyone with a unit
@@ -244,9 +245,10 @@ uses the linked UUID. If no identity is available, leave it unlinked and
 return after the person has been recorded on a linked server. Ask
 hosting staff to check player detection if recording is unavailable.</p>
 <h3 id="link-their-panel-account">Link their panel account</h3>
-<p>If the member also has a staff login, select their <strong>Linked
-panel account</strong> and save. This gives the panel an association
-between the login and the person's name in this unit.</p>
+<p>If the member already has a login, a unit administrator can select
+their <strong>Linked panel account</strong> and save. This gives the
+panel an association between the login and the person's name in this
+unit.</p>
 <p>The link does not create a login or grant access. The unit role is
 assigned separately.</p>
 <h3 id="write-a-personnel-note">Write a personnel note</h3>
@@ -321,10 +323,12 @@ Sergeant, Vehicle Commander or Company Medic.</li>
 </ul>
 <p>Position suggestions are reusable names. A suggestion alone does not
 create or fill a billet.</p>
-<p>To assign someone, use the slot's assignment controls or the member
-editor's <strong>Primary billet</strong> field. Each member has one
-primary billet. Moving them leaves the old slot open. Empty slots remain
-visible with staffing counts.</p>
+<p>To assign someone, use the Assignment board or the member editor’s
+<strong>Primary placement</strong> field. Each formation can contain
+named billets and directly assigned members without billets. A person
+has one primary placement. For an occupied billet, choose Swap
+placements or leave the displaced member unassigned. Empty billets
+remain visible; directly assigned members do not consume slots.</p>
 <p>Rank and qualifications do not block billet assignments. Use your
 unit's own staffing policy when deciding whom to place.</p>
 <p>Unit administrators create and remove groups, sections and billets in
@@ -743,3 +747,19 @@ required</td>
 <p><strong>Before saving:</strong> check the unit, person/event, dates
 and proposed change. <strong>After saving:</strong> wait for success and
 confirm the record reflects the intended result.</p>
+<h3 id="formation-builder-and-member-logins">Formation builder and
+Member logins</h3>
+<p>In <strong>Structure</strong>, select a formation in the navigator to
+edit or move it, add smaller formations, or add several billets using
+<code>Name | count</code> lines. <strong>Copy empty layout</strong>
+duplicates the structure without its member assignments. Removing a
+branch leaves its members unassigned and retains their records. The
+<strong>All members</strong> roster remains available for units that do
+not use formations.</p>
+<p>Unit Staff can use <strong>Create login</strong> beside an active
+roster member or inside their record. Enter a username and initial
+password; the panel creates and links a <strong>Member</strong> account
+for this unit only. Hand the credentials and the panel’s
+<code>/login</code> address to the member. This action cannot grant
+Staff, administrator or hosting permissions. Existing linked accounts
+are managed through Accounts &amp; access by administrators.</p>

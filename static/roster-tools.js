@@ -70,13 +70,16 @@
   }
   function sectionMembers(id, members) {
     if (id === 'all') return members;
-    if (id === 'unassigned') return members.filter((m) => !m.billet_id);
+    if (id === 'unassigned')
+      return members.filter((m) => !m.billet_id && !m.placement_id);
     const descendants = new Set([Number(id)]);
     for (let i = 0; i < 7; i++)
       context.detail.structure.forEach((n) => {
         if (descendants.has(n.parent_id)) descendants.add(n.id);
       });
-    return members.filter((m) => descendants.has(m.billet_id));
+    return members.filter(
+      (m) => descendants.has(m.billet_id) || descendants.has(m.placement_id),
+    );
   }
   function memberButton(member) {
     return `<button type="button" class="member-record-link" data-tool-record="${member.id}">${esc(member.game_name)}</button><small>${esc([member.rank_track, member.rank].filter(Boolean).join(' · '))}</small>`;
@@ -152,7 +155,7 @@
           members
             .map(
               (m) =>
-                `<tr><td>${memberButton(m)}<small>${m.archived ? 'Former' : esc(m.status)}</small></td><td>${esc(m.billet_path || 'Unassigned')}</td>${columns
+                `<tr><td>${memberButton(m)}<small>${m.archived ? 'Former' : esc(m.status)}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}</td>${columns
                   .map((c) => {
                     const has = held(m).includes(c),
                       award = awards(m).find((a) => a.certificate === c);
@@ -314,7 +317,7 @@
     );
     open(
       'Bulk roster edit',
-      `<p class="feature-note">Select up to 500 current members. Review every proposed change before applying. Section moves fill open primary billets; ranks and qualifications do not restrict placement.</p><div class="bulk-layout"><section><div class="unit-toolbar"><input type="search" id="bulk-search" aria-label="Find members for bulk editing" placeholder="Search members"><button type="button" id="bulk-select-visible">Select shown</button><button type="button" id="bulk-clear">Clear selection</button></div><p id="bulk-count" role="status"></p><div class="bulk-member-list">${members.map((m) => `<label data-bulk-row="${m.id}"><input type="checkbox" name="bulk_members" value="${m.id}" ${chosen.has(m.id) ? 'checked' : ''}><span>${esc(m.game_name)}<small>${esc([m.rank, m.status, m.billet_path || 'Unassigned'].join(' · '))}</small></span></label>`).join('') || '<p>No current members.</p>'}</div></section><section><label class="unit-field">Change<select name="action"><option value="grant">Grant qualification</option><option value="revoke">Revoke qualification</option><option value="status">Change status</option><option value="section">Move to section’s open billets</option><option value="unassign">Remove primary billet</option></select></label><div id="bulk-fields"></div><label class="unit-field">Reason / award note<textarea name="reason" required maxlength="1000">${esc(initial.reason || '')}</textarea></label></section></div>`,
+      `<p class="feature-note">Select up to 500 current members. Review every proposed change before applying. Section moves fill open primary billets; ranks and qualifications do not restrict placement.</p><div class="bulk-layout"><section><div class="unit-toolbar"><input type="search" id="bulk-search" aria-label="Find members for bulk editing" placeholder="Search members"><button type="button" id="bulk-select-visible">Select shown</button><button type="button" id="bulk-clear">Clear selection</button></div><p id="bulk-count" role="status"></p><div class="bulk-member-list">${members.map((m) => `<label data-bulk-row="${m.id}"><input type="checkbox" name="bulk_members" value="${m.id}" ${chosen.has(m.id) ? 'checked' : ''}><span>${esc(m.game_name)}<small>${esc([m.rank, m.status, m.assignment_path || m.billet_path || 'Unassigned'].join(' · '))}</small></span></label>`).join('') || '<p>No current members.</p>'}</div></section><section><label class="unit-field">Change<select name="action"><option value="grant">Grant qualification</option><option value="revoke">Revoke qualification</option><option value="status">Change status</option><option value="section">Move to section’s open billets</option><option value="unassign">Remove primary placement</option></select></label><div id="bulk-fields"></div><label class="unit-field">Reason / award note<textarea name="reason" required maxlength="1000">${esc(initial.reason || '')}</textarea></label></section></div>`,
       async () => {
         const data = Object.fromEntries(new FormData(form));
         delete data.bulk_members;
@@ -385,7 +388,10 @@
       payload.action === 'status'
         ? s.status
         : payload.action === 'section' || payload.action === 'unassign'
-          ? s.billet_path || 'Unassigned'
+          ? s.assignment_path ||
+            s.billet_path ||
+            s.placement_path ||
+            'Unassigned'
           : s.certificates.split(';').filter(Boolean).join(', ') || 'None';
     open(
       'Review bulk changes',

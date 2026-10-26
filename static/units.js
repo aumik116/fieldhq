@@ -9,7 +9,9 @@
     baseline = '',
     loading = false,
     dialogSaving = false;
-  let rosterView = '',
+  let boardMember = null,
+    structureSelection = null,
+    rosterView = '',
     rosterUnit = null,
     activeTab = 'roster';
   const pageNotes = {
@@ -295,9 +297,9 @@
         (status === 'archived'
           ? m.archived
           : !m.archived && (!status || m.status === status)) &&
-        (rosterView !== 'unassigned' || !m.billet_id) &&
+        (rosterView !== 'unassigned' || (!m.billet_id && !m.placement_id)) &&
         [
-          m.billet_path,
+          m.assignment_path || m.billet_path,
           m.rank_track,
           m.game_name,
           m.discord,
@@ -335,7 +337,7 @@
       rows
         .map((m) => {
           const p = m.promotion;
-          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button><small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td>${esc(m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>` : ''}</td></tr>`;
+          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button><small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td>${esc(m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
         })
         .join('') ||
       '<tr><td colspan="8" class="unit-empty">No members match. Add a member to start.</td></tr>';
@@ -354,6 +356,14 @@
             )),
       );
   }
+  el('roster-member-list').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-member-login]');
+    if (button)
+      memberLoginEditor(
+        detail.roster.find((m) => m.id === Number(button.dataset.memberLogin)),
+      );
+  });
+  el('structure-search').oninput = renderStructure;
   function structurePath(id) {
     const nodes = new Map((detail.structure || []).map((n) => [n.id, n]));
     const parts = [];
@@ -371,15 +381,16 @@
       rosterUnit = unitId;
     }
     if (
-      !['all', 'unassigned'].includes(rosterView) &&
+      !['all', 'unassigned', 'board'].includes(rosterView) &&
       !groups.some((g) => String(g.id) === rosterView)
     )
       rosterView = String(groups[0]?.id || 'all');
     if (el('roster-status').value === 'archived') rosterView = 'all';
     const unassigned = detail.roster.filter(
-      (m) => !m.archived && !m.billet_id,
+      (m) => !m.archived && !m.billet_id && !m.placement_id,
     ).length;
     el('roster-groups').innerHTML = [
+      ...(groups.length ? [['board', 'Assignment board']] : []),
       ...groups.map((g) => [String(g.id), g.name]),
       ['unassigned', `Unassigned (${unassigned})`],
       ['all', 'All members'],
@@ -405,129 +416,170 @@
       );
   }
   function renderStructuredRoster(query, status) {
-    const nodes = detail.structure || [],
-      group = nodes.find((n) => String(n.id) === rosterView);
-    const children = (id) => nodes.filter((n) => n.parent_id === id);
-    const assigned = new Map(
-      detail.roster
-        .filter((m) => !m.archived && m.billet_id)
-        .map((m) => [m.billet_id, m]),
+    UnitStructure.renderBoard(
+      el('roster-hierarchy'),
+      detail,
+      {
+        group: rosterView === 'board' ? null : Number(rosterView),
+        query,
+        status,
+        member: boardMember,
+      },
+      {
+        record: memberRecord,
+        assign: assignmentEditor,
+        place: placementEditor,
+        select(id) {
+          boardMember = id;
+          renderRoster();
+        },
+        build(id) {
+          structureSelection = id;
+          selectTab('structure');
+        },
+        login(id) {
+          memberLoginEditor(detail.roster.find((m) => m.id === id));
+        },
+      },
     );
-    function counts(node) {
-      const slots = [];
-      function visit(n) {
-        if (n.kind === 'billet') slots.push(n);
-        else children(n.id).forEach(visit);
-      }
-      visit(node);
-      const filled = slots.filter((n) => assigned.has(n.id)).length;
-      return `${filled}/${slots.length}${slots.length > filled ? ' · ' + (slots.length - filled) + ' open' : ''}`;
-    }
-    function billetRows(slots) {
-      return slots
-        .map((slot) => {
-          const member = assigned.get(slot.id),
-            path = structurePath(slot.id).toLowerCase();
-          if (member) {
-            if (status && member.status !== status) return '';
-            if (
-              query &&
-              ![
-                member.game_name,
-                member.rank,
-                member.rank_track,
-                member.discord,
-                member.identity,
-                member.certificates,
-                path,
-              ]
-                .join(' ')
-                .toLowerCase()
-                .includes(query)
-            )
-              return '';
-          } else if (status || (query && !path.includes(query))) return '';
-          return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td>${member ? esc(member.rank || '—') : '—'}${member?.rank_track ? `<small>${esc(member.rank_track)}</small>` : ''}</td><td>${member ? `<button type="button" class="member-record-link" data-record="${member.id}">${esc(member.game_name)}</button>${member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}` : '<span class="billet-open">— Open —</span>'}</td><td>${detail.can_edit ? `<button type="button" data-assign="${slot.id}">${member ? 'Change' : 'Assign'}</button>` : ''}</td></tr>`;
-        })
-        .join('');
-    }
-    function section(node, depth) {
-      let content = '',
-        run = [];
-      function flush() {
-        const rows = billetRows(run);
-        if (rows)
-          content += `<div class="billet-table"><table><thead><tr><th>Billet</th><th>Rank</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-        run = [];
-      }
-      for (const child of children(node.id)) {
-        if (child.kind === 'billet') run.push(child);
-        else {
-          flush();
-          content += section(child, depth + 1);
-        }
-      }
-      flush();
-      if ((query || status) && !content) return '';
-      return `<section class="structure-section depth-${Math.min(depth, 2)}"><div class="structure-section-heading"><h3>${esc(node.name)}</h3><span>${counts(node)}</span>${detail.can_staff ? `<button type="button" data-new-billet="${node.id}">+ Billet</button>` : ''}</div>${content || '<p class="feature-note structure-empty">No billets yet.</p>'}</section>`;
-    }
-    const content = children(group.id)
-      .map((n) => section(n, 0))
-      .join('');
-    el('roster-hierarchy').innerHTML =
-      `<div class="structure-group-heading"><h2>${esc(group.name)}</h2><span>${counts(group)}</span>${detail.can_staff ? `<button type="button" data-new-section="${group.id}">+ Section</button>` : ''}</div>${content || '<p class="unit-empty">No sections match. Unit administrators can add sections and billets in Structure.</p>'}`;
-    el('roster-hierarchy')
-      .querySelectorAll('[data-record]')
-      .forEach(
-        (b) => (b.onclick = () => memberRecord(Number(b.dataset.record))),
-      );
-    el('roster-hierarchy')
-      .querySelectorAll('[data-assign]')
-      .forEach(
-        (b) => (b.onclick = () => assignmentEditor(Number(b.dataset.assign))),
-      );
-    el('roster-hierarchy')
-      .querySelectorAll('[data-new-section]')
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            structureEditor('section', Number(b.dataset.newSection))),
-      );
-    el('roster-hierarchy')
-      .querySelectorAll('[data-new-billet]')
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            structureEditor('billet', Number(b.dataset.newBillet))),
-      );
   }
-  function assignmentEditor(billetId) {
-    const slot = detail.structure.find((n) => n.id === billetId),
-      occupant = detail.roster.find((m) => m.billet_id === billetId);
-    const members = detail.roster.filter(
-      (m) => !m.archived && (!occupant || m.id === occupant.id),
+  function assignmentEditor(billetId, selectedMember = null) {
+    const slot = detail.structure.find((n) => n.id === billetId);
+    const occupant = detail.roster.find(
+      (m) => !m.archived && m.billet_id === billetId,
     );
+    const members = detail.roster
+      .filter((m) => !m.archived)
+      .sort(
+        (a, b) =>
+          Number(!!(a.billet_id || a.placement_id)) -
+            Number(!!(b.billet_id || b.placement_id)) ||
+          a.game_name.localeCompare(b.game_name),
+      );
     openDialog(
       `Assign ${slot.name}`,
-      `<p>${esc(structurePath(billetId))}</p><label class="unit-field">Primary member<select name="member_id"><option value="">Open / unassigned</option>${members.map((m) => `<option value="${m.id}" ${m.id === occupant?.id ? 'selected' : ''}>${esc([m.rank, m.game_name].filter(Boolean).join(' '))}${m.billet_id && m.billet_id !== billetId ? ' · Currently ' + esc(m.billet_path) : ''}</option>`).join('')}</select></label><p class="feature-note">One primary billet per member. Moving a member here frees their previous slot.${occupant ? ' Unassign the current member before filling this billet with someone else.' : ''}</p>`,
+      `<p>${esc(structurePath(billetId))}</p>
+      <label class="unit-field">Find member<input type="search" id="assignment-search" placeholder="Name or current formation"></label>
+      <label class="unit-field">Primary member<select name="member_id" id="assignment-member"></select></label>
+      <div id="assignment-conflict"><label class="unit-field">Current occupant<select name="conflict"><option value="replace">Leave displaced member unassigned</option><option value="swap">Swap placements</option></select></label><label><input type="checkbox" name="confirmed"> I confirm moving the current occupant.</label></div>
+      <p id="assignment-preview" role="status"></p><label class="unit-field">Reason (optional)<textarea name="reason" maxlength="1000"></textarea></label>`,
       async () => {
-        const memberId = Number(values().member_id) || null,
-          member = detail.roster.find((m) => m.id === memberId);
-        if (
-          member?.billet_id &&
-          member.billet_id !== billetId &&
-          !confirm(
-            `Move ${member.game_name} from ${member.billet_path}? Their old billet will become open.`,
-          )
-        )
-          throw new Error('Assignment cancelled.');
+        const data = values();
         await write(`/api/units/${unitId}/assignment`, {
           billet_id: billetId,
-          member_id: memberId,
+          member_id: Number(data.member_id) || null,
+          expected_occupant: occupant?.id ?? null,
+          conflict: data.conflict,
+          confirmed: !!data.confirmed,
+          reason: data.reason,
+          revision: detail.unit.revision,
+        });
+        boardMember = null;
+      },
+    );
+    let chosen = selectedMember ?? occupant?.id ?? null;
+    function preview() {
+      chosen = Number(form.elements.member_id.value) || null;
+      const incoming = members.find((m) => m.id === chosen),
+        displaces = !!(occupant && incoming && occupant.id !== chosen);
+      el('assignment-conflict').hidden = !displaces;
+      const swap = form.elements.conflict.querySelector('[value="swap"]');
+      swap.disabled = !(incoming?.billet_id || incoming?.placement_id);
+      if (swap.disabled) form.elements.conflict.value = 'replace';
+      const previous = incoming?.assignment_path || incoming?.billet_path;
+      el('assignment-preview').textContent = displaces
+        ? `${incoming.game_name} takes this billet. ${occupant.game_name} ${form.elements.conflict.value === 'swap' ? 'moves to ' + previous : 'becomes unassigned'}.`
+        : incoming
+          ? `${incoming.game_name} takes this billet.${previous && incoming.id !== occupant?.id ? ' Their previous placement is cleared.' : ''}`
+          : 'This billet will be open.';
+    }
+    function populate() {
+      const q = el('assignment-search').value.toLowerCase();
+      el('assignment-member').innerHTML =
+        '<option value="">Open / unassigned</option>' +
+        members
+          .filter(
+            (m) =>
+              m.id === chosen ||
+              [m.game_name, m.assignment_path]
+                .join(' ')
+                .toLowerCase()
+                .includes(q),
+          )
+          .map(
+            (m) =>
+              `<option value="${m.id}" ${m.id === chosen ? 'selected' : ''}>${esc(m.game_name)} · ${esc(m.assignment_path || m.billet_path || 'Unassigned')}</option>`,
+          )
+          .join('');
+      preview();
+    }
+    el('assignment-search').oninput = populate;
+    el('assignment-member').onchange = preview;
+    form.elements.conflict.onchange = preview;
+    populate();
+    baseline = signature();
+  }
+  function placementEditor(parentId = null, initialMember = null) {
+    const selected = new Set(initialMember ? [initialMember] : []),
+      members = detail.roster.filter((m) => !m.archived);
+    openDialog(
+      'Place members in a formation',
+      `<label class="unit-field">Destination<select name="parent_id"><option value="">Unassigned</option>${detail.structure
+        .filter((n) => n.kind !== 'billet')
+        .map(
+          (n) =>
+            `<option value="${n.id}" ${n.id === parentId ? 'selected' : ''}>${esc(structurePath(n.id))}</option>`,
+        )
+        .join(
+          '',
+        )}</select></label><p class="feature-note">Members belong directly to this formation without occupying a named billet. Each selected member’s previous primary placement is cleared.</p><label class="unit-field">Find members<input type="search" id="placement-search" placeholder="Name or current formation"></label><p id="placement-count" role="status"></p><div class="formation-member-picker" id="placement-members">${members.map((m) => `<label data-placement-row="${m.id}"><input type="checkbox" name="member_ids" value="${m.id}" ${selected.has(m.id) ? 'checked' : ''}><span>${esc(m.game_name)}<small>${esc(m.assignment_path || m.billet_path || 'Unassigned')}</small></span></label>`).join('')}</div><label class="unit-field">Reason (optional)<textarea name="reason" maxlength="1000"></textarea></label>`,
+      async () => {
+        const data = values(),
+          ids = checked('member_ids').map(Number);
+        if (!ids.length) throw new Error('Choose at least one member.');
+        await write(`/api/units/${unitId}/placement`, {
+          parent_id: Number(data.parent_id) || null,
+          member_ids: ids,
+          reason: data.reason,
+          revision: detail.unit.revision,
+        });
+        boardMember = null;
+      },
+    );
+    function count() {
+      el('placement-count').textContent =
+        `${checked('member_ids').length} selected`;
+    }
+    el('placement-members').onchange = count;
+    el('placement-search').oninput = () => {
+      const q = el('placement-search').value.toLowerCase();
+      for (const row of el('placement-members').querySelectorAll(
+        '[data-placement-row]',
+      ))
+        row.hidden = !row.textContent.toLowerCase().includes(q);
+    };
+    count();
+  }
+  function memberLoginEditor(member) {
+    if (!member || !UnitUX.canLeave()) return;
+    const suggested = member.game_name
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+    openDialog(
+      `Create login for ${member.game_name}`,
+      `<p>This creates and links a <strong>Member</strong> account for this unit. Members can view published resources and events; staff and hosting permissions are not granted.</p><label class="unit-field">Username<input name="username" required minlength="3" maxlength="32" value="${esc(suggested)}" autocomplete="off"></label><label class="unit-field">Initial password<input name="password" type="password" required minlength="10" maxlength="72" autocomplete="new-password"></label><p class="feature-note">Give the member these credentials and the panel address: ${esc(location.origin)}/login. Save the password before closing; it is not shown again.</p>`,
+      async () => {
+        const data = values();
+        await write(`/api/units/${unitId}/roster/${member.id}/login`, {
+          username: data.username,
+          password: data.password,
           revision: detail.unit.revision,
         });
       },
     );
+    form.querySelector('[type="submit"]').textContent = 'Create Member login';
   }
   function structureEditor(kind, parentId = null, node = null) {
     const excluded = new Set();
@@ -540,11 +592,7 @@
     if (node) exclude(node.id);
     const candidates = (detail.structure || [])
       .filter((n) => !excluded.has(n.id))
-      .filter((n) =>
-        kind === 'section'
-          ? n.kind === 'group' || n.kind === 'section'
-          : n.kind === 'section',
-      );
+      .filter((n) => n.kind === 'group' || n.kind === 'section');
     openDialog(
       `${node ? 'Edit' : 'Add'} ${kind}`,
       `${field('Name', 'name', node?.name || '')}${kind !== 'group' ? `<label class="unit-field">Inside<select name="parent_id">${candidates.map((n) => `<option value="${n.id}" ${(node ? node.parent_id : parentId) === n.id ? 'selected' : ''}>${esc(structurePath(n.id))}</option>`).join('')}</select></label>` : ''}${kind === 'billet' ? '<p class="feature-note">A billet is one slot. Repeated names such as Rifleman are allowed. There are no rank or qualification requirements.</p>' : '<p class="feature-note">Sections can contain subsections, teams or crews as well as billets.</p>'}`,
@@ -592,65 +640,107 @@
       await loadListing(unitId);
       feedback('Structure removed. Member records retained.');
     } catch (error) {
-      el('unit-dialog-error').textContent = error.message;
+      if (dialog.open) el('unit-dialog-error').textContent = error.message;
+      else feedback(error.message);
     } finally {
       dialogSaving = false;
     }
   }
   function renderStructure() {
-    const nodes = detail.structure || [];
-    function branch(parent) {
-      return nodes
-        .filter((n) => n.parent_id === parent)
-        .map(
-          (n) =>
-            `<div class="structure-admin-node"><div class="structure-admin-row"><span><small>${esc(n.kind)}</small> <strong>${esc(n.name)}</strong></span><div><button type="button" data-structure-edit="${n.id}">Edit</button>${n.kind !== 'billet' ? `<button type="button" data-structure-add="${n.id}" data-kind="section">+ Section</button>` : ''}${n.kind === 'section' ? `<button type="button" data-structure-add="${n.id}" data-kind="billet">+ Billet</button>` : ''}<button type="button" data-structure-order="${n.id}" data-direction="up" aria-label="Move ${esc(n.name)} up">↑</button><button type="button" data-structure-order="${n.id}" data-direction="down" aria-label="Move ${esc(n.name)} down">↓</button></div></div>${branch(n.id)}</div>`,
-        )
-        .join('');
+    structureSelection = UnitStructure.renderBuilder(
+      el('structure-tree'),
+      detail,
+      {
+        selected: structureSelection,
+        query: el('structure-search').value.toLowerCase(),
+      },
+      {
+        select(id) {
+          structureSelection = id;
+          renderStructure();
+        },
+        edit(node) {
+          structureEditor(node.kind, node.parent_id, node);
+        },
+        copy: copyStructureEditor,
+        remove: removeStructure,
+        add(id) {
+          structureEditor('section', id);
+        },
+        billets: bulkBilletsEditor,
+        place: placementEditor,
+        assign: assignmentEditor,
+        order: orderStructure,
+        record: memberRecord,
+        moveMember(id) {
+          placementEditor(null, id);
+        },
+      },
+    );
+  }
+  async function orderStructure(id, direction) {
+    try {
+      await write(`/api/units/${unitId}/structure/${id}/order`, {
+        direction,
+        revision: detail.unit.revision,
+      });
+      await loadListing(unitId);
+    } catch (error) {
+      feedback(error.message);
     }
-    el('structure-tree').innerHTML =
-      branch(null) ||
-      '<p class="unit-empty">Create a group, then add its sections and billet slots.</p>';
-    el('structure-tree')
-      .querySelectorAll('[data-structure-edit]')
-      .forEach(
-        (b) =>
-          (b.onclick = () => {
-            const node = nodes.find(
-              (n) => n.id === Number(b.dataset.structureEdit),
-            );
-            structureEditor(node.kind, node.parent_id, node);
-          }),
-      );
-    el('structure-tree')
-      .querySelectorAll('[data-structure-add]')
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            structureEditor(b.dataset.kind, Number(b.dataset.structureAdd))),
-      );
-    el('structure-tree')
-      .querySelectorAll('[data-structure-order]')
-      .forEach(
-        (b) =>
-          (b.onclick = async () => {
-            b.disabled = true;
-            try {
-              await write(
-                `/api/units/${unitId}/structure/${b.dataset.structureOrder}/order`,
-                {
-                  direction: b.dataset.direction,
-                  revision: detail.unit.revision,
-                },
-              );
-              await loadListing(unitId);
-            } catch (error) {
-              feedback(error.message);
-            } finally {
-              b.disabled = false;
-            }
-          }),
-      );
+  }
+  function bulkBilletsEditor(node) {
+    openDialog(
+      `Add billets to ${node.name}`,
+      `<label class="unit-field">Billets<textarea name="entries" rows="8" required placeholder="Platoon Leader | 1\nPlatoon Sergeant | 1\nRifleman | 8"></textarea></label><p class="feature-note">One name per line. Add | and a count for repeated slots. Up to 100 billets per save. No rank or qualification requirements.</p>`,
+      async () => {
+        const entries = values()
+          .entries.split('\n')
+          .filter((line) => line.trim())
+          .map((line) => {
+            const parts = line.split('|');
+            if (parts.length > 2)
+              throw new Error('Use Name | count on each line.');
+            return {
+              name: parts[0].trim(),
+              count: parts.length === 2 ? Number(parts[1]) : 1,
+            };
+          });
+        await write(`/api/units/${unitId}/structure/${node.id}/billets`, {
+          entries,
+          revision: detail.unit.revision,
+        });
+      },
+    );
+  }
+  function copyStructureEditor(node) {
+    const totals = UnitStructure.index(detail).totals.get(node.id);
+    openDialog(
+      'Copy empty layout',
+      `${field('Name for copy', 'name', node.name + ' copy')}${
+        node.kind !== 'group'
+          ? `<label class="unit-field">Destination<select name="parent_id">${detail.structure
+              .filter((n) => n.kind !== 'billet')
+              .map(
+                (n) =>
+                  `<option value="${n.id}" ${n.id === node.parent_id ? 'selected' : ''}>${esc(structurePath(n.id))}</option>`,
+              )
+              .join('')}</select></label>`
+          : ''
+      }<p class="feature-note">Copies ${totals.slots} named billets and their formation layout. Member assignments are not copied.</p>`,
+      async () => {
+        const data = values();
+        const result = await write(
+          `/api/units/${unitId}/structure/${node.id}/copy`,
+          {
+            name: data.name,
+            parent_id: node.kind === 'group' ? null : Number(data.parent_id),
+            revision: detail.unit.revision,
+          },
+        );
+        structureSelection = result.id;
+      },
+    );
   }
   async function memberRecord(memberId) {
     const requestedUnit = unitId;
@@ -662,7 +752,7 @@
         p = m.promotion;
       openDialog(
         `${m.game_name} — member record`,
-        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary billet & qualifications</h3><p>${esc(m.billet_path || 'No primary billet assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
+        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.assignment_path || m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary placement & qualifications</h3><p>${esc(m.assignment_path || m.billet_path || 'No primary placement assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
         async () => {
           await write(url, { note: form.elements.record_note.value });
           form.elements.record_note.value = '';
@@ -679,6 +769,13 @@
       const button = form.querySelector('[type="submit"]');
       button.textContent = 'Add note';
       button.hidden = !record.can_write;
+      if (detail.can_edit && !m.archived && !m.panel_user_id) {
+        const login = document.createElement('button');
+        login.type = 'button';
+        login.textContent = 'Create Member login';
+        login.onclick = () => memberLoginEditor(m);
+        el('unit-dialog-body').prepend(login);
+      }
       dialog.dataset.record = requestedUnit + ':' + memberId;
       button.disabled = true;
       read(`/api/units/${requestedUnit}/roster/${memberId}/attendance`)
@@ -767,7 +864,13 @@
               .filter(Boolean)
               .join(' · ') || 'No rank'
           );
-        if (kind === 'billet') return value.billet_path || 'Unassigned';
+        if (kind === 'billet')
+          return (
+            value.assignment_path ||
+            value.billet_path ||
+            value.placement_path ||
+            'Unassigned'
+          );
         if (kind === 'status')
           return value.archived
             ? 'Former member'
@@ -913,7 +1016,7 @@
       `<div class="unit-form-grid">${field('Game name', 'game_name', member.game_name || '')}${field('Discord handle', 'discord', member.discord || '')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity ? [member.identity] : [], member.identity || '', 'Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${member.status === s ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s === 'active' ? 'Active' : 'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options(
         (catalog.rank_structures || []).map((s) => s.name),
         member.rank_track || '',
-      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary billet<select name="billet_id" id="member-billet"></select><small>One primary billet per member. Rank and qualifications do not restrict assignment.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates', catalog.certificates || [], (member.certificates || '').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
+      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary placement<select name="billet_id" id="member-billet"></select><small>Choose a named billet or assign directly to a formation. One primary placement per member; no rank or qualification requirements.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates', catalog.certificates || [], (member.certificates || '').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
       async () => {
         const data = values();
         await write(`/api/units/${unitId}/roster`, {
@@ -935,7 +1038,9 @@
           ),
           section: member.section || '',
           position: member.position || '',
-          billet_id: data.billet_id ? Number(data.billet_id) : null,
+          ...(data.billet_id?.startsWith('formation:')
+            ? { placement_id: Number(data.billet_id.slice(10)) }
+            : { billet_id: data.billet_id ? Number(data.billet_id) : null }),
           certificates: checked('certificates').join(';'),
           archived: !!data.archived,
           panel_user_id: detail.can_staff
@@ -961,6 +1066,17 @@
     el('member-rank-track').onchange = () => setRankOptions();
     const billetSelect = el('member-billet');
     billetSelect.append(new Option('Unassigned', ''));
+    const formations = document.createElement('optgroup');
+    formations.label = 'Direct formation membership';
+    for (const node of detail.structure.filter((n) => n.kind !== 'billet')) {
+      const option = new Option(
+        structurePath(node.id) + ' · without billet',
+        'formation:' + node.id,
+      );
+      option.selected = node.id === member.placement_id;
+      formations.append(option);
+    }
+    billetSelect.append(formations);
     for (const billet of (detail.structure || []).filter(
       (n) =>
         n.kind === 'billet' &&
@@ -1061,7 +1177,8 @@
       await loadListing(unitId);
       feedback('Member deleted from this unit.');
     } catch (error) {
-      el('unit-dialog-error').textContent = error.message;
+      if (dialog.open) el('unit-dialog-error').textContent = error.message;
+      else feedback(error.message);
     } finally {
       dialogSaving = false;
     }

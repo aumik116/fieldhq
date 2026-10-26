@@ -14,11 +14,12 @@ const vm = require('node:vm');
   let respond = async () => reply(200, {ok:true});
   const context = vm.createContext({Headers, Request, URL, URLSearchParams,
     location:{href:'https://panel.test/?server=training', origin:'https://panel.test', search:'?server=training'},
-    document:{getElementById:node, querySelector:() => null, dispatchEvent() {}},
+    document:{addEventListener() {},getElementById:node, querySelector:() => null, dispatchEvent() {}},
     CustomEvent:class {}, confirm:() => true, updateModLibrary() {},
     fetch:async (input, options = {}) => { calls.push({input, options}); return respond(input, options); },
   });
   context.window = context;
+  context.PanelUI={confirm:async()=>context.confirm()};
   for (const name of ['api.js', 'status.js', 'server_controls.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'static', name), 'utf8'), context);
   }

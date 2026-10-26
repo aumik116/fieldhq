@@ -67,7 +67,7 @@ Unit pages use the same grouped sidebar pattern as server workspaces. Choose a u
 
 ### Member home and self-service
 
-Members use the same `/login` page as staff. A unit administrator creates the account under **Administration → Accounts & access** and links it to the correct roster member. Members land on **Overview → My unit**. Staff can open the same page to manage announcements, see document review reminders, and inspect event RSVPs.
+Members use the same `/login` page as staff. Unit Staff can create a linked Member account using **Create login** on an active roster record. Unit administrators can also create accounts under **Administration → Accounts & access**. Members land on **Overview → My unit**. Staff can open the same page to manage announcements, see document review reminders, and inspect event RSVPs.
 
 - **Required reading:** staff open an SOP and choose **Reading & review**. Assign everyone with a unit login, selected positions / primary billet names, selected qualifications, or a combination. Audiences are combined as “matches any.” A reading deadline is optional. Position and qualification targeting requires an active linked roster record; “everyone” includes unlinked logins. The progress list shows who has acknowledged the current published version.
 - **Acknowledging a document:** open it from **My unit → Required reading**, read the published copy, then choose **I have read this version**. This records a personal acknowledgement, not proof of comprehension. Republishing creates a new version and requires a fresh acknowledgement. An old open document cannot acknowledge a newer publication.
@@ -131,7 +131,7 @@ A matching display name is not enough for automatic attendance; it uses the link
 
 ### Link their panel account
 
-If the member also has a staff login, select their **Linked panel account** and save. This gives the panel an association between the login and the person's name in this unit.
+If the member already has a login, a unit administrator can select their **Linked panel account** and save. This gives the panel an association between the login and the person's name in this unit.
 
 The link does not create a login or grant access. The unit role is assigned separately.
 
@@ -174,7 +174,7 @@ A flat roster needs no organization structure. Units using slots organize people
 
 Position suggestions are reusable names. A suggestion alone does not create or fill a billet.
 
-To assign someone, use the slot's assignment controls or the member editor's **Primary billet** field. Each member has one primary billet. Moving them leaves the old slot open. Empty slots remain visible with staffing counts.
+To assign someone, use the Assignment board or the member editor’s **Primary placement** field. Each formation can contain named billets and directly assigned members without billets. A person has one primary placement. For an occupied billet, choose Swap placements or leave the displaced member unassigned. Empty billets remain visible; directly assigned members do not consume slots.
 
 Rank and qualifications do not block billet assignments. Use your unit's own staffing policy when deciding whom to place.
 
@@ -382,3 +382,9 @@ When asking for help, include the unit, page, member/event concerned, time and e
 | Edit icon or banner | Administration → Customization; administrator permission required |
 
 **Before saving:** check the unit, person/event, dates and proposed change. **After saving:** wait for success and confirm the record reflects the intended result.
+
+### Formation builder and Member logins
+
+In **Structure**, select a formation in the navigator to edit or move it, add smaller formations, or add several billets using `Name | count` lines. **Copy empty layout** duplicates the structure without its member assignments. Removing a branch leaves its members unassigned and retains their records. The **All members** roster remains available for units that do not use formations.
+
+Unit Staff can use **Create login** beside an active roster member or inside their record. Enter a username and initial password; the panel creates and links a **Member** account for this unit only. Hand the credentials and the panel’s `/login` address to the member. This action cannot grant Staff, administrator or hosting permissions. Existing linked accounts are managed through Accounts & access by administrators.
