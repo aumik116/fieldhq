@@ -10,6 +10,7 @@ from flask import g, jsonify, request
 from functools import partial
 from unit_common import (
     actor,
+    roster_status,
     archive,
     audit,
     get_row,
@@ -85,13 +86,12 @@ def install(api, db, access, revision, panel_admin, endpoints):
             ) from None
 
     def strength(conn, unit_id, before=None, after=None, baseline=False):
-        counts = {
-            r["status"]: r["n"]
-            for r in conn.execute(
-                "SELECT status,count(*) AS n FROM unit_roster WHERE unit_id=? AND archived=0 GROUP BY status",
-                (unit_id,),
-            )
-        }
+        counts = {}
+        for member in conn.execute(
+            "SELECT * FROM unit_roster WHERE unit_id=? AND archived=0", (unit_id,)
+        ):
+            status = roster_status(member)
+            counts[status] = counts.get(status, 0) + 1
         values = tuple(counts.get(key, 0) for key in ("active", "reserve", "loa"))
         previous = conn.execute(
             "SELECT * FROM unit_strength_history WHERE unit_id=? ORDER BY id DESC LIMIT 1",

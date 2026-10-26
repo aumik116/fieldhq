@@ -7,6 +7,9 @@
 - `unit_sops.py`: SOP/loadout schema and migration, document routes, publishing, revision history and attachments.
 - `unit_resources.py`: awards, campaigns and measured roster analytics.
 - `unit_members.py`: member self-service, required-reading acknowledgements, document reviews, announcements and RSVPs.
+- `unit_structure.py`: reusable billet types, slot creation and empty layout copies. Schema initialization runs before roster history baselines.
+- `unit_demo.py`: panel-admin creation of an opt-in editable fictional company; no accounts or game-server links.
+- `unit_login_management.py`: Member-only unit suspensions and scoped password resets; shared accounts require panel administration.
 - `unit_events.py`: staff events and UUID attendance.
 - `roster_tools.py`: qualification history, promotion reviews and bulk roster changes.
 

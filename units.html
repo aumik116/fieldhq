@@ -16,7 +16,7 @@
       rel="stylesheet"
       href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=roster-layout-3" /><link
+      href="/static/panel.css?v=unit-roster-4" /><link
       rel="stylesheet"
       href="/static/help.css?v=manuals-3"
   /></head>
@@ -297,7 +297,10 @@
           ><p class="feature-note" id="unit-page-subtitle"
             >Choose a unit to manage its people and operations.</p
           ></div
-        ><button id="unit-new" class="btn-save" hidden>New unit</button></div
+        ><div class="formation-actions"
+          ><button type="button" id="unit-demo" hidden>Create demo unit</button
+          ><button id="unit-new" class="btn-save" hidden>New unit</button></div
+        ></div
       >
       <p id="units-feedback" role="status" aria-live="polite"></p
       ><p
@@ -553,6 +556,7 @@
             /><label
               >Review queue<select id="promotion-filter"
                 ><option value="eligible">Eligible for review</option
+                ><option value="upcoming">Due in next 30 days</option
                 ><option value="pending">Not yet eligible</option
                 ><option value="all">All current members</option></select
               ></label
@@ -685,6 +689,8 @@
             belong directly to any formation. Removing structure unassigns
             members and keeps their records.</p
           ><button id="structure-add-group" class="btn-save">Add group</button
+          ><button type="button" id="structure-billet-types"
+            >Billet types</button
           ><label class="unit-field"
             >Find formation or billet<input
               type="search"
@@ -805,10 +811,10 @@
     ><script src="/static/user-editor.js?v=formations-1"></script
     ><script src="/static/unit-ux.js?v=formations-1"></script
     ><script src="/static/unit-events.js?v=formations-1"></script
-    ><script src="/static/roster-tools.js?v=formations-1"></script
+    ><script src="/static/roster-tools.js?v=unit-roster-4"></script
     ><script src="/static/unit-resources.js?v=formations-1"></script
-    ><script src="/static/unit-members.js?v=formations-1"></script
-    ><script src="/static/unit-structure.js?v=roster-layout-3"></script
-    ><script src="/static/units.js?v=roster-layout-3"></script
+    ><script src="/static/unit-members.js?v=unit-roster-4"></script
+    ><script src="/static/unit-structure.js?v=unit-roster-4"></script
+    ><script src="/static/units.js?v=unit-demo-1"></script
     ><script src="/static/help.js?v=manuals-3"></script></body
 ></html>

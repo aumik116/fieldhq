@@ -183,16 +183,17 @@ credentials. Disabling an account prevents it from being used to sign
 in. Deleting an account has additional membership and ownership
 checks.</p>
 <h3 id="unit-staff">Unit staff</h3>
-<p>There are three unit roles. <strong>Members</strong> use My unit for
-published guidance, required reading, announcements and RSVPs, and My
-profile for their own record. They cannot access other members’ staff
-records, drafts, revision history or hosting controls.
-<strong>Staff</strong> manage rosters, notes, assignments,
-qualifications, promotion reviews, events, attendance, SOPs/loadouts,
-awards and campaigns. <strong>Unit administrators</strong> additionally
-manage staff access, rank rules/catalogs, structure, branding and
-permanent member deletion. There are no individual permission switches.
-Unit authority grants no automatic hosting control.</p>
+<p>There are three unit roles. <strong>Members</strong> can read their
+unit roster and use My unit for published guidance, required reading,
+announcements and RSVPs, and My profile for their own record. They
+cannot access other members’ staff records, drafts, revision history or
+hosting controls. <strong>Staff</strong> manage rosters, notes,
+assignments, qualifications, promotion reviews, events, attendance,
+SOPs/loadouts, awards and campaigns. <strong>Unit
+administrators</strong> additionally manage staff access, rank
+rules/catalogs, structure, branding and permanent member deletion. There
+are no individual permission switches. Unit authority grants no
+automatic hosting control.</p>
 <p>Inside a unit, <strong>Administration → Accounts &amp; access → Add
 account</strong> lets panel and unit administrators create a new login
 or assign an existing account. Choose Member, Staff or Unit
@@ -911,6 +912,65 @@ for this unit only. Hand the credentials and the panel’s
 <code>/login</code> address to the member. This action cannot grant
 Staff, administrator or hosting permissions. Existing linked accounts
 are managed through Accounts &amp; access by administrators.</p>
+<h3 id="member-access-dated-loa-and-reusable-billets">Member access,
+dated LOA and reusable billets</h3>
+<p>Members can view the current roster of their own unit, including
+names, ranks, callsigns, qualifications and placements. Staff notes,
+Discord handles, UUIDs, account details, promotion records and former
+members are excluded from this read-only view. Members cannot change
+assignments or open staff records.</p>
+<p>Staff use <strong>Manage assignments</strong> to assign members to
+formations and billets. Only administrators can create, rename, reorder
+or remove structure items. Unit administrators can use a member record’s
+<strong>Access → Change unit role</strong> action to promote a Member to
+Staff; rank promotion never changes account permissions
+automatically.</p>
+<p>Staff member records have <strong>Overview, Qualifications,
+Attendance, Awards, History, Notes and Access</strong> tabs.
+Qualification details include award dates, instructor and notes.
+Promotion review remains manual, with an additional next-30-days filter.
+Unsaved notes are preserved while switching record tabs and guarded when
+opening another editor.</p>
+<p>Select LOA and enter optional start/end dates in Edit member. Dates
+are inclusive; a blank start begins immediately and a blank end is
+indefinite. Event expectations use the event’s local date. Members
+return to Active after the end date; the stored status and history
+update when the unit roster is opened. Active and past event snapshots
+stay unchanged. Bulk status changes clear previous LOA dates when the
+status changes.</p>
+<p>Administrators manage saved billet titles through <strong>Manage
+structure → Billet types</strong>. Existing slot titles and legacy
+position labels are carried over. Select a saved title and quantity when
+adding slots. Set callsigns on individual slots, not on the saved type.
+An occupant inherits the slot’s callsign unless their member record has
+a personal override. Moving or unassigning the member updates the
+inherited callsign. Empty layout copies omit callsigns to avoid
+duplicating radio identifiers. Removing a saved type preserves existing
+slots and occupants.</p>
+<p>Unit administrators can reset a Member login’s password, disable
+access to this unit, or restore it through the record’s Access tab.
+Disabling unit access does not disable other units or hosting
+permissions. Password resets invalidate existing login sessions.
+Accounts shared between units, linked to hosting, or holding panel
+authority require a panel administrator for password resets. Staff/admin
+memberships are managed through Change unit role or Accounts &amp;
+access.</p>
+<h3 id="editable-demo-company">Editable demo company</h3>
+<p>Panel administrators can choose <strong>Create demo unit</strong> at
+the top of Units. Confirm <strong>Create / open demo</strong> to create
+<strong>Demo Company — Training Sandbox</strong>. Reopening the action
+preserves existing demo edits rather than making another copy.</p>
+<p>The demo contains 48 fictional members: company HQ, two platoons,
+four squads and eight teams. Leadership/support personnel hold 24 named
+billets; 24 troops belong directly to teams, and three billets are
+vacant. Six published SOPs, six sample kit references, qualification
+awards, promotion examples, staff notes, callsigns and
+Active/Reserve/LOA examples are included.</p>
+<p>The demo is an ordinary editable unit. It creates no passwords,
+player UUIDs, game servers or server links. To try Member access, create
+a login from one of the demo roster records and sign into that account
+separately. Sample kit references do not apply equipment in game. Keep
+real personnel and server links in your real units.</p>
 <h2 id="15-qualifications-and-promotions">15. Qualifications and
 promotions</h2>
 <h3 id="qualificationscertifications">Qualifications/certifications</h3>

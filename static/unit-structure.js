@@ -123,6 +123,15 @@ window.UnitStructure = {
           break;
       }
     };
+    if (!detail.can_staff) {
+      for (const button of root.querySelectorAll('[data-structure-action]'))
+        if (
+          ['edit', 'copy', 'remove', 'add', 'billets', 'up', 'down'].includes(
+            button.dataset.structureAction,
+          )
+        )
+          button.remove();
+    }
     return selected.id;
   },
   renderBoard(root, detail, state, actions) {
@@ -137,12 +146,13 @@ window.UnitStructure = {
           member.rank,
           member.assignment_path,
           member.certificates,
+          member.effective_callsign,
         ]
           .join(' ')
           .toLowerCase()
           .includes(state.query));
     const person = (member) =>
-      `<button type="button" class="member-record-link" data-board-action="record" data-member="${member.id}">${esc(member.game_name)}</button>${member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
+      `${detail.role === 'member' ? esc(member.game_name) : `<button type="button" class="member-record-link" data-board-action="record" data-member="${member.id}">${esc(member.game_name)}</button>`}${member.effective_callsign ? `<small>${esc(member.effective_callsign)}</small>` : ''}${member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
     const counts = (node) => {
       const value = totals.get(node.id);
       return `${value.members} member${value.members === 1 ? '' : 's'}${value.slots ? ` · ${value.filled}/${value.slots} billets filled${value.slots > value.filled ? ` · ${value.slots - value.filled} open` : ''}` : ''}`;

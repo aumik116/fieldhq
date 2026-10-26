@@ -15,6 +15,7 @@ from unit_common import (
     STAFF_CAPABILITIES as STAFF_CAPABILITIES,
     UUID as UUID,
     actor,
+    roster_status,
     text,
     unit_role_capabilities,
 )
@@ -30,6 +31,8 @@ FIELDS = (
     "position",
     "joined_on",
     "loa_until",
+    "loa_from",
+    "callsign",
     "notes",
     "last_promo",
     "certificates",
@@ -148,6 +151,7 @@ def install(api):
             CREATE TABLE IF NOT EXISTS unit_primary_slots (
                 unit_id INTEGER NOT NULL, member_id INTEGER PRIMARY KEY,
                 billet_id INTEGER NOT NULL UNIQUE);
+            CREATE TABLE IF NOT EXISTS unit_account_suspensions (unit_id INTEGER NOT NULL,user_id INTEGER NOT NULL,PRIMARY KEY(unit_id,user_id));
             CREATE TABLE IF NOT EXISTS unit_roster_deleted_ids (id INTEGER PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS unit_member_notes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, unit_id INTEGER NOT NULL,
@@ -178,6 +182,8 @@ def install(api):
             ("unit_roster", "certificates", "TEXT NOT NULL DEFAULT ''"),
             ("unit_roster", "panel_user_id", "INTEGER"),
             ("unit_roster", "rank_track", "TEXT NOT NULL DEFAULT ''"),
+            ("unit_roster", "loa_from", "TEXT NOT NULL DEFAULT ''"),
+            ("unit_roster", "callsign", "TEXT NOT NULL DEFAULT ''"),
         ]:
             if column not in {
                 r["name"] for r in conn.execute(f"PRAGMA table_info({table})")
@@ -256,7 +262,13 @@ def install(api):
             "SELECT * FROM unit_staff WHERE unit_id=? AND user_id=?",
             (unit_id, g.user["id"]),
         ).fetchone()
-        if not membership:
+        if (
+            not membership
+            or conn.execute(
+                "SELECT 1 FROM unit_account_suspensions WHERE unit_id=? AND user_id=?",
+                (unit_id, g.user["id"]),
+            ).fetchone()
+        ):
             abort(404, description="Unit not found")
         if membership["role"] == "member" and request.endpoint not in {
             "unit_detail",
@@ -428,7 +440,7 @@ def install(api):
                 conn.execute("SELECT * FROM units ORDER BY name").fetchall()
                 if panel_admin()
                 else conn.execute(
-                    "SELECT u.* FROM units u JOIN unit_staff s ON s.unit_id=u.id WHERE s.user_id=? ORDER BY u.name",
+                    "SELECT u.* FROM units u JOIN unit_staff s ON s.unit_id=u.id WHERE s.user_id=? AND NOT EXISTS (SELECT 1 FROM unit_account_suspensions x WHERE x.unit_id=s.unit_id AND x.user_id=s.user_id) ORDER BY u.name",
                     (g.user["id"],),
                 ).fetchall()
             )
@@ -812,12 +824,17 @@ def install(api):
             return " / ".join(parts)
 
         for member in members:
+            member["scheduled_status"] = member["status"]
+            member["status"] = roster_status(member)
             slot = by_id.get(slots.get(member["id"]))
             placement = by_id.get(placements.get(member["id"])) if not slot else None
             formation = by_id.get(slot["parent_id"]) if slot else placement
             member.update(
                 billet_id=slot["id"] if slot else None,
                 billet_name=slot["name"] if slot else "",
+                billet_callsign=slot["callsign"] if slot else "",
+                effective_callsign=member.get("callsign", "")
+                or (slot["callsign"] if slot else ""),
                 billet_path=path(slot),
                 placement_id=placement["id"] if placement else None,
                 placement_path=path(placement),
@@ -1008,6 +1025,31 @@ def install(api):
                         "INSERT INTO unit_structure(unit_id,parent_id,kind,name,sort_order) VALUES(?,?,?,?,?)",
                         (unit_id, parent, kind, name, order),
                     ).lastrowid
+                if kind == "billet":
+                    type_id = data.get(
+                        "billet_type_id", old["billet_type_id"] if old else None
+                    )
+                    if type_id is not None:
+                        if type(type_id) is not int:
+                            raise ValueError("Choose a saved billet type")
+                        definition = conn.execute(
+                            "SELECT name FROM unit_billet_types WHERE unit_id=? AND id=?",
+                            (unit_id, type_id),
+                        ).fetchone()
+                        if not definition:
+                            raise ValueError(
+                                "Choose a saved billet type from this unit"
+                            )
+                        name = definition["name"]
+                    callsign = text(
+                        data.get("callsign", old["callsign"] if old else ""),
+                        "Billet callsign",
+                        60,
+                    )
+                    conn.execute(
+                        "UPDATE unit_structure SET billet_type_id=?,callsign=?,name=? WHERE unit_id=? AND id=?",
+                        (type_id, callsign, name, unit_id, identity),
+                    )
                 for member_id, before in previous_states.items():
                     record_roster_change(
                         conn,
@@ -1327,10 +1369,33 @@ def install(api):
     def unit_detail(unit_id):
         with db() as conn:
             unit = access(conn, unit_id)
+            expired = conn.execute(
+                "SELECT id FROM unit_roster WHERE unit_id=? AND status='loa' AND loa_until!='' AND loa_until<? AND archived=0",
+                (unit_id, date.today().isoformat()),
+            ).fetchall()
+            for row in expired:
+                before = roster_state(conn, unit_id, row["id"])
+                conn.execute(
+                    "UPDATE unit_roster SET status='active',updated_at=? WHERE unit_id=? AND id=?",
+                    (time.time(), unit_id, row["id"]),
+                )
+                record_roster_change(
+                    conn,
+                    unit_id,
+                    row["id"],
+                    before,
+                    dict(history_reason="LOA ended; returned to Active"),
+                )
+            if expired:
+                conn.execute(
+                    "UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,)
+                )
+                sync_event_roster(conn, unit_id)
+                unit = access(conn, unit_id)
             roster = [
                 dict(r)
                 for r in conn.execute(
-                    "SELECT r.*,u.username AS panel_username,u.enabled AS panel_user_enabled FROM unit_roster r LEFT JOIN users u ON u.id=r.panel_user_id WHERE r.unit_id=? ORDER BY r.archived,r.game_name COLLATE NOCASE,r.id",
+                    "SELECT r.*,u.username AS panel_username,u.enabled AS panel_user_enabled, EXISTS(SELECT 1 FROM unit_account_suspensions x WHERE x.unit_id=r.unit_id AND x.user_id=r.panel_user_id) AS unit_login_suspended FROM unit_roster r LEFT JOIN users u ON u.id=r.panel_user_id WHERE r.unit_id=? ORDER BY r.archived,r.game_name COLLATE NOCASE,r.id",
                     (unit_id,),
                 )
             ]
@@ -1340,13 +1405,41 @@ def install(api):
             ).fetchone()
             if not panel_admin() and membership["role"] == "member":
                 public_unit = {key: unit[key] for key in ("id", "name", "revision")}
+                decorate_slots(conn, unit_id, roster)
+                public_roster = [
+                    {
+                        key: m[key]
+                        for key in (
+                            "id",
+                            "game_name",
+                            "rank",
+                            "rank_track",
+                            "status",
+                            "certificates",
+                            "billet_id",
+                            "billet_path",
+                            "placement_id",
+                            "assignment_path",
+                            "effective_callsign",
+                        )
+                    }
+                    for m in roster
+                    if not m["archived"]
+                ]
+                for m in public_roster:
+                    m.update(
+                        archived=False,
+                        promotion=dict(
+                            eligible=False, next_rank="", next_date="", missing=[]
+                        ),
+                    )
                 return jsonify(
                     unit=dict(
                         public_unit, catalog={}, branding=branding(conn, unit_id)
                     ),
                     role="member",
-                    structure=[],
-                    roster=[],
+                    structure=structure_rows(conn, unit_id),
+                    roster=public_roster,
                     staff=[],
                     accounts=[],
                     can_edit=False,
@@ -1356,6 +1449,13 @@ def install(api):
                 )
             catalog = json.loads(unit["catalog"])
             structure = structure_rows(conn, unit_id)
+            billet_types = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT id,name FROM unit_billet_types WHERE unit_id=? ORDER BY name COLLATE NOCASE",
+                    (unit_id,),
+                )
+            ]
             decorate_slots(conn, unit_id, roster, structure)
             for member in roster:
                 member["promotion"] = promotion(member, catalog)
@@ -1390,6 +1490,7 @@ def install(api):
             )
         return jsonify(
             unit=dict(unit, catalog=catalog, branding=unit_brand),
+            billet_types=billet_types,
             structure=structure,
             roster=roster,
             staff=staff,
@@ -1402,7 +1503,7 @@ def install(api):
 
     def find_member(conn, unit_id, member_id):
         member = conn.execute(
-            "SELECT r.*,u.username AS panel_username,u.enabled AS panel_user_enabled FROM unit_roster r LEFT JOIN users u ON u.id=r.panel_user_id WHERE r.unit_id=? AND r.id=?",
+            "SELECT r.*,u.username AS panel_username,u.enabled AS panel_user_enabled, EXISTS(SELECT 1 FROM unit_account_suspensions x WHERE x.unit_id=r.unit_id AND x.user_id=r.panel_user_id) AS unit_login_suspended FROM unit_roster r LEFT JOIN users u ON u.id=r.panel_user_id WHERE r.unit_id=? AND r.id=?",
             (unit_id, member_id),
         ).fetchone()
         if not member:
@@ -1432,6 +1533,13 @@ def install(api):
                 "SELECT role,capabilities FROM unit_staff WHERE unit_id=? AND user_id=?",
                 (unit_id, g.user["id"]),
             ).fetchone()
+            qualifications = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT certificate,awarded_on,issuer,notes FROM unit_qualification_awards WHERE unit_id=? AND member_id=? ORDER BY certificate",
+                    (unit_id, member_id),
+                )
+            ]
             can_write = (
                 panel_admin()
                 or membership["role"] == "admin"
@@ -1441,6 +1549,7 @@ def install(api):
             member=dict(
                 member, promotion=promotion(member, json.loads(unit["catalog"]))
             ),
+            qualifications=qualifications,
             notes=rows[:50],
             next_before=rows[49]["id"] if len(rows) > 50 else None,
             can_write=can_write,
@@ -1569,7 +1678,9 @@ def install(api):
                 (
                     8000
                     if field in ("certificates", "position")
-                    else 2000 if field == "notes" else 120
+                    else (
+                        2000 if field == "notes" else 60 if field == "callsign" else 120
+                    )
                 ),
                 field == "game_name",
             )
@@ -1615,12 +1726,18 @@ def install(api):
             raise ValueError(
                 "Choose a rank from the selected structure, or leave it blank"
             )
-        for field in ("joined_on", "loa_until", "last_promo"):
+        for field in ("joined_on", "loa_from", "loa_until", "last_promo"):
             if values[field]:
                 try:
                     values[field] = date.fromisoformat(values[field]).isoformat()
                 except ValueError:
                     raise ValueError(f"{field}: choose a valid date") from None
+        if (
+            values["loa_from"]
+            and values["loa_until"]
+            and values["loa_from"] > values["loa_until"]
+        ):
+            raise ValueError("LOA end date must be on or after its start date")
         if values["last_promo"] and values["last_promo"] > date.today().isoformat():
             raise ValueError("Last promotion date cannot be in the future")
         return values
@@ -1863,6 +1980,10 @@ def install(api):
                     validate_staff(role)
                 protect_admin(conn, unit_id, user["id"], role)
                 conn.execute(
+                    "DELETE FROM unit_account_suspensions WHERE unit_id=? AND user_id=?",
+                    (unit_id, user["id"]),
+                )
+                conn.execute(
                     "DELETE FROM unit_staff WHERE unit_id=? AND user_id=?",
                     (unit_id, user["id"]),
                 )
@@ -1981,6 +2102,7 @@ def install(api):
                 "archived",
                 "primary_billet",
                 "primary_billet_path",
+                "effective_callsign",
                 "direct_formation_path",
                 "next_rank",
                 "next_eligible_date",
@@ -1994,6 +2116,7 @@ def install(api):
                 + [
                     export_cell(row["billet_name"]),
                     export_cell(row["billet_path"]),
+                    export_cell(row["effective_callsign"]),
                     export_cell(row["placement_path"]),
                     export_cell(result["next_rank"]),
                     result["next_date"],
@@ -2013,8 +2136,14 @@ def install(api):
     from roster_tools import install as install_roster_tools
     from unit_members import install as install_members
     from unit_sops import install as install_sops
-    from unit_structure import install as install_structure
+    from unit_structure import (
+        install as install_structure,
+        initialize as initialize_structure,
+    )
+    from unit_login_management import install as install_login_management
+    from unit_demo import install as install_demo
 
+    initialize_structure(db)
     # Register schemas and route dependencies before accepting requests.
     record_strength = install_resources(
         api, db, access, revision, panel_admin, endpoints
@@ -2040,7 +2169,20 @@ def install(api):
         api, db, access, revision, panel_admin, endpoints
     )
     install_sops(api, db, access, revision, panel_admin, endpoints, required_reading)
-    install_structure(api, db, access, revision, endpoints, structure_node)
+    install_structure(
+        api,
+        db,
+        access,
+        revision,
+        endpoints,
+        structure_node,
+        roster_state,
+        record_roster_change,
+    )
+    install_login_management(
+        api, db, access, revision, endpoints, find_member, panel_admin
+    )
+    install_demo(api, db, panel_admin, endpoints, record_roster_change, record_strength)
 
 
 # Keep established imports available to integrations while sharing their definitions.

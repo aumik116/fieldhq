@@ -34,7 +34,8 @@
     references: 'Unit SOPs and role-specific kit references.',
     catalog:
       'Configure rank paths, qualification names and position suggestions.',
-    structure: 'Manage roster groups, sections and billet slots.',
+    structure:
+      'Assign members to formations and billets. Administrators also manage layouts and saved billet types.',
     staff:
       'Create logins and assign Member, Staff or Unit administrator access.',
   };
@@ -58,7 +59,7 @@
       )
       .join('');
   const field = (label, name, value = '', type = 'text') =>
-    `<label class="unit-field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" maxlength="${name.includes('cert') ? 8000 : name === 'notes' ? 2000 : 120}"></label>`;
+    `<label class="unit-field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" maxlength="${name.includes('cert') ? 8000 : name === 'notes' ? 2000 : name === 'callsign' ? 60 : 120}"></label>`;
   const checks = (name, values, selected = []) =>
     `<div class="unit-checks">${values.map((v) => `<label><input type="checkbox" name="${name}" value="${esc(v)}" ${selected.includes(v) ? 'checked' : ''}>${esc(v)}</label>`).join('') || '<span class="feature-note">None defined yet.</span>'}</div>`;
   const checked = (name) =>
@@ -156,6 +157,7 @@
       listing = await read('/api/units');
       el('units-server-navigation').hidden = listing.hosting_access === false;
       el('unit-new').hidden = !listing.panel_admin;
+      el('unit-demo').hidden = !listing.panel_admin;
       el('unit-users').hidden = !listing.panel_admin;
       el('unit-select').replaceChildren();
       for (const unit of listing.units) {
@@ -220,27 +222,45 @@
         : detail.can_staff
           ? 'Unit administrator · Full unit access'
           : detail.role === 'member'
-            ? 'Member · My unit, personal profile and published resources'
+            ? 'Member · Read-only roster, personal profile and published resources'
             : 'Unit staff · Roster, events, attendance and resources';
       el('unit-settings').hidden = !detail.can_settings;
       el('roster-add').hidden = !detail.can_edit;
       el('catalog-edit').hidden = !detail.can_staff;
       el('position-rename').hidden = !detail.can_staff;
       el('unit-tab-staff').hidden = !detail.can_staff;
-      el('unit-tab-structure').hidden = !detail.can_staff;
-      el('roster-structure').hidden = !detail.can_staff;
+      el('unit-tab-structure').hidden = !detail.can_edit;
+      el('unit-tab-structure').textContent = detail.can_staff
+        ? 'Structure'
+        : 'Assignments';
+      el('structure-add-group').hidden = !detail.can_staff;
+      el('structure-billet-types').hidden = !detail.can_staff;
+      el('roster-structure').hidden = !detail.can_edit;
+      el('roster-structure').textContent = detail.can_staff
+        ? 'Manage structure'
+        : 'Manage assignments';
+      el('roster-export').hidden = detail.role === 'member';
+      el('roster-bulk').hidden = !detail.can_edit;
+      el('roster-status').querySelector('[value="archived"]').hidden =
+        detail.role === 'member';
+      if (detail.role === 'member' && el('roster-status').value === 'archived')
+        el('roster-status').value = '';
       for (const key of ['staff', 'structure', 'customization'])
         el('unit-tab-' + key).dataset.restricted = String(!detail.can_staff);
       document.querySelectorAll('[data-unit-tab]').forEach((b) => {
         if (detail.role === 'member')
           b.dataset.restricted = String(
-            !['home', 'profile', 'references'].includes(b.dataset.unitTab),
+            !['home', 'profile', 'roster', 'references'].includes(
+              b.dataset.unitTab,
+            ),
           );
         else if (
           !['staff', 'structure', 'customization'].includes(b.dataset.unitTab)
         )
           b.dataset.restricted = 'false';
       });
+      if (detail.role !== 'member')
+        el('unit-tab-structure').dataset.restricted = String(!detail.can_edit);
       el('roster-export').href = '/api/units/' + unitId + '/roster.csv';
       el('unit-page-title').textContent = detail.unit.name;
       applyBranding();
@@ -299,6 +319,7 @@
         (rosterView !== 'unassigned' || (!m.billet_id && !m.placement_id)) &&
         [
           m.assignment_path || m.billet_path,
+          m.effective_callsign,
           m.rank_track,
           m.game_name,
           m.discord,
@@ -328,6 +349,20 @@
               numeric: true,
             }),
     );
+    if (detail.role === 'member') {
+      el('roster-member-list').querySelector('thead').innerHTML =
+        '<tr><th>Name</th><th>Status</th><th>Rank</th><th>Formation / billet</th><th>Qualifications</th></tr>';
+      el('roster-rows').innerHTML =
+        rows
+          .map(
+            (m) =>
+              `<tr><td>${esc(m.game_name)}${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}</td><td>${esc(m.status === 'loa' ? 'LOA' : m.status)}</td><td>${esc(m.rank || '—')}</td><td>${esc(m.assignment_path || 'Unassigned')}</td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td></tr>`,
+          )
+          .join('') || '<tr><td colspan="5">No members match.</td></tr>';
+      return;
+    }
+    el('roster-member-list').querySelector('thead').innerHTML =
+      '<tr><th>Name</th><th>Status</th><th>Rank</th><th>Primary placement</th><th>Qualifications</th><th>Last promotion</th><th>Next promotion</th><th>Actions</th></tr>';
     const rankInfo = (m) =>
       (detail.unit.catalog.rank_structures || [])
         .find((s) => s.name === m.rank_track)
@@ -336,7 +371,7 @@
       rows
         .map((m) => {
           const p = m.promotion;
-          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button><small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td>${esc(m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
+          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button>${m.effective_callsign ? `<small>${esc(m.effective_callsign)}</small>` : ''}<small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td>${esc(m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.assignment_path || m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>${!m.archived && !m.panel_user_id ? `<button type="button" data-member-login="${m.id}">Create login</button>` : ''}` : ''}</td></tr>`;
         })
         .join('') ||
       '<tr><td colspan="8" class="unit-empty">No members match. Add a member to start.</td></tr>';
@@ -363,6 +398,7 @@
       );
   });
   el('structure-search').oninput = renderStructure;
+  el('structure-billet-types').onclick = billetTypesEditor;
   function structurePath(id) {
     const nodes = new Map((detail.structure || []).map((n) => [n.id, n]));
     const parts = [];
@@ -580,26 +616,31 @@
       .filter((n) => n.kind === 'group' || n.kind === 'section');
     openDialog(
       `${node ? 'Edit' : 'Add'} ${kind}`,
-      `${field('Name', 'name', node?.name || '')}${kind !== 'group' ? `<label class="unit-field">Inside<select name="parent_id">${candidates.map((n) => `<option value="${n.id}" ${(node ? node.parent_id : parentId) === n.id ? 'selected' : ''}>${esc(structurePath(n.id))}</option>`).join('')}</select></label>` : ''}${kind === 'billet' ? '<p class="feature-note">A billet is one slot. Repeated names such as Rifleman are allowed. There are no rank or qualification requirements.</p>' : '<p class="feature-note">Sections can contain subsections, teams or crews as well as billets.</p>'}`,
+      `${kind === 'billet' ? `<label class="unit-field">Billet type<select name="billet_type_id" required>${(detail.billet_types || []).map((t) => `<option value="${t.id}" ${t.id === node?.billet_type_id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select><small>Create reusable titles with Billet types in Manage structure.</small></label>${field('Slot callsign (optional)', 'callsign', node?.callsign || '')}` : field('Name', 'name', node?.name || '')}${kind !== 'group' ? `<label class="unit-field">Inside<select name="parent_id">${candidates.map((n) => `<option value="${n.id}" ${(node ? node.parent_id : parentId) === n.id ? 'selected' : ''}>${esc(structurePath(n.id))}</option>`).join('')}</select></label>` : ''}${kind === 'billet' ? '<p class="feature-note">A billet is one slot. Repeated names such as Rifleman are allowed. There are no rank or qualification requirements.</p>' : '<p class="feature-note">Sections can contain subsections, teams or crews as well as billets.</p>'}`,
       async () => {
         const data = values();
         await write(`/api/units/${unitId}/structure`, {
           kind,
-          name: data.name,
+          name:
+            kind === 'billet'
+              ? (detail.billet_types || []).find(
+                  (t) => t.id === Number(data.billet_type_id),
+                )?.name ||
+                node?.name ||
+                'Billet'
+              : data.name,
+          ...(kind === 'billet'
+            ? {
+                billet_type_id: Number(data.billet_type_id),
+                callsign: data.callsign,
+              }
+            : {}),
           parent_id: kind === 'group' ? null : Number(data.parent_id),
           revision: detail.unit.revision,
           ...(node ? { id: node.id } : {}),
         });
       },
     );
-    if (kind === 'billet') {
-      const list = document.createElement('datalist');
-      list.id = 'billet-position-suggestions';
-      for (const name of detail.unit.catalog.positions || [])
-        list.append(new Option(name, name));
-      el('unit-dialog-body').append(list);
-      form.elements.name.setAttribute('list', list.id);
-    }
     if (node) {
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -674,29 +715,70 @@
       feedback(error.message);
     }
   }
+  function billetTypeOptions(selected = null) {
+    return (detail.billet_types || [])
+      .map(
+        (type) =>
+          `<option value="${type.id}" ${type.id === selected ? 'selected' : ''}>${esc(type.name)}</option>`,
+      )
+      .join('');
+  }
+  function billetTypesEditor() {
+    openDialog(
+      'Reusable billet types',
+      '<p>Create titles once, then select them when adding slots to any formation. Callsigns belong to individual slots. Removing a type preserves existing slots and their occupants.</p><div id="billet-type-rows"></div><button type="button" id="billet-type-add">Add billet type</button>',
+      async () => {
+        const entries = [...el('billet-type-rows').children].map((row) => ({
+          ...(row.dataset.id ? { id: Number(row.dataset.id) } : {}),
+          name: row.querySelector('input').value,
+        }));
+        await write(`/api/units/${unitId}/billet-types`, {
+          entries,
+          revision: detail.unit.revision,
+        });
+      },
+    );
+    function row(type = {}) {
+      const item = document.createElement('div');
+      item.className = 'unit-toolbar';
+      if (type.id) item.dataset.id = type.id;
+      item.innerHTML = `<label class="unit-field">Billet title<input name="billet_type_name" required maxlength="80" value="${esc(type.name || '')}" aria-label="Billet title"></label><button type="button">Remove type</button>`;
+      item.querySelector('button').onclick = () => item.remove();
+      el('billet-type-rows').append(item);
+    }
+    (detail.billet_types || []).forEach(row);
+    el('billet-type-add').onclick = () => row();
+    baseline = signature();
+  }
   function bulkBilletsEditor(node) {
+    if (!detail.billet_types?.length) {
+      billetTypesEditor();
+      return;
+    }
     openDialog(
       `Add billets to ${node.name}`,
-      `<label class="unit-field">Billets<textarea name="entries" rows="8" required placeholder="Platoon Leader | 1\nPlatoon Sergeant | 1\nRifleman | 8"></textarea></label><p class="feature-note">One name per line. Add | and a count for repeated slots. Up to 100 billets per save. No rank or qualification requirements.</p>`,
+      '<p>Select saved billet titles and quantities. Set callsigns separately on individual slots after adding them.</p><div id="billet-entry-rows"></div><button type="button" id="billet-entry-add">Add another billet type</button>',
       async () => {
-        const entries = values()
-          .entries.split('\n')
-          .filter((line) => line.trim())
-          .map((line) => {
-            const parts = line.split('|');
-            if (parts.length > 2)
-              throw new Error('Use Name | count on each line.');
-            return {
-              name: parts[0].trim(),
-              count: parts.length === 2 ? Number(parts[1]) : 1,
-            };
-          });
+        const entries = [...el('billet-entry-rows').children].map((row) => ({
+          billet_type_id: Number(row.querySelector('select').value),
+          count: Number(row.querySelector('input').value),
+        }));
         await write(`/api/units/${unitId}/structure/${node.id}/billets`, {
           entries,
           revision: detail.unit.revision,
         });
       },
     );
+    function row() {
+      const item = document.createElement('div');
+      item.className = 'unit-toolbar';
+      item.innerHTML = `<label class="unit-field">Billet type<select name="entry_type" required>${billetTypeOptions()}</select></label><label class="unit-field">Slots<input name="entry_count" type="number" required min="1" max="50" value="1"></label><button type="button">Remove</button>`;
+      item.querySelector('button').onclick = () => item.remove();
+      el('billet-entry-rows').append(item);
+    }
+    row();
+    el('billet-entry-add').onclick = row;
+    baseline = signature();
   }
   function copyStructureEditor(node) {
     const totals = UnitStructure.index(detail).totals.get(node.id);
@@ -737,7 +819,7 @@
         p = m.promotion;
       openDialog(
         `${m.game_name} — member record`,
-        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.assignment_path || m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary placement & qualifications</h3><p>${esc(m.assignment_path || m.billet_path || 'No primary placement assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
+        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.assignment_path || m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>LOA dates</span><strong>${esc([m.loa_from || 'No start date', m.loa_until || 'No end date'].join(' → '))}</strong></div><div><span>Callsign</span><strong>${esc(m.effective_callsign || 'Not assigned')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary placement & qualifications</h3><p>${esc(m.assignment_path || m.billet_path || 'No primary placement assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status / LOA</option><option value="callsign">Callsign</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
         async () => {
           await write(url, { note: form.elements.record_note.value });
           form.elements.record_note.value = '';
@@ -758,6 +840,7 @@
         const login = document.createElement('button');
         login.type = 'button';
         login.textContent = 'Create Member login';
+        login.dataset.recordAccess = 'true';
         login.onclick = () => memberLoginEditor(m);
         el('unit-dialog-body').prepend(login);
       }
@@ -849,6 +932,8 @@
               .filter(Boolean)
               .join(' · ') || 'No rank'
           );
+        if (kind === 'callsign')
+          return value.effective_callsign || value.callsign || 'No callsign';
         if (kind === 'billet')
           return (
             value.assignment_path ||
@@ -861,7 +946,13 @@
             ? 'Former member'
             : value.status === 'loa'
               ? 'LOA'
-              : value.status || 'Not set';
+              : [
+                  value.status || 'Not set',
+                  value.loa_from ? 'From ' + value.loa_from : '',
+                  value.loa_until ? 'Until ' + value.loa_until : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
         if (kind.startsWith('qualification_'))
           return [
             value.certificate,
@@ -908,6 +999,7 @@
           const labels = {
             baseline: 'Existing record at upgrade',
             created: 'Member record created',
+            callsign: 'Callsign changed',
             rank: 'Rank / promotion date changed',
             billet: 'Billet assignment / transfer',
             status: 'Membership status changed',
@@ -990,18 +1082,179 @@
           button.disabled = false;
         }
       };
+      organizeMemberRecord(m, record);
+      baseline = signature();
     } catch (error) {
       feedback(error.message);
     }
   }
+  function organizeMemberRecord(member, record) {
+    const body = el('unit-dialog-body'),
+      content = [...body.children];
+    const names = [
+      'Overview',
+      'Qualifications',
+      'Attendance',
+      'Awards',
+      'History',
+      'Notes',
+      'Access',
+    ];
+    const tabs = document.createElement('div');
+    tabs.className = 'member-record-tabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Member record');
+    const panes = new Map();
+    for (const name of names) {
+      const pane = document.createElement('section');
+      pane.id = 'record-pane-' + name;
+      pane.setAttribute('role', 'tabpanel');
+      pane.setAttribute('aria-labelledby', 'record-tab-' + name);
+      pane.hidden = name !== 'Overview';
+      panes.set(name, pane);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'record-tab-' + name;
+      button.textContent = name;
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-controls', pane.id);
+      button.setAttribute('aria-selected', String(name === 'Overview'));
+      button.tabIndex = name === 'Overview' ? 0 : -1;
+      button.onclick = () => {
+        for (const [key, region] of panes) region.hidden = key !== name;
+        for (const tab of tabs.children) {
+          tab.setAttribute('aria-selected', String(tab === button));
+          tab.tabIndex = tab === button ? 0 : -1;
+        }
+        form.querySelector('[type="submit"]').hidden =
+          name !== 'Notes' || !record.can_write;
+      };
+      tabs.append(button);
+    }
+    tabs.onkeydown = (event) => {
+      const buttons = [...tabs.children],
+        index = buttons.indexOf(document.activeElement);
+      if (index < 0) return;
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % buttons.length;
+      else if (event.key === 'ArrowLeft')
+        next = (index + buttons.length - 1) % buttons.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      buttons[next].click();
+      buttons[next].focus();
+    };
+    let inNotes = false;
+    for (const node of content) {
+      if (node.matches('h3') && node.textContent === 'Staff record')
+        inNotes = true;
+      let name = inNotes ? 'Notes' : 'Overview';
+      if (node.dataset.recordAccess) name = 'Access';
+      else if (node.querySelector('#member-award-history')) name = 'Awards';
+      else if (node.querySelector('#member-attendance-history'))
+        name = 'Attendance';
+      else if (node.querySelector('#member-change-timeline')) name = 'History';
+      else if (node.id === 'member-manage-qualifications')
+        name = 'Qualifications';
+      if (node.tagName === 'DETAILS') {
+        node.open = true;
+        const summary = node.querySelector('summary');
+        if (summary) summary.hidden = true;
+      }
+      panes.get(name).append(node);
+    }
+    const qual = document.createElement('div');
+    qual.className = 'unit-table';
+    qual.innerHTML = `<table><thead><tr><th>Qualification</th><th>Awarded</th><th>Instructor</th><th>Notes</th></tr></thead><tbody>${(record.qualifications || []).map((q) => `<tr><td>${esc(q.certificate)}</td><td>${esc(q.awarded_on || 'Unknown')}</td><td>${esc(q.issuer || 'Unknown')}</td><td>${esc(q.notes || '—')}</td></tr>`).join('') || '<tr><td colspan="4">No qualifications recorded.</td></tr>'}</tbody></table>`;
+    panes.get('Qualifications').prepend(qual);
+    if (record.can_write) {
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = 'Edit member';
+      edit.onclick = () => {
+        if (UnitUX.canLeave()) memberEditor(member);
+      };
+      panes.get('Overview').append(edit);
+    }
+    if (member.promotion.eligible && detail.can_edit) {
+      const promote = document.createElement('button');
+      promote.type = 'button';
+      promote.textContent = 'Review promotion';
+      promote.onclick = () => {
+        if (!UnitUX.canLeave()) return;
+        dialog.close();
+        document.dispatchEvent(
+          new CustomEvent('unit-review-promotion', { detail: member.id }),
+        );
+      };
+      panes.get('Overview').append(promote);
+    }
+    const access = panes.get('Access');
+    if (member.panel_user_id) {
+      const text = document.createElement('p');
+      text.textContent = `Login: ${member.panel_username} · ${member.unit_login_suspended ? 'Unit access disabled' : member.panel_user_enabled ? 'Enabled' : 'Account disabled by panel administrator'}`;
+      access.prepend(text);
+      if (detail.can_staff) {
+        const membership = detail.staff.find(
+          (s) => s.user_id === member.panel_user_id,
+        );
+        if (membership) {
+          const role = document.createElement('button');
+          role.type = 'button';
+          role.textContent = 'Change unit role';
+          role.onclick = () => {
+            if (UnitUX.canLeave()) staffEditor(membership);
+          };
+          access.append(role);
+        }
+        if (membership?.role === 'member')
+          for (const [action, label] of [
+            ['reset', 'Reset password'],
+            [
+              member.unit_login_suspended ? 'enable' : 'disable',
+              member.unit_login_suspended
+                ? 'Restore unit access'
+                : 'Disable unit access',
+            ],
+          ]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.onclick = () => loginManagementEditor(member, action);
+            access.append(button);
+          }
+      }
+    } else if (!access.children.length) access.textContent = 'No linked login.';
+    body.replaceChildren(tabs, ...panes.values());
+    form.querySelector('[type="submit"]').hidden = true;
+  }
+  function loginManagementEditor(member, action) {
+    if (!UnitUX.canLeave()) return;
+    openDialog(
+      `${action === 'reset' ? 'Reset password' : action === 'disable' ? 'Disable unit access' : 'Restore unit access'} — ${member.game_name}`,
+      action === 'reset'
+        ? '<p>A reset signs out existing sessions. Shared or hosting accounts require a panel administrator.</p><label class="unit-field">New password<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password"></label>'
+        : `<p>${action === 'disable' ? 'Stops access to this unit only. Other unit memberships and hosting access remain available.' : 'Restores this Member’s access to this unit.'}</p><label><input type="checkbox" required> Confirm this access change.</label>`,
+      async () => {
+        await write(`/api/units/${unitId}/roster/${member.id}/login/manage`, {
+          action,
+          ...(action === 'reset' ? { password: values().password } : {}),
+          revision: detail.unit.revision,
+        });
+      },
+    );
+  }
+
   function memberEditor(member = {}) {
     const catalog = detail.unit.catalog;
     openDialog(
       member.id ? 'Edit roster member' : 'Add roster member',
-      `<div class="unit-form-grid">${field('Game name', 'game_name', member.game_name || '')}${field('Discord handle', 'discord', member.discord || '')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity ? [member.identity] : [], member.identity || '', 'Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${member.status === s ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s === 'active' ? 'Active' : 'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options(
+      `<div class="unit-form-grid">${field('Game name', 'game_name', member.game_name || '')}${field('Discord handle', 'discord', member.discord || '')}${field('Personal callsign override (optional)', 'callsign', member.callsign || '')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity ? [member.identity] : [], member.identity || '', 'Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${(member.scheduled_status || member.status) === s ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s === 'active' ? 'Active' : 'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options(
         (catalog.rank_structures || []).map((s) => s.name),
         member.rank_track || '',
-      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary placement<select name="billet_id" id="member-billet"></select><small>Choose a named billet or assign directly to a formation. One primary placement per member; no rank or qualification requirements.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates', catalog.certificates || [], (member.certificates || '').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
+      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary placement<select name="billet_id" id="member-billet"></select><small>Choose a named billet or assign directly to a formation. One primary placement per member; no rank or qualification requirements.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA starts (optional)', 'loa_from', member.loa_from || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates', catalog.certificates || [], (member.certificates || '').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
       async () => {
         const data = values();
         await write(`/api/units/${unitId}/roster`, {
@@ -1016,6 +1269,8 @@
               'joined_on',
               'last_promo',
               'loa_until',
+              'loa_from',
+              'callsign',
               'notes',
               'history_reason',
               'qualification_awarded_on',
@@ -1171,13 +1426,13 @@
   function renderCatalog() {
     const c = detail.unit.catalog;
     el('catalog-summary').innerHTML =
-      `<div class="unit-block"><h3>Qualifications / certifications</h3>${esc((c.certificates || []).join(', ') || 'None defined')}</div><div class="unit-block"><h3>Position name suggestions</h3>${esc((c.positions || []).join(', ') || 'None defined')}</div>${(c.rank_structures || []).map((s) => `<div class="unit-block"><h3>${esc(s.name)}</h3><div class="rank-policy-table"><table><thead><tr><th>Rank</th><th>Paygrade label</th><th>Days to enter</th><th>Required qualifications</th><th>Next rank</th></tr></thead><tbody>${s.ranks.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.paygrade || '—')}</td><td>${r.days}</td><td>${esc(r.certificates.join(', ') || 'None')}</td><td>${esc(r.next_rank || 'End of structure')}</td></tr>`).join('')}</tbody></table></div></div>`).join('') || '<p class="unit-empty">No rank structures defined. Add Marine, Medical, Officer or your own structures.</p>'}`;
+      `<div class="unit-block"><h3>Qualifications / certifications</h3>${esc((c.certificates || []).join(', ') || 'None defined')}</div><div class="unit-block"><h3>Legacy position labels</h3>${esc((c.positions || []).join(', ') || 'None defined')}</div>${(c.rank_structures || []).map((s) => `<div class="unit-block"><h3>${esc(s.name)}</h3><div class="rank-policy-table"><table><thead><tr><th>Rank</th><th>Paygrade label</th><th>Days to enter</th><th>Required qualifications</th><th>Next rank</th></tr></thead><tbody>${s.ranks.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.paygrade || '—')}</td><td>${r.days}</td><td>${esc(r.certificates.join(', ') || 'None')}</td><td>${esc(r.next_rank || 'End of structure')}</td></tr>`).join('')}</tbody></table></div></div>`).join('') || '<p class="unit-empty">No rank structures defined. Add Marine, Medical, Officer or your own structures.</p>'}`;
   }
   function catalogEditor() {
     const c = detail.unit.catalog;
     openDialog(
       'Rank structures & qualifications',
-      `<p class="feature-note">Each rank structure is independent. Marine, Medical and Officer can have different rank names, advancement times and qualification requirements. Paygrade labels are optional and do not share rules between structures.</p><div class="unit-form-grid"><label class="unit-field">Qualification names<textarea name="qualification_names">${esc((c.certificates || []).join('\n'))}</textarea></label><label class="unit-field">Position name suggestions<textarea name="position_names">${esc((c.positions || []).join('\n'))}</textarea></label></div><h3>Rank structures</h3><p class="feature-note">Days to enter is the minimum time since the last promotion needed to enter that rank. Requirements use qualification names separated by semicolons. Next rank must name a rank in the same structure. Eligibility is a notice for staff; no automatic promotion.</p><div id="rank-structure-rows"></div><button type="button" id="rank-structure-add">Add rank structure</button>`,
+      `<p class="feature-note">Each rank structure is independent. Marine, Medical and Officer can have different rank names, advancement times and qualification requirements. Paygrade labels are optional and do not share rules between structures. Reusable billet titles are managed in Structure → Billet types; legacy position labels are kept for older records.</p><div class="unit-form-grid"><label class="unit-field">Qualification names<textarea name="qualification_names">${esc((c.certificates || []).join('\n'))}</textarea></label><label class="unit-field">Legacy position labels<textarea name="position_names">${esc((c.positions || []).join('\n'))}</textarea></label></div><h3>Rank structures</h3><p class="feature-note">Days to enter is the minimum time since the last promotion needed to enter that rank. Requirements use qualification names separated by semicolons. Next rank must name a rank in the same structure. Eligibility is a notice for staff; no automatic promotion.</p><div id="rank-structure-rows"></div><button type="button" id="rank-structure-add">Add rank structure</button>`,
       async () => {
         const split = (value) =>
           value
@@ -1568,6 +1823,24 @@
     busy: () => brandSaving,
     discard: () => applyBranding(),
   });
+  el('unit-demo').onclick = () => {
+    if (!UnitUX.canLeave()) return;
+    openDialog(
+      'Create or open demo unit',
+      '<p>Creates an editable fictional company with 48 members, company/platoon/squad/team leadership, three vacant billets, qualification records, staff notes, six SOPs and six sample loadouts.</p><p>It creates no login credentials or server links. Existing units stay separate. If the demo already exists, this opens it and preserves your edits.</p>',
+      async () => {
+        const result = await write('/api/units/demo', {});
+        unitId = result.id;
+        activeTab = 'roster';
+        rosterUnit = null;
+        const params = new URLSearchParams(location.search);
+        params.set('unit', unitId);
+        params.set('tab', 'roster');
+        history.replaceState(null, '', '/units?' + params);
+      },
+    );
+    form.querySelector('[type="submit"]').textContent = 'Create / open demo';
+  };
   el('unit-new').onclick = () => unitSettings(true);
   el('unit-settings').onclick = () => unitSettings();
   el('roster-add').onclick = () => memberEditor();

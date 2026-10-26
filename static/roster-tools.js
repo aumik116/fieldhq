@@ -249,6 +249,11 @@
     if (!context) return;
     const filter = el('promotion-filter').value,
       query = el('promotion-search').value.trim().toLowerCase();
+    const upcomingUntil = metadata
+      ? new Date(Date.parse(metadata.today + 'T00:00:00Z') + 30 * 86400000)
+          .toISOString()
+          .slice(0, 10)
+      : '';
     const members = current()
       .filter(
         (m) =>
@@ -257,9 +262,13 @@
             .toLowerCase()
             .includes(query) &&
           (filter === 'all' ||
-            (filter === 'eligible'
-              ? m.promotion.eligible
-              : !m.promotion.eligible)),
+            (filter === 'upcoming'
+              ? !!m.promotion.next_date &&
+                m.promotion.next_date > metadata?.today &&
+                m.promotion.next_date <= upcomingUntil
+              : filter === 'eligible'
+                ? m.promotion.eligible
+                : !m.promotion.eligible)),
       )
       .sort(
         (a, b) =>
@@ -343,7 +352,7 @@
         action === 'grant' || action === 'revoke'
           ? `<label class="unit-field">Qualification<select name="certificate" required>${catalog.map((c) => `<option ${c === initial.certificate ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>${!catalog.length ? '<p class="unit-warn">Create qualifications in Ranks & qualifications first.</p>' : ''}${action === 'grant' ? `<label class="unit-field">Award date<input type="date" name="awarded_on" required value="${esc(initial.awarded_on || metadata.today)}" max="${metadata.today}"></label><p class="feature-note">Members who already hold it keep their current award date and issuer.</p>` : ''}`
           : action === 'status'
-            ? `<label class="unit-field">New status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${s === initial.status ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select></label><p class="feature-note">Future event rosters update. Past and active event expectations stay unchanged.</p>`
+            ? `<label class="unit-field">New status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${s === initial.status ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select></label><p class="feature-note">Changing status clears the previous LOA dates. Set date ranges in Edit member. Future event rosters update; past and active event expectations stay unchanged.</p>`
             : action === 'section'
               ? `<label class="unit-field">Target section<select name="section_id" required>${sections.map((s) => `<option value="${s.id}" ${s.id === initial.section_id ? 'selected' : ''}>${esc(path(s.id))}</option>`).join('')}</select></label><p class="feature-note">Members already in this section stay in their billets. Others receive vacant billets in structure order. The preview lists each assignment. No change is applied if there are too few vacancies.</p>${!sections.length ? '<p class="unit-warn">Create sections and billets in Structure first.</p>' : ''}`
               : '<p>Selected members will become unassigned. Their roster records remain.</p>';
@@ -468,6 +477,9 @@
     if (event.detail.tab === 'qualifications') renderMatrix();
     if (event.detail.tab === 'promotions') renderPromotions();
   });
+  document.addEventListener('unit-review-promotion', (e) =>
+    promotionEditor(e.detail),
+  );
   document.addEventListener('unit-manage-qualification', (e) =>
     qualificationEditor(e.detail),
   );

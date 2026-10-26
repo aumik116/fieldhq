@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import abort, g, jsonify, request
 
 from functools import partial
-from unit_common import UUID, actor, can as unit_can, text
+from unit_common import roster_status, UUID, actor, can as unit_can, text
 
 OUTCOMES = ("present", "absent", "excused", "unknown")
 
@@ -124,8 +124,8 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                 continue
             exempt = (
                 "LOA"
-                if member["status"] == "loa"
-                else "Reserve" if member["status"] == "reserve" else ""
+                if roster_status(member, local_day) == "loa"
+                else "Reserve" if roster_status(member, local_day) == "reserve" else ""
             )
             conn.execute(
                 "INSERT INTO unit_event_members(event_id,member_id,game_name,identity,status,expected,exemption) VALUES(?,?,?,?,?,?,?)",
@@ -134,7 +134,7 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                     member["id"],
                     member["game_name"],
                     member["identity"].lower(),
-                    member["status"],
+                    roster_status(member, local_day),
                     int(not exempt),
                     exempt,
                 ),
@@ -877,6 +877,8 @@ def install(api, db, access, panel_admin, promotion, endpoints):
                     (unit_id,),
                 )
             ]
+            for member in roster:
+                member["status"] = roster_status(member)
             assigned = {
                 r[0]
                 for r in conn.execute(

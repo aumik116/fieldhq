@@ -5384,3 +5384,20 @@ html[data-theme] #unit-sidebar [hidden] {
   .roster-formation-heading > div { display: block; }
   .roster-formation-table table { min-width: 470px; }
 }
+
+.member-record-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.member-record-tabs [aria-selected='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+#record-pane-Access { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#record-pane-Access[hidden] { display: none; }
+#record-pane-Access p { flex-basis: 100%; }

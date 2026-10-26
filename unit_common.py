@@ -1,5 +1,6 @@
 """Shared unit identity, role checks and reference serialization."""
 
+from datetime import date
 import hashlib
 import json
 import re
@@ -145,3 +146,13 @@ def decode_reference(row):
     item.pop("published_value", None)
     item["slots"] = json.loads(item["slots"])
     return item
+
+
+def roster_status(member, on=None):
+    """LOA dates are inclusive; undated legacy LOA remains indefinite."""
+    day = on or date.today().isoformat()
+    if member["status"] != "loa":
+        return member["status"]
+    start = member["loa_from"] if "loa_from" in member.keys() else ""
+    end = member["loa_until"]
+    return "active" if (start and day < start) or (end and day > end) else "loa"

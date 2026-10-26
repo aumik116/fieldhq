@@ -6,7 +6,7 @@ import time
 
 from flask import abort, g, jsonify, request
 from functools import partial
-from unit_common import actor, can, publication_digest, text
+from unit_common import actor, can, publication_digest, text, roster_status
 
 
 def install(api, db, access, revision, panel_admin, endpoints):
@@ -241,6 +241,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
                 "archived",
             )
             public = {key: member[key] for key in keys}
+            public["status"] = roster_status(member)
             # Award notes and staff attendance reasons never enter this response.
             qualifications = [
                 dict(r)
@@ -252,7 +253,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
             positions = [
                 dict(r)
                 for r in conn.execute(
-                    "SELECT s.id,s.name,s.parent_id,s.kind FROM unit_structure s WHERE s.unit_id=?",
+                    "SELECT s.id,s.name,s.parent_id,s.kind,s.callsign FROM unit_structure s WHERE s.unit_id=?",
                     (unit_id,),
                 )
             ]
@@ -263,6 +264,9 @@ def install(api, db, access, revision, panel_admin, endpoints):
             by_id = {p["id"]: p for p in positions}
             path = []
             node = by_id.get(assigned[0]) if assigned else None
+            public["effective_callsign"] = member["callsign"] or (
+                node["callsign"] if node and node["kind"] == "billet" else ""
+            )
             visited = set()
             while node and node["id"] not in visited:
                 visited.add(node["id"])

@@ -97,7 +97,7 @@ Use the separate password-reset action when someone needs replacement credential
 
 ### Unit staff
 
-There are three unit roles. **Members** use My unit for published guidance, required reading, announcements and RSVPs, and My profile for their own record. They cannot access other members’ staff records, drafts, revision history or hosting controls. **Staff** manage rosters, notes, assignments, qualifications, promotion reviews, events, attendance, SOPs/loadouts, awards and campaigns. **Unit administrators** additionally manage staff access, rank rules/catalogs, structure, branding and permanent member deletion. There are no individual permission switches. Unit authority grants no automatic hosting control.
+There are three unit roles. **Members** can read their unit roster and use My unit for published guidance, required reading, announcements and RSVPs, and My profile for their own record. They cannot access other members’ staff records, drafts, revision history or hosting controls. **Staff** manage rosters, notes, assignments, qualifications, promotion reviews, events, attendance, SOPs/loadouts, awards and campaigns. **Unit administrators** additionally manage staff access, rank rules/catalogs, structure, branding and permanent member deletion. There are no individual permission switches. Unit authority grants no automatic hosting control.
 
 Inside a unit, **Administration → Accounts & access → Add account** lets panel and unit administrators create a new login or assign an existing account. Choose Member, Staff or Unit administrator. Link the account to its roster member when applicable; this provides the person's unit-specific name for notes and history.
 
@@ -538,6 +538,28 @@ Review the consequences before removing a group, section or billet. These tools 
 In **Structure**, select a formation in the navigator to edit or move it, add smaller formations, or add several billets using `Name | count` lines. **Copy empty layout** duplicates the structure without its member assignments. Removing a branch leaves its members unassigned and retains their records. The **All members** roster remains available for units that do not use formations.
 
 Unit Staff can use **Create login** beside an active roster member or inside their record. Enter a username and initial password; the panel creates and links a **Member** account for this unit only. Hand the credentials and the panel’s `/login` address to the member. This action cannot grant Staff, administrator or hosting permissions. Existing linked accounts are managed through Accounts & access by administrators.
+
+### Member access, dated LOA and reusable billets
+
+Members can view the current roster of their own unit, including names, ranks, callsigns, qualifications and placements. Staff notes, Discord handles, UUIDs, account details, promotion records and former members are excluded from this read-only view. Members cannot change assignments or open staff records.
+
+Staff use **Manage assignments** to assign members to formations and billets. Only administrators can create, rename, reorder or remove structure items. Unit administrators can use a member record’s **Access → Change unit role** action to promote a Member to Staff; rank promotion never changes account permissions automatically.
+
+Staff member records have **Overview, Qualifications, Attendance, Awards, History, Notes and Access** tabs. Qualification details include award dates, instructor and notes. Promotion review remains manual, with an additional next-30-days filter. Unsaved notes are preserved while switching record tabs and guarded when opening another editor.
+
+Select LOA and enter optional start/end dates in Edit member. Dates are inclusive; a blank start begins immediately and a blank end is indefinite. Event expectations use the event’s local date. Members return to Active after the end date; the stored status and history update when the unit roster is opened. Active and past event snapshots stay unchanged. Bulk status changes clear previous LOA dates when the status changes.
+
+Administrators manage saved billet titles through **Manage structure → Billet types**. Existing slot titles and legacy position labels are carried over. Select a saved title and quantity when adding slots. Set callsigns on individual slots, not on the saved type. An occupant inherits the slot’s callsign unless their member record has a personal override. Moving or unassigning the member updates the inherited callsign. Empty layout copies omit callsigns to avoid duplicating radio identifiers. Removing a saved type preserves existing slots and occupants.
+
+Unit administrators can reset a Member login’s password, disable access to this unit, or restore it through the record’s Access tab. Disabling unit access does not disable other units or hosting permissions. Password resets invalidate existing login sessions. Accounts shared between units, linked to hosting, or holding panel authority require a panel administrator for password resets. Staff/admin memberships are managed through Change unit role or Accounts & access.
+
+### Editable demo company
+
+Panel administrators can choose **Create demo unit** at the top of Units. Confirm **Create / open demo** to create **Demo Company — Training Sandbox**. Reopening the action preserves existing demo edits rather than making another copy.
+
+The demo contains 48 fictional members: company HQ, two platoons, four squads and eight teams. Leadership/support personnel hold 24 named billets; 24 troops belong directly to teams, and three billets are vacant. Six published SOPs, six sample kit references, qualification awards, promotion examples, staff notes, callsigns and Active/Reserve/LOA examples are included.
+
+The demo is an ordinary editable unit. It creates no passwords, player UUIDs, game servers or server links. To try Member access, create a login from one of the demo roster records and sign into that account separately. Sample kit references do not apply equipment in game. Keep real personnel and server links in your real units.
 
 ## 15. Qualifications and promotions
 

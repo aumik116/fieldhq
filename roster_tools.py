@@ -32,6 +32,7 @@ def install(
             abort(404, description="Member not found in this unit")
         member = dict(row)
         decorate_slots(conn, unit_id, [member])
+        member["status"] = member["scheduled_status"]
         return {
             key: member[key]
             for key in (
@@ -41,6 +42,8 @@ def install(
                 "rank_track",
                 "last_promo",
                 "status",
+                "loa_from",
+                "loa_until",
                 "archived",
                 "certificates",
                 "billet_id",
@@ -48,6 +51,8 @@ def install(
                 "placement_id",
                 "placement_path",
                 "assignment_path",
+                "callsign",
+                "effective_callsign",
             )
         }
 
@@ -87,7 +92,8 @@ def install(
         for kind, keys in [
             ("rank", ("rank_track", "rank", "last_promo")),
             ("billet", ("billet_id", "billet_path", "placement_id", "placement_path")),
-            ("status", ("status", "archived")),
+            ("status", ("status", "archived", "loa_from", "loa_until")),
+            ("callsign", ("callsign", "effective_callsign")),
         ]:
             old = {k: previous.get(k) for k in keys}
             new = {k: after[k] for k in keys}
@@ -243,7 +249,7 @@ def install(
         except ValueError:
             return jsonify(ok=False, error="Choose a valid timeline cursor"), 400
         kind = request.args.get("kind", "all")
-        if kind not in ("all", "rank", "billet", "qualification", "status"):
+        if kind not in ("all", "rank", "billet", "qualification", "status", "callsign"):
             return jsonify(ok=False, error="Choose a valid timeline filter"), 400
         with db() as conn:
             access(conn, unit_id)
@@ -465,6 +471,9 @@ def install(
                 raise ValueError("Choose Active, Reserve or LOA")
             for change in changes:
                 change["after"]["status"] = status
+                if status != change["before"]["status"]:
+                    change["after"]["loa_from"] = ""
+                    change["after"]["loa_until"] = ""
         elif action in ("section", "unassign"):
             nodes = structure_rows(conn, unit_id)
             available = []
@@ -574,10 +583,12 @@ def install(
                     if before == after:
                         continue
                     conn.execute(
-                        "UPDATE unit_roster SET certificates=?,status=?,updated_at=? WHERE unit_id=? AND id=?",
+                        "UPDATE unit_roster SET certificates=?,status=?,loa_from=?,loa_until=?,updated_at=? WHERE unit_id=? AND id=?",
                         (
                             after["certificates"],
                             after["status"],
+                            after["loa_from"],
+                            after["loa_until"],
                             time.time(),
                             unit_id,
                             member_id,
