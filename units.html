@@ -35,7 +35,14 @@
           >Units</a
         ></nav
       ><div class="fieldhq-account"
-        ><a class="workspace-back" href="/account">Account settings</a
+        ><a
+          class="workspace-back"
+          id="unit-users"
+          href="/units?admin=users"
+          hidden
+          >Panel users</a
+        ><a class="workspace-back" href="/account" aria-label="Account settings"
+          ><span id="unit-account-name"></span> · Account settings</a
         ><button type="button" class="btn-logout" id="unit-logout"
           >Logout</button
         ></div
@@ -814,6 +821,6 @@
     ><script src="/static/unit-resources.js?v=roster-chart-1"></script
     ><script src="/static/unit-members.js?v=unit-roster-4"></script
     ><script src="/static/unit-structure.js?v=roster-chart-1"></script
-    ><script src="/static/units.js?v=shared-header-1"></script
+    ><script src="/static/units.js?v=header-startup-2"></script
     ><script src="/static/help.js?v=manuals-3"></script></body
 ></html>
