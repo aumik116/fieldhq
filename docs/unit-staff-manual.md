@@ -174,7 +174,7 @@ A flat roster needs no organization structure. Units using slots organize people
 
 Position suggestions are reusable names. A suggestion alone does not create or fill a billet.
 
-To assign someone, use the Assignment board or the member editor’s **Primary placement** field. Each formation can contain named billets and directly assigned members without billets. A person has one primary placement. For an occupied billet, choose Swap placements or leave the displaced member unassigned. Empty billets remain visible; directly assigned members do not consume slots.
+To assign someone, use the formation roster or the member editor’s **Primary placement** field. Each formation can contain named billets and directly assigned members without billets. A person has one primary placement. For an occupied billet, choose Swap placements or leave the displaced member unassigned. Empty billets remain visible; directly assigned members do not consume slots.
 
 Rank and qualifications do not block billet assignments. Use your unit's own staffing policy when deciding whom to place.
 
@@ -388,3 +388,5 @@ When asking for help, include the unit, page, member/event concerned, time and e
 In **Structure**, select a formation in the navigator to edit or move it, add smaller formations, or add several billets using `Name | count` lines. **Copy empty layout** duplicates the structure without its member assignments. Removing a branch leaves its members unassigned and retains their records. The **All members** roster remains available for units that do not use formations.
 
 Unit Staff can use **Create login** beside an active roster member or inside their record. Enter a username and initial password; the panel creates and links a **Member** account for this unit only. Hand the credentials and the panel’s `/login` address to the member. This action cannot grant Staff, administrator or hosting permissions. Existing linked accounts are managed through Accounts & access by administrators.
+
+The roster opens on **All formations** when a structure exists. Group tabs filter the formation tables. Click a member’s name to open their record or click **— Open —** to fill an empty billet. Members assigned directly appear after the named billets with a dash in the Billet column. Use **Manage structure** for layout changes, occupied-billet swaps and direct formation assignments.

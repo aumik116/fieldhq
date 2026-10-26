@@ -127,8 +127,8 @@ window.UnitStructure = {
   },
   renderBoard(root, detail, state, actions) {
     const esc = escHtml,
-      index = this.index(detail),
-      { children, occupants, direct, totals } = index;
+      index = this.index(detail);
+    const { children, occupants, direct, totals } = index;
     const match = (member) =>
       (!state.status || member.status === state.status) &&
       (!state.query ||
@@ -141,86 +141,68 @@ window.UnitStructure = {
           .join(' ')
           .toLowerCase()
           .includes(state.query));
-    const selected = detail.roster.find(
-      (m) => m.id === state.member && !m.archived,
-    );
-    const person = (m) =>
-      `<button type="button" class="member-record-link" data-board-action="record" data-member="${m.id}">${esc([m.rank, m.game_name].filter(Boolean).join(' '))}</button>${m.status !== 'active' ? `<small>${m.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
-    function formation(node) {
-      const childNodes = children.get(node.id) || [],
-        directMembers = (direct.get(node.id) || []).filter(match),
-        slots = childNodes.filter((n) => n.kind === 'billet');
-      const rows = slots
-        .filter((slot) => {
-          const m = occupants.get(slot.id);
-          return m
-            ? match(m)
-            : !state.status &&
-                (!state.query || slot.name.toLowerCase().includes(state.query));
-        })
-        .map((slot) => {
-          const m = occupants.get(slot.id);
-          return `<tr class="${m ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td>${m ? person(m) : '<span class="billet-open">Open</span>'}</td><td>${detail.can_edit ? `<button type="button" data-board-action="assign" data-node="${slot.id}">${selected ? 'Assign selected' : m ? 'Change' : 'Assign'}</button>` : ''}</td></tr>`;
-        })
-        .join('');
+    const person = (member) =>
+      `<button type="button" class="member-record-link" data-board-action="record" data-member="${member.id}">${esc(member.game_name)}</button>${member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
+    const counts = (node) => {
+      const value = totals.get(node.id);
+      return `${value.members} member${value.members === 1 ? '' : 's'}${value.slots ? ` · ${value.filled}/${value.slots} billets filled${value.slots > value.filled ? ` · ${value.slots - value.filled} open` : ''}` : ''}`;
+    };
+    function formation(node, depth = 0) {
+      const childNodes = children.get(node.id) || [];
+      const rows =
+        childNodes
+          .filter((n) => n.kind === 'billet')
+          .filter((slot) => {
+            const member = occupants.get(slot.id);
+            return member
+              ? match(member)
+              : !state.status &&
+                  (!state.query ||
+                    [node.name, slot.name]
+                      .join(' ')
+                      .toLowerCase()
+                      .includes(state.query));
+          })
+          .map((slot) => {
+            const member = occupants.get(slot.id);
+            return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td>${member ? esc(member.rank || '—') : '—'}</td><td>${member ? person(member) : detail.can_edit ? `<button type="button" class="member-record-link billet-open" data-board-action="assign" data-node="${slot.id}" aria-label="Assign ${esc(slot.name)}">— Open —</button>` : '<span class="billet-open">— Open —</span>'}</td></tr>`;
+          })
+          .join('') +
+        (direct.get(node.id) || [])
+          .filter(match)
+          .map(
+            (member) =>
+              `<tr><td class="feature-note">—</td><td>${esc(member.rank || '—')}</td><td>${person(member)}</td></tr>`,
+          )
+          .join('');
       const nested = childNodes
         .filter((n) => n.kind !== 'billet')
-        .map(formation)
+        .map((child) => formation(child, depth + 1))
         .join('');
-      if (
-        (state.query || state.status) &&
-        !rows &&
-        !directMembers.length &&
-        !nested
-      )
-        return '';
-      return `<section class="formation-board-section"><div class="formation-heading"><div><h3>${esc(node.name)}</h3><small>${esc(UnitStructure.summary(totals.get(node.id)))}</small></div><div class="formation-actions">${detail.can_edit ? `<button type="button" data-board-action="place" data-node="${node.id}">Add members</button>` : ''}${detail.can_staff ? `<button type="button" data-board-action="build" data-node="${node.id}">Edit layout</button>` : ''}</div></div>${rows ? `<div class="billet-table"><table><thead><tr><th>Named billet</th><th>Member</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}${directMembers.length ? `<div class="formation-direct"><h4>Members without named billets · ${directMembers.length}</h4>${directMembers.map((m) => `<div class="formation-member-row">${person(m)}${detail.can_edit ? `<button type="button" data-board-action="move" data-member="${m.id}">Move / unassign</button>` : ''}</div>`).join('')}</div>` : ''}${nested}</section>`;
+      if ((state.query || state.status) && !rows && !nested) return '';
+      const heading = `<div class="roster-formation-heading" style="--formation-depth:${Math.min(depth, 5)}"><div><${depth ? 'h3' : 'h2'}>${esc(node.name)}</${depth ? 'h3' : 'h2'}><span>${esc(counts(node))}</span></div></div>`;
+      const table = rows
+        ? `<div class="billet-table roster-formation-table"><table><thead><tr><th>Billet</th><th>Rank</th><th>Name</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : !nested
+          ? '<p class="roster-formation-empty">No members or billets assigned.</p>'
+          : '';
+      return heading + table + nested;
     }
     const groups = state.group
       ? index.nodes.filter((n) => n.id === state.group)
       : children.get(null) || [];
-    root.innerHTML = `<div class="formation-board${detail.can_edit ? '' : ' formation-board-readonly'}">${
-      detail.can_edit
-        ? `<aside class="unit-block formation-pool"><h3>Unassigned · ${index.unassigned.length}</h3><p class="feature-note">Choose a member for a named billet, or place them directly in a formation.</p>${selected ? `<p class="formation-selection">Selected: <strong>${esc(selected.game_name)}</strong> <button type="button" data-board-action="clear">Clear</button></p>` : ''}${
-            index.unassigned
-              .filter(match)
-              .map(
-                (m) =>
-                  `<article><strong>${esc(m.game_name)}</strong><small>${esc(m.rank || 'No rank')}</small><div class="formation-actions"><button type="button" data-board-action="select" data-member="${m.id}">Select for billet</button><button type="button" data-board-action="move" data-member="${m.id}">Place</button>${!m.panel_user_id ? `<button type="button" data-board-action="login" data-member="${m.id}">Create login</button>` : ''}</div></article>`,
-              )
-              .join('') || '<p>No matching unassigned members.</p>'
-          }</aside>`
-        : ''
-    }<div class="formation-board-groups">${groups.map(formation).join('') || '<p class="unit-empty">No matching formations. The All members roster works without a structure.</p>'}</div></div>`;
+    root.innerHTML = `<div class="roster-formations">${groups.map((node) => formation(node)).join('') || '<p class="unit-empty">No matching formations. Use All members for the flat roster.</p>'}</div>`;
     root.onclick = (event) => {
-      const b = event.target.closest('[data-board-action]');
-      if (!b) return;
-      const member = Number(b.dataset.member),
-        node = Number(b.dataset.node);
-      switch (b.dataset.boardAction) {
+      const button = event.target.closest('[data-board-action]');
+      if (!button) return;
+      const member = Number(button.dataset.member),
+        node = Number(button.dataset.node);
+      switch (button.dataset.boardAction) {
         case 'record':
           actions.record(member);
           break;
         case 'assign':
-          actions.assign(node, selected?.id);
-          break;
-        case 'place':
-          actions.place(node, selected?.id);
-          break;
-        case 'move':
-          actions.place(null, member);
-          break;
-        case 'select':
-          actions.select(member);
-          break;
-        case 'clear':
-          actions.select(null);
-          break;
-        case 'build':
-          actions.build(node);
-          break;
-        case 'login':
-          actions.login(member);
+          actions.assign(node);
           break;
       }
     };

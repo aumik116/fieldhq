@@ -529,7 +529,7 @@ Use the flat roster for a simple list. Use Structure when you want an organizati
 
 In **Administration → Structure**, create the groups and sections you need, then add billets. Assign a member through the slot controls or their **Primary billet** field.
 
-Each member has one primary placement: a named billet or direct membership in a formation. Every group, platoon, squad, team or staff formation supports both. Empty named billets contribute to vacancy counts; directly assigned members do not consume billets. Rank and qualification requirements do not restrict assignments. Use the Assignment board to select unassigned members, fill billets or place several members directly. For an occupied billet, choose Swap placements or leave the displaced member unassigned, then confirm.
+Each member has one primary placement: a named billet or direct membership in a formation. Every group, platoon, squad, team or staff formation supports both. Empty named billets contribute to vacancy counts; directly assigned members do not consume billets. Rank and qualification requirements do not restrict assignments. Use All formations or a group tab to view Billet / Rank / Name tables. Click a name for their record, or an open billet to assign it. Use Manage structure for direct assignments and occupied-billet changes. Unassigned members have their own tab and also appear in assignment pickers. For an occupied billet, choose Swap placements or leave the displaced member unassigned, then confirm.
 
 Review the consequences before removing a group, section or billet. These tools change organization and assignments; permanent member deletion is a separate roster action.
 

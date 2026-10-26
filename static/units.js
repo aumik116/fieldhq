@@ -9,8 +9,7 @@
     baseline = '',
     loading = false,
     dialogSaving = false;
-  let boardMember = null,
-    structureSelection = null,
+  let structureSelection = null,
     rosterView = '',
     rosterUnit = null,
     activeTab = 'roster';
@@ -377,20 +376,20 @@
   function renderGroupTabs() {
     const groups = (detail.structure || []).filter((n) => n.kind === 'group');
     if (rosterUnit !== unitId) {
-      rosterView = String(groups[0]?.id || 'all');
+      rosterView = groups.length ? 'board' : 'all';
       rosterUnit = unitId;
     }
     if (
       !['all', 'unassigned', 'board'].includes(rosterView) &&
       !groups.some((g) => String(g.id) === rosterView)
     )
-      rosterView = String(groups[0]?.id || 'all');
+      rosterView = groups.length ? 'board' : 'all';
     if (el('roster-status').value === 'archived') rosterView = 'all';
     const unassigned = detail.roster.filter(
       (m) => !m.archived && !m.billet_id && !m.placement_id,
     ).length;
     el('roster-groups').innerHTML = [
-      ...(groups.length ? [['board', 'Assignment board']] : []),
+      ...(groups.length ? [['board', 'All formations']] : []),
       ...groups.map((g) => [String(g.id), g.name]),
       ['unassigned', `Unassigned (${unassigned})`],
       ['all', 'All members'],
@@ -423,23 +422,11 @@
         group: rosterView === 'board' ? null : Number(rosterView),
         query,
         status,
-        member: boardMember,
       },
       {
         record: memberRecord,
         assign: assignmentEditor,
         place: placementEditor,
-        select(id) {
-          boardMember = id;
-          renderRoster();
-        },
-        build(id) {
-          structureSelection = id;
-          selectTab('structure');
-        },
-        login(id) {
-          memberLoginEditor(detail.roster.find((m) => m.id === id));
-        },
       },
     );
   }
@@ -474,7 +461,6 @@
           reason: data.reason,
           revision: detail.unit.revision,
         });
-        boardMember = null;
       },
     );
     let chosen = selectedMember ?? occupant?.id ?? null;
@@ -543,7 +529,6 @@
           reason: data.reason,
           revision: detail.unit.revision,
         });
-        boardMember = null;
       },
     );
     function count() {
