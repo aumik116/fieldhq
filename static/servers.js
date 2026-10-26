@@ -1,26 +1,84 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const rows = document.getElementById('overview-rows'), feedback = document.getElementById('overview-feedback');
-  let loading = false, permissions = [], timer;
+  const rows = document.getElementById('overview-rows'),
+    feedback = document.getElementById('overview-feedback');
+  let loading = false,
+    permissions = [],
+    timer;
   const busy = new Set();
-  let snapshots = [], events = [], eventError = '', host = null;
+  let snapshots = [],
+    events = [],
+    eventError = '',
+    host = null;
   let fleetUnits = [];
   const unitFilter = document.getElementById('overview-unit');
-  function inSelectedUnit(server) { return !unitFilter.value || fleetUnits.find(u => String(u.id) === unitFilter.value)?.servers.includes(server.id); }
+  function inSelectedUnit(server) {
+    return (
+      !unitFilter.value ||
+      fleetUnits
+        .find((u) => String(u.id) === unitFilter.value)
+        ?.servers.includes(server.id)
+    );
+  }
   const transitions = [];
   const charts = [];
   function chart(id, labels, percent) {
     if (typeof Chart === 'undefined') {
-      document.getElementById('fleet-chart-note').textContent = 'Charts could not load. Current readings are still available below.';
+      document.getElementById('fleet-chart-note').textContent =
+        'Charts could not load. Current readings are still available below.';
       return null;
     }
     const instance = new Chart(document.getElementById(id), {
-      type:'line', data:{datasets:labels.map(label => ({label, data:[], borderWidth:2, pointRadius:context => context.dataIndex === context.dataset.data.length - 1 ? 2 : 0, pointHitRadius:12, spanGaps:false, tension:0.2}))},
-      options:{responsive:true, maintainAspectRatio:false, animation:false, parsing:false,
-        interaction:{mode:'index', intersect:false},
-        plugins:{legend:{display:labels.length > 1}, tooltip:{callbacks:{title:items => new Date(items[0].parsed.x).toLocaleTimeString(), label:item => `${item.dataset.label}: ${item.parsed.y}${percent ? '%' : ''}`}}},
-        scales:{x:{type:'linear', ticks:{maxTicksLimit:5, callback:value => new Date(value).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}}, y:{min:0, ...(percent ? {max:100} : {ticks:{precision:0}})}}}
+      type: 'line',
+      data: {
+        datasets: labels.map((label) => ({
+          label,
+          data: [],
+          borderWidth: 2,
+          pointRadius: (context) =>
+            context.dataIndex === context.dataset.data.length - 1 ? 2 : 0,
+          pointHitRadius: 12,
+          spanGaps: false,
+          tension: 0.2,
+        })),
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: labels.length > 1 },
+          tooltip: {
+            callbacks: {
+              title: (items) =>
+                new Date(items[0].parsed.x).toLocaleTimeString(),
+              label: (item) =>
+                `${item.dataset.label}: ${item.parsed.y}${percent ? '%' : ''}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            ticks: {
+              maxTicksLimit: 5,
+              callback: (value) =>
+                new Date(value).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+            },
+          },
+          y: {
+            min: 0,
+            ...(percent ? { max: 100 } : { ticks: { precision: 0 } }),
+          },
+        },
+      },
     });
-    charts.push(instance); return instance;
+    charts.push(instance);
+    return instance;
   }
   const playerChart = chart('fleet-player-chart', ['Players'], false);
   const cpuChart = chart('fleet-cpu-chart', ['Host CPU'], true);
@@ -28,171 +86,559 @@ document.addEventListener('DOMContentLoaded', () => {
   function themeCharts() {
     const style = getComputedStyle(document.documentElement);
     for (const instance of charts) {
-      instance.data.datasets.forEach((set,index) => { set.borderColor = style.getPropertyValue(instance === memoryChart ? '--ram-color' : '--accent').trim(); set.backgroundColor = set.borderColor; });
-      instance.options.plugins.legend.labels = {color:style.getPropertyValue('--text').trim(), boxWidth:12, boxHeight:2};
-      for (const axis of Object.values(instance.options.scales)) { axis.ticks.color = style.getPropertyValue('--muted').trim(); axis.grid = {color:style.getPropertyValue('--border').trim()}; }
+      instance.data.datasets.forEach((set, index) => {
+        set.borderColor = style
+          .getPropertyValue(
+            instance === memoryChart ? '--ram-color' : '--accent',
+          )
+          .trim();
+        set.backgroundColor = set.borderColor;
+      });
+      instance.options.plugins.legend.labels = {
+        color: style.getPropertyValue('--text').trim(),
+        boxWidth: 12,
+        boxHeight: 2,
+      };
+      for (const axis of Object.values(instance.options.scales)) {
+        axis.ticks.color = style.getPropertyValue('--muted').trim();
+        axis.grid = { color: style.getPropertyValue('--border').trim() };
+      }
       instance.update('none');
     }
   }
-  document.querySelector('.fleet-player-trends').addEventListener('toggle',event=>{if(event.target.open)playerChart?.resize();});
+  document
+    .querySelector('.fleet-player-trends')
+    .addEventListener('toggle', (event) => {
+      if (event.target.open) playerChart?.resize();
+    });
   themeCharts();
   document.addEventListener('panel-theme-change', themeCharts);
   function sample(chart, values, now) {
     if (!chart) return;
-    chart.data.datasets.forEach((set,index) => {
+    chart.data.datasets.forEach((set, index) => {
       const last = set.data.at(-1);
-      if (last && now - last.x > 30000) set.data.push({x:last.x + 10000,y:null});
-      set.data.push({x:now, y:Number.isFinite(values[index]) ? values[index] : null});
-      set.data = set.data.filter(point => point.x >= now - 1800000).slice(-181);
+      if (last && now - last.x > 30000)
+        set.data.push({ x: last.x + 10000, y: null });
+      set.data.push({
+        x: now,
+        y: Number.isFinite(values[index]) ? values[index] : null,
+      });
+      set.data = set.data
+        .filter((point) => point.x >= now - 1800000)
+        .slice(-181);
     });
-    chart.options.scales.x.min = now - 1800000; chart.options.scales.x.max = now;
+    chart.options.scales.x.min = now - 1800000;
+    chart.options.scales.x.max = now;
     chart.update('none');
   }
   function renderEvents() {
-    const target = document.getElementById('fleet-events'); target.replaceChildren();
-    const names = {api_start:'Start requested', api_stop:'Stop requested', api_restart:'Restart requested', software_update:'Server update requested', server_delete:'Server removed', servers_create:'Server created', server_provision_retry:'Installation retried', config_editor_save:'Configuration saved', users_save:'Account permissions updated', players_moderate:'Player moderation', players_admin_save:'Server admins updated'};
-    const relevant = events.filter(event => !['login','account_preferences_save','config_editor_validate','files_preview','software_check'].includes(event.action));
-    const items = [...relevant.map(event => {
-      const serverName = event.details.server_id ? snapshots.find(server => server.id === event.details.server_id)?.name || event.details.server_id : '';
-      return {ts:event.ts, text:`${serverName ? serverName + ' · ' : ''}${names[event.action] || event.action.replace(/^api_/, '').replaceAll('_',' ')} · ${event.outcome} · ${event.actor}`, failed:event.outcome === 'failed'};
-    }), ...transitions].sort((a,b) => b.ts-a.ts).slice(0,8);
+    const target = document.getElementById('fleet-events');
+    target.replaceChildren();
+    const names = {
+      api_start: 'Start requested',
+      api_stop: 'Stop requested',
+      api_restart: 'Restart requested',
+      software_update: 'Server update requested',
+      server_delete: 'Server removed',
+      servers_create: 'Server created',
+      server_provision_retry: 'Installation retried',
+      config_editor_save: 'Configuration saved',
+      users_save: 'Account permissions updated',
+      players_moderate: 'Player moderation',
+      players_admin_save: 'Server admins updated',
+    };
+    const relevant = events.filter(
+      (event) =>
+        ![
+          'login',
+          'account_preferences_save',
+          'config_editor_validate',
+          'files_preview',
+          'software_check',
+        ].includes(event.action),
+    );
+    const items = [
+      ...relevant.map((event) => {
+        const serverName = event.details.server_id
+          ? snapshots.find((server) => server.id === event.details.server_id)
+              ?.name || event.details.server_id
+          : '';
+        return {
+          ts: event.ts,
+          text: `${serverName ? serverName + ' · ' : ''}${names[event.action] || event.action.replace(/^api_/, '').replaceAll('_', ' ')} · ${event.outcome} · ${event.actor}`,
+          failed: event.outcome === 'failed',
+        };
+      }),
+      ...transitions,
+    ]
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 8);
     for (const item of items) {
-      const row = element('div','', 'fleet-event');
-      const time = element('time', new Date(item.ts*1000).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}));
-      time.dateTime = new Date(item.ts*1000).toISOString();
-      row.append(element('span',item.text,item.failed ? 'fleet-event-error' : ''), time); target.append(row);
+      const row = element('div', '', 'fleet-event');
+      const time = element(
+        'time',
+        new Date(item.ts * 1000).toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      );
+      time.dateTime = new Date(item.ts * 1000).toISOString();
+      row.append(
+        element('span', item.text, item.failed ? 'fleet-event-error' : ''),
+        time,
+      );
+      target.append(row);
     }
-    document.getElementById('fleet-alert-status').textContent = eventError || (items.length ? 'Recent events · no player join/leave notices' : 'No recent alerts');
+    document.getElementById('fleet-alert-status').textContent =
+      eventError ||
+      (items.length
+        ? 'Recent events · no player join/leave notices'
+        : 'No recent alerts');
   }
-  const attention = server => ['failed','unavailable'].includes(server.status);
-  const storageSize = bytes => (bytes / 1e9).toFixed(2) + ' GB';
-  const workspace = server => server.id ? '/?server=' + encodeURIComponent(server.id) : '/?legacy=1';
-  function element(tag, text, className) { const node = document.createElement(tag); node.textContent = text; if (className) node.className = className; return node; }
+  const attention = (server) =>
+    ['failed', 'unavailable'].includes(server.status);
+  const storageSize = (bytes) => (bytes / 1e9).toFixed(2) + ' GB';
+  const workspace = (server) =>
+    server.id ? '/?server=' + encodeURIComponent(server.id) : '/?legacy=1';
+  function element(tag, text, className) {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
   async function read(url, id) {
-    return readJson(await fetch(url, {headers:id === undefined ? {} : {'X-Server-ID':id}, signal:AbortSignal.timeout(8000)}));
+    return readJson(
+      await fetch(url, {
+        headers: id === undefined ? {} : { 'X-Server-ID': id },
+        signal: AbortSignal.timeout(8000),
+      }),
+    );
   }
   async function inspect(server) {
-    if (server.state !== 'ready') return {...server, status:server.state};
+    if (server.state !== 'ready') return { ...server, status: server.state };
     try {
       const status = await read('/api/status', server.id);
-      const live = window.liveMetrics?.healthy() ? window.liveMetrics.data?.servers[server.id] : null;
+      const live = window.liveMetrics?.healthy()
+        ? window.liveMetrics.data?.servers[server.id]
+        : null;
       let players = live?.players ?? null;
       if (!status.running) players = 0;
-      else if (!live) { try { const roster = await read('/api/players', server.id); if (roster.available) players = roster.players.length; } catch (_) {} }
+      else if (!live) {
+        try {
+          const roster = await read('/api/players', server.id);
+          if (roster.available) players = roster.players.length;
+        } catch (_) {}
+      }
       let preview = null;
       try {
         const image = await read('/api/scenario-preview', server.id);
         if (image.scenario_id === status.scenario_id) preview = image;
       } catch (_) {} // Workshop failures must not hide server status or controls.
-      return {...server, preview, ...status, ...(live || {}), name:status.server_name || server.name, status:(live || status).running ? 'online' : 'offline', players};
-    } catch (error) { return {...server, status:'unavailable', error:error.message}; }
+      return {
+        ...server,
+        preview,
+        ...status,
+        ...(live || {}),
+        name: status.server_name || server.name,
+        status: (live || status).running ? 'online' : 'offline',
+        players,
+      };
+    } catch (error) {
+      return { ...server, status: 'unavailable', error: error.message };
+    }
   }
   async function action(server, command, button) {
     if (busy.has(server.id)) return;
-    if (command !== 'start' && !await PanelUI.confirm(`${command === 'stop' ? 'Stop' : 'Restart'} ${server.name}? Connected players will be disconnected.`)) return;
-    busy.add(server.id); button.disabled = true;
+    if (
+      command !== 'start' &&
+      !(await PanelUI.confirm(
+        `${command === 'stop' ? 'Stop' : 'Restart'} ${server.name}? Connected players will be disconnected.`,
+      ))
+    )
+      return;
+    busy.add(server.id);
+    button.disabled = true;
     try {
       await controlServer(command, server.id);
       feedback.textContent = `${server.name}: ${command} requested.`;
-    } catch (error) { feedback.textContent = error.message; }
-    finally { busy.delete(server.id); button.disabled = false; await refresh(false); }
+    } catch (error) {
+      feedback.textContent = error.message;
+    } finally {
+      busy.delete(server.id);
+      button.disabled = false;
+      await refresh(false);
+    }
   }
   function render(servers) {
     servers = servers.filter(inSelectedUnit);
-    const focused = rows.contains(document.activeElement) ? document.activeElement : null;
-    const focusedServer = focused?.closest('[data-server-id]')?.dataset.serverId;
+    const focused = rows.contains(document.activeElement)
+      ? document.activeElement
+      : null;
+    const focusedServer =
+      focused?.closest('[data-server-id]')?.dataset.serverId;
     const focusedAction = focused?.dataset.action;
     rows.replaceChildren();
-    const query = document.getElementById('overview-search').value.trim().toLowerCase();
+    const query = document
+      .getElementById('overview-search')
+      .value.trim()
+      .toLowerCase();
     const filter = document.getElementById('overview-filter').value;
-    const visible = servers.filter(server =>
-      [server.name, server.ip, server.port, server.game_port, server.query_port].join(' ').toLowerCase().includes(query) &&
-      (filter === 'all' || filter === server.status || filter === 'attention' && attention(server) || filter === 'installing' && ['provisioning','registered','installing'].includes(server.status)));
+    const visible = servers.filter(
+      (server) =>
+        [
+          server.name,
+          server.ip,
+          server.port,
+          server.game_port,
+          server.query_port,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query) &&
+        (filter === 'all' ||
+          filter === server.status ||
+          (filter === 'attention' && attention(server)) ||
+          (filter === 'installing' &&
+            ['provisioning', 'registered', 'installing'].includes(
+              server.status,
+            ))),
+    );
     for (const server of visible) {
-      const row = element('article', '', 'fleet-server-card'); row.dataset.serverId = server.id;
+      const row = element('article', '', 'fleet-server-card');
+      row.dataset.serverId = server.id;
       const art = element('div', '', 'fleet-server-art');
-      const fallback = element('span', server.preview?.status === 'pending' ? 'Loading preview…' : 'No preview', 'fleet-art-fallback');
+      const fallback = element(
+        'span',
+        server.preview?.status === 'pending'
+          ? 'Loading preview…'
+          : 'No preview',
+        'fleet-art-fallback',
+      );
       art.append(fallback);
       if (server.preview?.thumbnail) {
-        const image = element('img', ''); image.alt = '';
-        image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
-        image.onload = () => { fallback.hidden = true; };
-        image.onerror = () => { image.remove(); fallback.hidden = false; fallback.textContent = 'No preview'; };
-        image.src = server.preview.thumbnail; art.append(image);
+        const image = element('img', '');
+        image.alt = '';
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        image.referrerPolicy = 'no-referrer';
+        image.onload = () => {
+          fallback.hidden = true;
+        };
+        image.onerror = () => {
+          image.remove();
+          fallback.hidden = false;
+          fallback.textContent = 'No preview';
+        };
+        image.src = server.preview.thumbnail;
+        art.append(image);
       }
       row.append(art);
-      const heading = element('div','', 'fleet-card-heading');
-      heading.append(element('span',server.status,'server-state state-' + server.status));
-      for (const unit of fleetUnits.filter(u=>u.servers.includes(server.id))) { const badge=element('a',unit.tag||unit.name,'unit-badge');badge.href='/units?unit='+unit.id;badge.title=unit.name;heading.append(badge); }
+      const heading = element('div', '', 'fleet-card-heading');
+      heading.append(
+        element('span', server.status, 'server-state state-' + server.status),
+      );
+      for (const unit of fleetUnits.filter((u) =>
+        u.servers.includes(server.id),
+      )) {
+        const badge = element('a', unit.tag || unit.name, 'unit-badge');
+        badge.href = '/units?unit=' + unit.id;
+        badge.title = unit.name;
+        heading.append(badge);
+      }
       row.append(heading);
-      row.append(element('span',server.uptime && server.running ? server.uptime : '—', 'fleet-uptime'));
-      const build = element('span', '', 'fleet-build'); build.dataset.softwareServer = server.id; heading.append(build);
-      const title = element('h3','');
-      const link = element('a',server.name,'fleet-server-title');
-      link.href = server.state === 'ready' ? workspace(server) : '/setup?server='+encodeURIComponent(server.id);
-      link.dataset.action = 'open'; title.append(link); row.append(title);
-      row.append(element('p',server.map || (server.state === 'ready' ? 'Scenario unavailable' : 'Preparing server'), 'fleet-map'));
-      row.append(element('p',server.ip && server.ip !== '—' ? server.ip + ':' + (server.port || server.game_port || '—') : 'Game ' + (server.port || server.game_port || '—') + ' · Query ' + (server.query_port || '—'), 'fleet-address'));
-      if (server.error) row.append(element('p',server.error,'fleet-event-error'));
-      const stats = element('dl','', 'fleet-card-stats');
-      for (const [label,value] of [['Players',Number.isFinite(server.players) && Number.isFinite(server.max_players) ? server.players+' / '+server.max_players : server.players ?? '—'],['CPU',Number.isFinite(server.cpu) ? server.cpu.toFixed(1)+'%' : '—'],['Memory',Number.isFinite(server.ram_process) ? (server.ram_process/1024).toFixed(2)+' GiB' : '—']]) {
-        const stat = element('div',''), reading=element('dd',value); stat.append(element('dt',label),reading);
-        const percent=label==='CPU'?server.cpu:label==='Memory'&&host?.ram_total>0?100*server.ram_process/host.ram_total:null;
-        if(Number.isFinite(percent)){const track=element('span','','fleet-usage-track'),fill=element('span','','fleet-usage-fill');track.setAttribute('aria-hidden','true');fill.style.width=Math.max(0,Math.min(100,percent))+'%';track.append(fill);reading.append(track);}
+      row.append(
+        element(
+          'span',
+          server.uptime && server.running ? server.uptime : '—',
+          'fleet-uptime',
+        ),
+      );
+      const build = element('span', '', 'fleet-build');
+      build.dataset.softwareServer = server.id;
+      heading.append(build);
+      const title = element('h3', '');
+      const link = element('a', server.name, 'fleet-server-title');
+      link.href =
+        server.state === 'ready'
+          ? workspace(server)
+          : '/setup?server=' + encodeURIComponent(server.id);
+      link.dataset.action = 'open';
+      title.append(link);
+      row.append(title);
+      row.append(
+        element(
+          'p',
+          server.map ||
+            (server.state === 'ready'
+              ? 'Scenario unavailable'
+              : 'Preparing server'),
+          'fleet-map',
+        ),
+      );
+      row.append(
+        element(
+          'p',
+          server.ip && server.ip !== '—'
+            ? server.ip + ':' + (server.port || server.game_port || '—')
+            : 'Game ' +
+                (server.port || server.game_port || '—') +
+                ' · Query ' +
+                (server.query_port || '—'),
+          'fleet-address',
+        ),
+      );
+      if (server.error)
+        row.append(element('p', server.error, 'fleet-event-error'));
+      const stats = element('dl', '', 'fleet-card-stats');
+      for (const [label, value] of [
+        [
+          'Players',
+          Number.isFinite(server.players) && Number.isFinite(server.max_players)
+            ? server.players + ' / ' + server.max_players
+            : (server.players ?? '—'),
+        ],
+        [
+          'CPU',
+          Number.isFinite(server.cpu) ? server.cpu.toFixed(1) + '%' : '—',
+        ],
+        [
+          'Memory',
+          Number.isFinite(server.ram_process)
+            ? (server.ram_process / 1024).toFixed(2) + ' GiB'
+            : '—',
+        ],
+      ]) {
+        const stat = element('div', ''),
+          reading = element('dd', value);
+        stat.append(element('dt', label), reading);
+        const percent =
+          label === 'CPU'
+            ? server.cpu
+            : label === 'Memory' && host?.ram_total > 0
+              ? (100 * server.ram_process) / host.ram_total
+              : null;
+        if (Number.isFinite(percent)) {
+          const track = element('span', '', 'fleet-usage-track'),
+            fill = element('span', '', 'fleet-usage-fill');
+          track.setAttribute('aria-hidden', 'true');
+          fill.style.width = Math.max(0, Math.min(100, percent)) + '%';
+          track.append(fill);
+          reading.append(track);
+        }
         stats.append(stat);
       }
       row.append(stats);
-      const actions = element('div','', 'manager-actions');
-      if ((server.permissions || []).includes('control') && ['online','offline'].includes(server.status)) {
+      const actions = element('div', '', 'manager-actions');
+      if (
+        (server.permissions || []).includes('control') &&
+        ['online', 'offline'].includes(server.status)
+      ) {
         const command = server.running ? 'stop' : 'start';
-        const button = element('button',server.running ? 'Stop' : 'Start','btn-logout action-' + command); button.disabled = busy.has(server.id); button.onclick = () => action(server,command,button); actions.append(button);
-        if (server.running) { const restart = element('button','Restart','btn-logout action-restart'); restart.disabled = busy.has(server.id); restart.onclick = () => action(server,'restart',restart); actions.append(restart); }
+        const button = element(
+          'button',
+          server.running ? 'Stop' : 'Start',
+          'btn-logout action-' + command,
+        );
+        button.disabled = busy.has(server.id);
+        button.onclick = () => action(server, command, button);
+        actions.append(button);
+        if (server.running) {
+          const restart = element(
+            'button',
+            'Restart',
+            'btn-logout action-restart',
+          );
+          restart.disabled = busy.has(server.id);
+          restart.onclick = () => action(server, 'restart', restart);
+          actions.append(restart);
+        }
       }
-      if (server.state === 'ready') { const manage = element('a','Open','manager-link'); manage.href = workspace(server); actions.prepend(manage); }
-      else if (permissions.includes('admin_config')) { const progress = element('a','Progress / retry','manager-link'); progress.href = '/setup?server='+encodeURIComponent(server.id); actions.append(progress); }
-      if(server.state==='ready'&&permissions.includes('users')){const clone=element('a','Clone','manager-link');clone.href='/setup?clone='+encodeURIComponent(server.id||'__existing__');actions.append(clone);}
-      if(server.state==='ready'&&(server.permissions||[]).includes('admin_config')){const startup=element('a','Startup','manager-link');startup.href=workspace(server)+'#startup';actions.append(startup);}
-      if(server.id&&permissions.includes('admin_config')){const remove=element('button','Remove','btn-logout');remove.disabled=busy.has(server.id);remove.onclick=async()=>{
-        openServerRemoval(server,()=>refresh(false));
-      };actions.append(remove);}
-      actions.querySelectorAll('button,a').forEach(node => { node.dataset.action = node.textContent; });
-      row.append(actions); rows.append(row);
+      if (server.state === 'ready') {
+        const manage = element('a', 'Open', 'manager-link');
+        manage.href = workspace(server);
+        actions.prepend(manage);
+      } else if (permissions.includes('admin_config')) {
+        const progress = element('a', 'Progress / retry', 'manager-link');
+        progress.href = '/setup?server=' + encodeURIComponent(server.id);
+        actions.append(progress);
+      }
+      if (server.state === 'ready' && permissions.includes('users')) {
+        const clone = element('a', 'Clone', 'manager-link');
+        clone.href =
+          '/setup?clone=' + encodeURIComponent(server.id || '__existing__');
+        actions.append(clone);
+      }
+      if (
+        server.state === 'ready' &&
+        (server.permissions || []).includes('admin_config')
+      ) {
+        const startup = element('a', 'Startup', 'manager-link');
+        startup.href = workspace(server) + '#startup';
+        actions.append(startup);
+      }
+      if (server.id && permissions.includes('admin_config')) {
+        const remove = element('button', 'Remove', 'btn-logout');
+        remove.disabled = busy.has(server.id);
+        remove.onclick = async () => {
+          openServerRemoval(server, () => refresh(false));
+        };
+        actions.append(remove);
+      }
+      actions.querySelectorAll('button,a').forEach((node) => {
+        node.dataset.action = node.textContent;
+      });
+      row.append(actions);
+      rows.append(row);
     }
-    if (!visible.length) rows.append(element('p',servers.length ? 'No servers match these filters.' : permissions.includes('admin_config') ? 'No servers yet. Create your first server to get started.' : 'No servers are assigned to your account.', 'fleet-empty'));
+    if (!visible.length)
+      rows.append(
+        element(
+          'p',
+          servers.length
+            ? 'No servers match these filters.'
+            : permissions.includes('admin_config')
+              ? 'No servers yet. Create your first server to get started.'
+              : 'No servers are assigned to your account.',
+          'fleet-empty',
+        ),
+      );
     if (focusedAction) {
-      const card = Array.from(rows.children).find(node => node.dataset.serverId === focusedServer);
-      Array.from(card?.querySelectorAll('[data-action]') || []).find(node => node.dataset.action === focusedAction)?.focus({preventScroll:true});
+      const card = Array.from(rows.children).find(
+        (node) => node.dataset.serverId === focusedServer,
+      );
+      Array.from(card?.querySelectorAll('[data-action]') || [])
+        .find((node) => node.dataset.action === focusedAction)
+        ?.focus({ preventScroll: true });
     }
     document.dispatchEvent(new Event('fleet-rows-rendered'));
     const alerts = document.getElementById('overview-alerts');
-    const notices=servers.filter(attention).map(server=>({label:server.name+': '+(server.error||(server.status==='unavailable'?'Status unavailable':'Installation failed')),href:server.state==='ready'?workspace(server):'/setup?server='+encodeURIComponent(server.id),action:server.state==='ready'?'Open server':'View progress',severity:'error'}));
-    if(host?.disk_total>0&&Number.isFinite(host.disk_free)&&host.disk_free/host.disk_total<.2)notices.push({label:'Panel disk space below 20% free',action:'Open storage',severity:'warning'});
-    if(!alerts.contains(document.activeElement)){
-      alerts.replaceChildren();alerts.hidden=!notices.length;
-      if(notices.length){alerts.append(element('strong','Needs attention · '+notices.length,'attention-heading'));const list=element('div',null,'attention-items');
-        for(const notice of notices){const item=element('div',null,'attention-item '+notice.severity);item.append(element('span',notice.label));const action=element(notice.href?'a':'button',notice.action,'btn-logout');if(notice.href)action.href=notice.href;else{action.type='button';action.onclick=()=>document.getElementById('overview-storage').click();}item.append(action);list.append(item);}alerts.append(list);
+    const notices = servers
+      .filter(attention)
+      .map((server) => ({
+        label:
+          server.name +
+          ': ' +
+          (server.error ||
+            (server.status === 'unavailable'
+              ? 'Status unavailable'
+              : 'Installation failed')),
+        href:
+          server.state === 'ready'
+            ? workspace(server)
+            : '/setup?server=' + encodeURIComponent(server.id),
+        action: server.state === 'ready' ? 'Open server' : 'View progress',
+        severity: 'error',
+      }));
+    if (
+      host?.disk_total > 0 &&
+      Number.isFinite(host.disk_free) &&
+      host.disk_free / host.disk_total < 0.2
+    )
+      notices.push({
+        label: 'Panel disk space below 20% free',
+        action: 'Open storage',
+        severity: 'warning',
+      });
+    if (!alerts.contains(document.activeElement)) {
+      alerts.replaceChildren();
+      alerts.hidden = !notices.length;
+      if (notices.length) {
+        alerts.append(
+          element(
+            'strong',
+            'Needs attention · ' + notices.length,
+            'attention-heading',
+          ),
+        );
+        const list = element('div', null, 'attention-items');
+        for (const notice of notices) {
+          const item = element(
+            'div',
+            null,
+            'attention-item ' + notice.severity,
+          );
+          item.append(element('span', notice.label));
+          const action = element(
+            notice.href ? 'a' : 'button',
+            notice.action,
+            'btn-logout',
+          );
+          if (notice.href) action.href = notice.href;
+          else {
+            action.type = 'button';
+            action.onclick = () =>
+              document.getElementById('overview-storage').click();
+          }
+          item.append(action);
+          list.append(item);
+        }
+        alerts.append(list);
       }
     }
-    document.getElementById('overview-alert-count').textContent = notices.length;
-    document.getElementById('overview-cpu').textContent = Number.isFinite(host?.cpu_host) ? host.cpu_host.toFixed(1)+'%' : '—';
-    document.getElementById('overview-ram').textContent = host?.ram_total > 0 && Number.isFinite(host.ram_used) ? (100*host.ram_used/host.ram_total).toFixed(1)+'%' : '—';
-    document.getElementById('overview-ram-detail').textContent = host?.ram_total > 0 && Number.isFinite(host.ram_used) ? (host.ram_used/1024).toFixed(1)+' / '+(host.ram_total/1024).toFixed(1)+' GiB' : 'Waiting for a reading';
-    document.getElementById('overview-disk').textContent=Number.isFinite(host?.disk_free)?(host.disk_free/1e9).toFixed(1)+' GB':'—';
-    document.getElementById('overview-disk-detail').textContent=host?.disk_total>0?'of '+(host.disk_total/1e9).toFixed(1)+' GB · panel volume':'Panel data volume';
+    document.getElementById('overview-alert-count').textContent =
+      notices.length;
+    document.getElementById('overview-cpu').textContent = Number.isFinite(
+      host?.cpu_host,
+    )
+      ? host.cpu_host.toFixed(1) + '%'
+      : '—';
+    document.getElementById('overview-ram').textContent =
+      host?.ram_total > 0 && Number.isFinite(host.ram_used)
+        ? ((100 * host.ram_used) / host.ram_total).toFixed(1) + '%'
+        : '—';
+    document.getElementById('overview-ram-detail').textContent =
+      host?.ram_total > 0 && Number.isFinite(host.ram_used)
+        ? (host.ram_used / 1024).toFixed(1) +
+          ' / ' +
+          (host.ram_total / 1024).toFixed(1) +
+          ' GiB'
+        : 'Waiting for a reading';
+    document.getElementById('overview-disk').textContent = Number.isFinite(
+      host?.disk_free,
+    )
+      ? (host.disk_free / 1e9).toFixed(1) + ' GB'
+      : '—';
+    document.getElementById('overview-disk-detail').textContent =
+      host?.disk_total > 0
+        ? 'of ' + (host.disk_total / 1e9).toFixed(1) + ' GB · panel volume'
+        : 'Panel data volume';
     document.getElementById('overview-total').textContent = servers.length;
-    document.getElementById('overview-online').textContent = servers.filter(s => s.status === 'online').length;
-    const known = servers.filter(s => s.players !== null && s.players !== undefined);
-    document.getElementById('overview-players').textContent = !servers.length ? '0' : known.length ? known.reduce((total,s) => total+s.players,0) + (known.length < servers.length ? '+' : '') : '—';
+    document.getElementById('overview-online').textContent = servers.filter(
+      (s) => s.status === 'online',
+    ).length;
+    const known = servers.filter(
+      (s) => s.players !== null && s.players !== undefined,
+    );
+    document.getElementById('overview-players').textContent = !servers.length
+      ? '0'
+      : known.length
+        ? known.reduce((total, s) => total + s.players, 0) +
+          (known.length < servers.length ? '+' : '')
+        : '—';
   }
-  document.addEventListener('live-metrics', event => {
+  document.addEventListener('live-metrics', (event) => {
     host = event.detail.host;
-    snapshots = snapshots.map(server => {
+    snapshots = snapshots.map((server) => {
       if (server.state !== 'ready') return server;
       const data = event.detail.servers[server.id];
-      if (!data) return {...server, status:'unavailable', cpu:null, ram_process:null, players:null};
+      if (!data)
+        return {
+          ...server,
+          status: 'unavailable',
+          cpu: null,
+          ram_process: null,
+          players: null,
+        };
       const status = data.running ? 'online' : 'offline';
-      if (server.status !== status) transitions.unshift({ts:Date.now()/1000, text:`${server.name} · ${server.status} → ${status}`, failed:false});
-      return {...server, ...data, status};
+      if (server.status !== status)
+        transitions.unshift({
+          ts: Date.now() / 1000,
+          text: `${server.name} · ${server.status} → ${status}`,
+          failed: false,
+        });
+      return { ...server, ...data, status };
     });
     transitions.splice(20);
     // Avoid replacing a focused control mid-use.
@@ -200,54 +646,166 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEvents();
   });
   async function refresh(report = true) {
-    if (loading) return; loading = true;
-    const button = document.getElementById('overview-refresh'); button.disabled = true;
+    if (loading) return;
+    loading = true;
+    const button = document.getElementById('overview-refresh');
+    button.disabled = true;
     try {
-      const [data, unitData] = await Promise.all([read('/api/servers'),read('/api/units').catch(()=>({units:[]}))]);
-      fleetUnits=unitData.units||[];
-      const unitSelection=unitFilter.value;
-      unitFilter.replaceChildren(new Option('All units',''));
-      for(const unit of fleetUnits)unitFilter.append(new Option(unit.name,unit.id));
-      if(fleetUnits.some(u=>String(u.id)===unitSelection))unitFilter.value=unitSelection;
-      const servers = [...(data.legacy_server ? [{id:'',name:data.legacy_server.name,state:'ready',permissions:data.legacy_server.permissions}] : []),...data.servers];
-      const activityServer = servers.find(server => (server.permissions || []).includes('activity'));
-      const canReadActivity = permissions.includes('activity') || !!activityServer;
-      const hostResult = await Promise.allSettled([read('/api/host-metrics'), canReadActivity ? read('/api/activity', permissions.includes('activity') ? undefined : activityServer.id) : Promise.resolve(null)]);
+      const [data, unitData] = await Promise.all([
+        read('/api/servers'),
+        read('/api/units').catch(() => ({ units: [] })),
+      ]);
+      fleetUnits = unitData.units || [];
+      const unitSelection = unitFilter.value;
+      unitFilter.replaceChildren(new Option('All units', ''));
+      for (const unit of fleetUnits)
+        unitFilter.append(new Option(unit.name, unit.id));
+      if (fleetUnits.some((u) => String(u.id) === unitSelection))
+        unitFilter.value = unitSelection;
+      const servers = [
+        ...(data.legacy_server
+          ? [
+              {
+                id: '',
+                name: data.legacy_server.name,
+                state: 'ready',
+                permissions: data.legacy_server.permissions,
+              },
+            ]
+          : []),
+        ...data.servers,
+      ];
+      const activityServer = servers.find((server) =>
+        (server.permissions || []).includes('activity'),
+      );
+      const canReadActivity =
+        permissions.includes('activity') || !!activityServer;
+      const hostResult = await Promise.allSettled([
+        read('/api/host-metrics'),
+        canReadActivity
+          ? read(
+              '/api/activity',
+              permissions.includes('activity') ? undefined : activityServer.id,
+            )
+          : Promise.resolve(null),
+      ]);
       host = hostResult[0].status === 'fulfilled' ? hostResult[0].value : null;
       const activity = hostResult[1];
-      events = activity.status === 'fulfilled' ? activity.value?.events || [] : [];
-      eventError = activity.status === 'rejected' ? 'Activity unavailable; showing observed status changes' : !canReadActivity ? 'Showing observed status changes; activity history requires permission' : '';
-      if (!rows.children.length) render(servers.map(server => ({...server,status:server.state === 'ready' ? 'checking' : server.state}))); 
+      events =
+        activity.status === 'fulfilled' ? activity.value?.events || [] : [];
+      eventError =
+        activity.status === 'rejected'
+          ? 'Activity unavailable; showing observed status changes'
+          : !canReadActivity
+            ? 'Showing observed status changes; activity history requires permission'
+            : '';
+      if (!rows.children.length)
+        render(
+          servers.map((server) => ({
+            ...server,
+            status: server.state === 'ready' ? 'checking' : server.state,
+          })),
+        );
       // Three concurrent checks keep a host with many instances responsive.
-      const results = new Array(servers.length); let next = 0;
-      await Promise.all(Array.from({length:Math.min(3,servers.length)},async () => { while (next < servers.length) { const index = next++; results[index] = await inspect(servers[index]); } }));
+      const results = new Array(servers.length);
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(3, servers.length) }, async () => {
+          while (next < servers.length) {
+            const index = next++;
+            results[index] = await inspect(servers[index]);
+          }
+        }),
+      );
       for (const server of results) {
-        const previous = snapshots.find(item => item.id === server.id);
-        if (previous && previous.status !== server.status && previous.status !== 'checking') {
-          transitions.unshift({ts:Date.now()/1000, text:`${server.name} · ${previous.status} → ${server.status}`, failed:attention(server)});
+        const previous = snapshots.find((item) => item.id === server.id);
+        if (
+          previous &&
+          previous.status !== server.status &&
+          previous.status !== 'checking'
+        ) {
+          transitions.unshift({
+            ts: Date.now() / 1000,
+            text: `${server.name} · ${previous.status} → ${server.status}`,
+            failed: attention(server),
+          });
         }
       }
       transitions.splice(20);
       snapshots = results;
       const now = Date.now();
-      const unitResults=results.filter(inSelectedUnit);
-      sample(playerChart, [unitResults.every(server => Number.isFinite(server.players)) ? unitResults.reduce((sum,server) => sum+server.players,0) : null], now);
+      const unitResults = results.filter(inSelectedUnit);
+      sample(
+        playerChart,
+        [
+          unitResults.every((server) => Number.isFinite(server.players))
+            ? unitResults.reduce((sum, server) => sum + server.players, 0)
+            : null,
+        ],
+        now,
+      );
       sample(cpuChart, [host?.cpu_host], now);
-      const memoryPercent=host?.ram_total > 0 ? 100*host.ram_used/host.ram_total : null;
+      const memoryPercent =
+        host?.ram_total > 0 ? (100 * host.ram_used) / host.ram_total : null;
       sample(memoryChart, [memoryPercent], now);
-      document.getElementById('fleet-cpu-reading').textContent=Number.isFinite(host?.cpu_host)?host.cpu_host.toFixed(0)+'%':'—';
-      document.getElementById('fleet-memory-reading').textContent=Number.isFinite(memoryPercent)?memoryPercent.toFixed(0)+'%':'—';
-      render(snapshots); renderEvents();
-      if (report) feedback.textContent = servers.length ? 'Updated ' + new Date().toLocaleTimeString() : permissions.includes('admin_config') ? 'No servers yet. Create your first server to get started.' : 'No servers are assigned to your account.';
-    } catch (error) { feedback.textContent = 'Refresh failed · ' + error.message + '. Displayed server readings may be out of date.'; host = null; sample(playerChart,[null],Date.now()); sample(cpuChart,[null],Date.now()); sample(memoryChart,[null],Date.now()); document.getElementById('fleet-cpu-reading').textContent='—';document.getElementById('fleet-memory-reading').textContent='—'; }
-    finally { loading = false; button.disabled = false; }
+      document.getElementById('fleet-cpu-reading').textContent =
+        Number.isFinite(host?.cpu_host) ? host.cpu_host.toFixed(0) + '%' : '—';
+      document.getElementById('fleet-memory-reading').textContent =
+        Number.isFinite(memoryPercent) ? memoryPercent.toFixed(0) + '%' : '—';
+      render(snapshots);
+      renderEvents();
+      if (report)
+        feedback.textContent = servers.length
+          ? 'Updated ' + new Date().toLocaleTimeString()
+          : permissions.includes('admin_config')
+            ? 'No servers yet. Create your first server to get started.'
+            : 'No servers are assigned to your account.';
+    } catch (error) {
+      feedback.textContent =
+        'Refresh failed · ' +
+        error.message +
+        '. Displayed server readings may be out of date.';
+      host = null;
+      sample(playerChart, [null], Date.now());
+      sample(cpuChart, [null], Date.now());
+      sample(memoryChart, [null], Date.now());
+      document.getElementById('fleet-cpu-reading').textContent = '—';
+      document.getElementById('fleet-memory-reading').textContent = '—';
+    } finally {
+      loading = false;
+      button.disabled = false;
+    }
   }
-  unitFilter.onchange=()=>{if(playerChart){playerChart.data.datasets.forEach(s=>s.data=[]);playerChart.update('none');}render(snapshots);};
+  unitFilter.onchange = () => {
+    if (playerChart) {
+      playerChart.data.datasets.forEach((s) => (s.data = []));
+      playerChart.update('none');
+    }
+    render(snapshots);
+  };
   document.getElementById('overview-search').oninput = () => render(snapshots);
   document.getElementById('overview-filter').onchange = () => render(snapshots);
   document.getElementById('overview-refresh').onclick = () => refresh();
-  document.getElementById('overview-logout').onclick = async () => { await postJson('/logout',{}); location.href = '/login'; };
-  read('/api/me').then(account => { permissions = account.panel_permissions || account.permissions || []; document.getElementById('overview-account').textContent = account.username; document.getElementById('fleet-panel-users').hidden=!permissions.includes('users'); document.getElementById('overview-create').hidden = !permissions.includes('admin_config'); document.getElementById('server-cleanup-open').hidden=!permissions.includes('users'); return refresh(); }).catch(error => feedback.textContent = error.message);
-  timer = setInterval(() => { if (!document.hidden) refresh(); },10000);
-  window.addEventListener('pagehide',() => clearInterval(timer));
+  document.getElementById('overview-logout').onclick = async () => {
+    await postJson('/logout', {});
+    location.href = '/login';
+  };
+  read('/api/me')
+    .then((account) => {
+      permissions = account.panel_permissions || account.permissions || [];
+      document.getElementById('overview-account').textContent =
+        account.username;
+      document.getElementById('fleet-panel-users').hidden =
+        !permissions.includes('users');
+      document.getElementById('overview-create').hidden =
+        !permissions.includes('admin_config');
+      document.getElementById('server-cleanup-open').hidden =
+        !permissions.includes('users');
+      return refresh();
+    })
+    .catch((error) => (feedback.textContent = error.message));
+  timer = setInterval(() => {
+    if (!document.hidden) refresh();
+  }, 10000);
+  window.addEventListener('pagehide', () => clearInterval(timer));
 });

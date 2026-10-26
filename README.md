@@ -162,3 +162,5 @@ The documentation builder needs Pandoc, ReportLab and DejaVu fonts in the develo
 FIELDHQ is distributed under the [MIT License](LICENSE). Upstream authorship and contribution history are retained; rebranding does not remove them. See [ATTRIBUTION.md](ATTRIBUTION.md) for upstream and bundled-asset credits.
 
 Release planning: [FIELDHQ 1.0 worklist](docs/roadmap-1.0.md).
+
+Developer notes: [module boundaries and source formatting](docs/development.md).

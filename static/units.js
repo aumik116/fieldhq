@@ -1,456 +1,1513 @@
 // Staff workspace. All unit access is also enforced by the API.
 (() => {
-  const el=id=>document.getElementById(id), esc=escHtml;
-  let listing, detail, unitId, dialogSave, baseline='', loading=false, dialogSaving=false;
-  let rosterView='',rosterUnit=null,activeTab='roster';
-  const areas={overview:['home','profile','dashboard','analytics'],people:['roster','qualifications','promotions','awards'],operations:['events','attendance','campaigns','servers'],resources:['references','catalog'],administration:['structure','staff','customization']};
-  const areaNames={overview:'Overview',people:'Roster',operations:'Operations',resources:'Resources',administration:'Administration'};
-  const pageNotes={home:'Required reading, upcoming events, announcements and review reminders.',profile:'Your unit record, qualifications and finalized attendance. Staff notes remain private.',customization:'Upload your unit’s icon and banner, and set its description.',dashboard:'Staffing, upcoming operations and work awaiting review.',analytics:'Recorded strength, retention and finalized attendance trends.',roster:'Members, primary billets and individual records.',qualifications:'Who holds each qualification, and where coverage is missing.',promotions:'Review readiness and approve promotions manually.',awards:'Medals, citations and issue history.',events:'Schedule operations and review event evidence.',attendance:'Monthly attendance decisions and exports.',campaigns:'Group operations and review campaign participation.',servers:'Basic health for this unit’s linked servers. Server control access is separate.',references:'Unit SOPs and role-specific kit references.',catalog:'Configure rank paths, qualification names and position suggestions.',structure:'Manage roster groups, sections and billet slots.',staff:'Create logins and assign Member, Staff or Unit administrator access.'};
-  const areaPages={};
-
-  const dialog=el('unit-dialog'), form=el('unit-form');
-  async function read(url) { return readJson(await fetch(url)); }
-  async function write(url,data) { return readJson(await postJson(url,data)); }
-  const feedback=message=>{el('units-feedback').textContent=message;};
-  const options=(values,selected='',blank='None')=>`<option value="">${esc(blank)}</option>`+values.map(v=>`<option ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
-  const field=(label,name,value='',type='text')=>`<label class="unit-field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" maxlength="${name.includes('cert')?8000:name==='notes'?2000:120}"></label>`;
-  const checks=(name,values,selected=[])=>`<div class="unit-checks">${values.map(v=>`<label><input type="checkbox" name="${name}" value="${esc(v)}" ${selected.includes(v)?'checked':''}>${esc(v)}</label>`).join('')||'<span class="feature-note">None defined yet.</span>'}</div>`;
-  const checked=name=>[...form.querySelectorAll(`input[name="${name}"]:checked`)].map(c=>c.value);
-  const values=()=>Object.fromEntries(new FormData(form));
-  function signature() { return JSON.stringify([...new FormData(form)]); }
-  UnitUX.registerDraft({dirty:()=>dialog.open&&signature()!==baseline,busy:()=>dialog.open&&dialogSaving,discard:()=>dialog.close()});
-  function closeDialog() { if(UnitUX.canLeave())dialog.close(); }
-  function openDialog(title,html,save) {
-    dialog.dataset.record='';el('unit-dialog-title').textContent=title;el('unit-dialog-body').innerHTML=html;
-    el('unit-dialog-error').textContent='';const saveButton=form.querySelector('[type="submit"]');saveButton.hidden=false;saveButton.disabled=false;saveButton.textContent='Save changes';dialogSave=save;dialog.showModal();baseline=signature();
-    UnitUX.open(dialog);
-  }
-  dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});el('unit-dialog-close').onclick=closeDialog;
-  form.onsubmit=async e=>{
-    e.preventDefault();if(dialogSaving)return;dialogSaving=true;const button=form.querySelector('[type="submit"]');button.disabled=true;
-    try { const close=await dialogSave();if(close!==false){dialog.close();await loadListing(unitId);feedback('Changes saved.');}else{baseline=signature();} }
-    catch(error) { el('unit-dialog-error').textContent=error.message; }
-    finally { dialogSaving=false;button.disabled=!!dialog.dataset.record&&!form.elements.record_note?.value.trim(); }
+  const el = (id) => document.getElementById(id),
+    esc = escHtml;
+  let listing,
+    detail,
+    unitId,
+    dialogSave,
+    baseline = '',
+    loading = false,
+    dialogSaving = false;
+  let rosterView = '',
+    rosterUnit = null,
+    activeTab = 'roster';
+  const pageNotes = {
+    home: 'Required reading, upcoming events, announcements and review reminders.',
+    profile:
+      'Your unit record, qualifications and finalized attendance. Staff notes remain private.',
+    customization:
+      'Upload your unit’s icon and banner, and set its description.',
+    dashboard: 'Staffing, upcoming operations and work awaiting review.',
+    analytics: 'Recorded strength, retention and finalized attendance trends.',
+    roster: 'Members, primary billets and individual records.',
+    qualifications:
+      'Who holds each qualification, and where coverage is missing.',
+    promotions: 'Review readiness and approve promotions manually.',
+    awards: 'Medals, citations and issue history.',
+    events: 'Schedule operations and review event evidence.',
+    attendance: 'Monthly attendance decisions and exports.',
+    campaigns: 'Group operations and review campaign participation.',
+    servers:
+      'Basic health for this unit’s linked servers. Server control access is separate.',
+    references: 'Unit SOPs and role-specific kit references.',
+    catalog:
+      'Configure rank paths, qualification names and position suggestions.',
+    structure: 'Manage roster groups, sections and billet slots.',
+    staff:
+      'Create logins and assign Member, Staff or Unit administrator access.',
   };
-  form.addEventListener('input',()=>{if(dialog.dataset.record)form.querySelector('[type="submit"]').disabled=dialogSaving||!form.elements.record_note?.value.trim();});
-  function unitSettings(create=false) {
-    const unit=create?{}:detail.unit, selected=create?[]:listing.units.find(u=>u.id===unitId).servers;
-    openDialog(create?'Create unit':'Unit settings',`<div class="unit-form-grid">${field('Unit name','name',unit.name||'')}${field('Short tag','tag',unit.tag||'')}</div><h3>Linked servers</h3><p class="feature-note">Linking a server provides basic health visibility. Server control roles are assigned separately.</p>${checks('servers',listing.servers.map(s=>s.id),selected)}`,async()=>{
-      const data=values();const result=await write('/api/units',{name:data.name,tag:data.tag,servers:checked('servers'),...(create?{}:{id:unitId,revision:detail.unit.revision})});unitId=result.id;
+
+  const dialog = el('unit-dialog'),
+    form = el('unit-form');
+  async function read(url) {
+    return readJson(await fetch(url));
+  }
+  async function write(url, data) {
+    return readJson(await postJson(url, data));
+  }
+  const feedback = (message) => {
+    el('units-feedback').textContent = message;
+  };
+  const options = (values, selected = '', blank = 'None') =>
+    `<option value="">${esc(blank)}</option>` +
+    values
+      .map(
+        (v) => `<option ${v === selected ? 'selected' : ''}>${esc(v)}</option>`,
+      )
+      .join('');
+  const field = (label, name, value = '', type = 'text') =>
+    `<label class="unit-field">${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" maxlength="${name.includes('cert') ? 8000 : name === 'notes' ? 2000 : 120}"></label>`;
+  const checks = (name, values, selected = []) =>
+    `<div class="unit-checks">${values.map((v) => `<label><input type="checkbox" name="${name}" value="${esc(v)}" ${selected.includes(v) ? 'checked' : ''}>${esc(v)}</label>`).join('') || '<span class="feature-note">None defined yet.</span>'}</div>`;
+  const checked = (name) =>
+    [...form.querySelectorAll(`input[name="${name}"]:checked`)].map(
+      (c) => c.value,
+    );
+  const values = () => Object.fromEntries(new FormData(form));
+  function signature() {
+    return JSON.stringify([...new FormData(form)]);
+  }
+  UnitUX.registerDraft({
+    dirty: () => dialog.open && signature() !== baseline,
+    busy: () => dialog.open && dialogSaving,
+    discard: () => dialog.close(),
+  });
+  function closeDialog() {
+    UnitUX.close(dialog);
+  }
+  function openDialog(title, html, save) {
+    dialog.dataset.record = '';
+    dialogSave = save;
+    form.querySelector('[type="submit"]').disabled = false;
+    UnitUX.prepare(dialog, {
+      title,
+      body: el('unit-dialog-body'),
+      content: html,
     });
-    // Use friendly server names while keeping stable IDs in submitted values.
-    form.querySelectorAll('[name="servers"]').forEach(input=>input.parentNode.lastChild.textContent=listing.servers.find(s=>s.id===input.value).name);
+    baseline = signature();
   }
-  async function loadListing(preferred=unitId) {
-    if(loading||!UnitUX.canLeave())return;loading=true;
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeDialog();
+  });
+  el('unit-dialog-close').onclick = closeDialog;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (dialogSaving) return;
+    dialogSaving = true;
     try {
-      listing=await read('/api/units');el('units-server-navigation').hidden=listing.hosting_access===false;el('unit-new').hidden=!listing.panel_admin;el('unit-users').hidden=!listing.panel_admin;
+      await UnitUX.save(dialog, dialogSave, async (result) => {
+        if (result !== false) {
+          dialog.close();
+          await loadListing(unitId);
+          feedback('Changes saved.');
+        } else baseline = signature();
+      });
+    } finally {
+      dialogSaving = false;
+      form.querySelector('[type="submit"]').disabled =
+        !!dialog.dataset.record && !form.elements.record_note?.value.trim();
+    }
+  };
+  form.addEventListener('input', () => {
+    if (dialog.dataset.record)
+      form.querySelector('[type="submit"]').disabled =
+        dialogSaving || !form.elements.record_note?.value.trim();
+  });
+  function unitSettings(create = false) {
+    const unit = create ? {} : detail.unit,
+      selected = create
+        ? []
+        : listing.units.find((u) => u.id === unitId).servers;
+    openDialog(
+      create ? 'Create unit' : 'Unit settings',
+      `<div class="unit-form-grid">${field('Unit name', 'name', unit.name || '')}${field('Short tag', 'tag', unit.tag || '')}</div><h3>Linked servers</h3><p class="feature-note">Linking a server provides basic health visibility. Server control roles are assigned separately.</p>${checks(
+        'servers',
+        listing.servers.map((s) => s.id),
+        selected,
+      )}`,
+      async () => {
+        const data = values();
+        const result = await write('/api/units', {
+          name: data.name,
+          tag: data.tag,
+          servers: checked('servers'),
+          ...(create ? {} : { id: unitId, revision: detail.unit.revision }),
+        });
+        unitId = result.id;
+      },
+    );
+    // Use friendly server names while keeping stable IDs in submitted values.
+    form
+      .querySelectorAll('[name="servers"]')
+      .forEach(
+        (input) =>
+          (input.parentNode.lastChild.textContent = listing.servers.find(
+            (s) => s.id === input.value,
+          ).name),
+      );
+  }
+  async function loadListing(preferred = unitId) {
+    if (loading || !UnitUX.canLeave()) return;
+    loading = true;
+    try {
+      listing = await read('/api/units');
+      el('units-server-navigation').hidden = listing.hosting_access === false;
+      el('unit-new').hidden = !listing.panel_admin;
+      el('unit-users').hidden = !listing.panel_admin;
       el('unit-select').replaceChildren();
-      for(const unit of listing.units){const option=document.createElement('option');option.value=unit.id;option.textContent=unit.name;el('unit-select').append(option);}
-      unitId=listing.units.some(u=>u.id===Number(preferred))?Number(preferred):listing.units[0]?.id;
-      el('unit-section-tabs').hidden=true;
-      if(listing.panel_admin&&new URLSearchParams(location.search).get('admin')==='users'){el('panel-users').hidden=false;await loadUsers();}
-      el('unit-workspace').hidden=!unitId;el('unit-select').disabled=!unitId;
-      if(!unitId){brandDirty=false;el('unit-brand-header').style.backgroundImage='';el('unit-brand-header').classList.remove('has-banner');el('unit-brand-icon').hidden=true;el('unit-page-title').textContent='Units & rosters';el('unit-page-subtitle').textContent='Choose a unit to manage its people and operations.';el('unit-access-description').hidden=true;feedback(listing.panel_admin?'Create your first unit to start building its roster.':'No units assigned. Ask a panel administrator or unit administrator to add your account.');return;}
-      el('unit-select').value=unitId;await loadUnit();
-    }catch(error){feedback(error.message);el('unit-workspace').hidden=true;}
-    finally{loading=false;}
+      for (const unit of listing.units) {
+        const option = document.createElement('option');
+        option.value = unit.id;
+        option.textContent = unit.name;
+        el('unit-select').append(option);
+      }
+      unitId = listing.units.some((u) => u.id === Number(preferred))
+        ? Number(preferred)
+        : listing.units[0]?.id;
+      el('unit-section-tabs').hidden = true;
+      if (
+        listing.panel_admin &&
+        new URLSearchParams(location.search).get('admin') === 'users'
+      ) {
+        el('panel-users').hidden = false;
+        await loadUsers();
+      }
+      el('unit-workspace').hidden = !unitId;
+      el('unit-select').disabled = !unitId;
+      if (!unitId) {
+        brandDirty = false;
+        el('unit-brand-header').style.backgroundImage = '';
+        el('unit-brand-header').classList.remove('has-banner');
+        el('unit-brand-icon').hidden = true;
+        el('unit-page-title').textContent = 'Units & rosters';
+        el('unit-page-subtitle').textContent =
+          'Choose a unit to manage its people and operations.';
+        el('unit-access-description').hidden = true;
+        feedback(
+          listing.panel_admin
+            ? 'Create your first unit to start building its roster.'
+            : 'No units assigned. Ask a panel administrator or unit administrator to add your account.',
+        );
+        return;
+      }
+      el('unit-select').value = unitId;
+      await loadUnit();
+    } catch (error) {
+      feedback(error.message);
+      el('unit-workspace').hidden = true;
+    } finally {
+      loading = false;
+    }
   }
-  async function loadUnit(){
-    if(!UnitUX.canLeave())return;
-    const requested=unitId;
-    if(detail?.unit.id!==requested)el('unit-workspace').hidden=true;
-    el('unit-workspace').setAttribute('aria-busy','true');
-    try{
-      const result=await read('/api/units/'+requested);
-      if(requested!==unitId||!UnitUX.canLeave())return;
-      detail=result;el('unit-workspace').hidden=false;el('unit-section-tabs').hidden=false;
-      const selected=listing.units.find(u=>u.id===unitId);
-      el('unit-access-description').hidden=false;
-      el('unit-access-description').textContent=listing.panel_admin?'Panel administrator · Full access':detail.can_staff?'Unit administrator · Full unit access':detail.role==='member'?'Member · My unit, personal profile and published resources':'Unit staff · Roster, events, attendance and resources';
-      el('unit-settings').hidden=!detail.can_settings;el('roster-add').hidden=!detail.can_edit;
-      el('catalog-edit').hidden=!detail.can_staff;el('position-rename').hidden=!detail.can_staff;el('unit-tab-staff').hidden=!detail.can_staff;
-      el('unit-tab-structure').hidden=!detail.can_staff;el('roster-structure').hidden=!detail.can_staff;
-      for(const key of ['staff','structure','customization'])el('unit-tab-'+key).dataset.restricted=String(!detail.can_staff);
-      document.querySelectorAll('[data-unit-tab]').forEach(b=>{if(detail.role==='member')b.dataset.restricted=String(!['home','profile','references'].includes(b.dataset.unitTab));else if(!['staff','structure','customization'].includes(b.dataset.unitTab))b.dataset.restricted='false';});
-      el('roster-export').href='/api/units/'+unitId+'/roster.csv';
-      el('unit-page-title').textContent=detail.unit.name;applyBranding();
-      selectTab(new URLSearchParams(location.search).get('tab')||activeTab,false);feedback('');
-      document.dispatchEvent(new CustomEvent('unit-loaded',{detail:{unitId,detail,listing}}));
-      const params=new URLSearchParams(location.search);params.set('unit',unitId);history.replaceState(null,'','/units?'+params);
-    }catch(error){if(requested===unitId){el('unit-workspace').hidden=true;feedback(error.message);}}
-    finally{if(requested===unitId)el('unit-workspace').setAttribute('aria-busy','false');}
+  async function loadUnit() {
+    if (!UnitUX.canLeave()) return;
+    const requested = unitId;
+    if (detail?.unit.id !== requested) el('unit-workspace').hidden = true;
+    el('unit-workspace').setAttribute('aria-busy', 'true');
+    try {
+      const result = await read('/api/units/' + requested);
+      if (requested !== unitId || !UnitUX.canLeave()) return;
+      detail = result;
+      el('unit-workspace').hidden = false;
+      el('unit-section-tabs').hidden = false;
+      const selected = listing.units.find((u) => u.id === unitId);
+      el('unit-access-description').hidden = false;
+      el('unit-access-description').textContent = listing.panel_admin
+        ? 'Panel administrator · Full access'
+        : detail.can_staff
+          ? 'Unit administrator · Full unit access'
+          : detail.role === 'member'
+            ? 'Member · My unit, personal profile and published resources'
+            : 'Unit staff · Roster, events, attendance and resources';
+      el('unit-settings').hidden = !detail.can_settings;
+      el('roster-add').hidden = !detail.can_edit;
+      el('catalog-edit').hidden = !detail.can_staff;
+      el('position-rename').hidden = !detail.can_staff;
+      el('unit-tab-staff').hidden = !detail.can_staff;
+      el('unit-tab-structure').hidden = !detail.can_staff;
+      el('roster-structure').hidden = !detail.can_staff;
+      for (const key of ['staff', 'structure', 'customization'])
+        el('unit-tab-' + key).dataset.restricted = String(!detail.can_staff);
+      document.querySelectorAll('[data-unit-tab]').forEach((b) => {
+        if (detail.role === 'member')
+          b.dataset.restricted = String(
+            !['home', 'profile', 'references'].includes(b.dataset.unitTab),
+          );
+        else if (
+          !['staff', 'structure', 'customization'].includes(b.dataset.unitTab)
+        )
+          b.dataset.restricted = 'false';
+      });
+      el('roster-export').href = '/api/units/' + unitId + '/roster.csv';
+      el('unit-page-title').textContent = detail.unit.name;
+      applyBranding();
+      selectTab(
+        new URLSearchParams(location.search).get('tab') || activeTab,
+        false,
+      );
+      feedback('');
+      document.dispatchEvent(
+        new CustomEvent('unit-loaded', { detail: { unitId, detail, listing } }),
+      );
+      const params = new URLSearchParams(location.search);
+      params.set('unit', unitId);
+      history.replaceState(null, '', '/units?' + params);
+    } catch (error) {
+      if (requested === unitId) {
+        el('unit-workspace').hidden = true;
+        feedback(error.message);
+      }
+    } finally {
+      if (requested === unitId)
+        el('unit-workspace').setAttribute('aria-busy', 'false');
+    }
   }
-  function renderRoster(){
-    const query=el('roster-search').value.trim().toLowerCase(),status=el('roster-status').value;
+  function renderRoster() {
+    const query = el('roster-search').value.trim().toLowerCase(),
+      status = el('roster-status').value;
     renderGroupTabs();
-    const current=detail.roster.filter(m=>!m.archived);
-    el('roster-summary').innerHTML=['active','reserve','loa'].map(s=>`<span>${s==='loa'?'LOA':s[0].toUpperCase()+s.slice(1)} <strong>${current.filter(m=>m.status===s).length}</strong></span>`).join('')+`<span>Current roster <strong>${current.length}</strong></span>`;
-    const eligible=current.filter(m=>m.promotion.eligible);
-    el('promotion-notice').hidden=!eligible.length;
-    el('promotion-notice').innerHTML=`<div class="promotion-notice-summary"><strong>${eligible.length} member${eligible.length===1?'':'s'} eligible for promotion review</strong><button type="button" id="promotion-open-queue">Open review queue</button></div><small>Staff approval required. No automatic promotions.</small>`;
-    el('promotion-open-queue').onclick=()=>selectTab('promotions');
-    const structured=!['all','unassigned'].includes(rosterView);
-    el('roster-member-list').hidden=structured;el('roster-hierarchy').hidden=!structured;el('roster-sort').hidden=structured;
-    if(structured){renderStructuredRoster(query,status);return;}
-    const rows=detail.roster.filter(m=>(status==='archived'?m.archived:!m.archived&&(!status||m.status===status))&&(rosterView!=='unassigned'||!m.billet_id)&&[m.billet_path,m.rank_track,m.game_name,m.discord,m.identity,m.panel_username,m.rank,m.section,m.position,m.certificates,m.notes].join(' ').toLowerCase().includes(query));
-    const key=el('roster-sort').value;
-    rows.sort((a,b)=>key==='promotion'?(a.promotion.next_date||'9999').localeCompare(b.promotion.next_date||'9999')||a.game_name.localeCompare(b.game_name):key==='joined'?(a.joined_on||'9999').localeCompare(b.joined_on||'9999')||a.game_name.localeCompare(b.game_name):a.game_name.localeCompare(b.game_name,undefined,{sensitivity:'base',numeric:true}));
-    const rankInfo=m=>(detail.unit.catalog.rank_structures||[]).find(s=>s.name===m.rank_track)?.ranks.find(r=>r.name===m.rank);
-    el('roster-rows').innerHTML=rows.map(m=>{
-      const p=m.promotion;
-      return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button><small>${esc(m.discord||'Discord not set')}</small><small>${esc(m.identity||'UUID not linked')}</small>${m.panel_username?`<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled?'':' · Disabled'}</small>`:''}${m.notes?`<small>${esc(m.notes)}</small>`:''}${m.joined_on?`<small>Joined ${esc(m.joined_on)}</small>`:''}</td><td>${m.archived?'Former':m.status==='loa'?'LOA':m.status==='active'?'Active':'Reserve'}${m.status==='loa'&&m.loa_until?`<small>Until ${esc(m.loa_until)}</small>`:''}</td><td>${esc(m.rank||'—')}<small>${esc([m.rank_track,rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.billet_path||'Unassigned')}<small>${!m.billet_id&&m.section?'Previous section: '+esc(m.section):''}</small></td><td>${esc(m.certificates.split(';').join(', ')||'—')}</td><td>${esc(m.last_promo||'—')}</td><td>${p.next_rank?`<strong>${esc(p.next_rank)}</strong><small>${p.next_date?esc(p.next_date):'Set last promotion date'}</small><small class="${p.eligible?'unit-good':'unit-warn'}">${p.missing.length?'Needs: '+esc(p.missing.join(', ')):p.eligible?'Eligible for staff review':'Qualifications met'}</small>`:'<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit?`<button data-member="${m.id}">Edit</button>`:''}</td></tr>`;
-    }).join('')||'<tr><td colspan="8" class="unit-empty">No members match. Add a member to start.</td></tr>';
-    el('roster-rows').querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>memberRecord(Number(b.dataset.record)));
-    el('roster-rows').querySelectorAll('[data-member]').forEach(b=>b.onclick=()=>memberEditor(detail.roster.find(m=>m.id===Number(b.dataset.member))));
+    const current = detail.roster.filter((m) => !m.archived);
+    el('roster-summary').innerHTML =
+      ['active', 'reserve', 'loa']
+        .map(
+          (s) =>
+            `<span>${s === 'loa' ? 'LOA' : s[0].toUpperCase() + s.slice(1)} <strong>${current.filter((m) => m.status === s).length}</strong></span>`,
+        )
+        .join('') +
+      `<span>Current roster <strong>${current.length}</strong></span>`;
+    const eligible = current.filter((m) => m.promotion.eligible);
+    el('promotion-notice').hidden = !eligible.length;
+    el('promotion-notice').innerHTML =
+      `<div class="promotion-notice-summary"><strong>${eligible.length} member${eligible.length === 1 ? '' : 's'} eligible for promotion review</strong><button type="button" id="promotion-open-queue">Open review queue</button></div><small>Staff approval required. No automatic promotions.</small>`;
+    el('promotion-open-queue').onclick = () => selectTab('promotions');
+    const structured = !['all', 'unassigned'].includes(rosterView);
+    el('roster-member-list').hidden = structured;
+    el('roster-hierarchy').hidden = !structured;
+    el('roster-sort').hidden = structured;
+    if (structured) {
+      renderStructuredRoster(query, status);
+      return;
+    }
+    const rows = detail.roster.filter(
+      (m) =>
+        (status === 'archived'
+          ? m.archived
+          : !m.archived && (!status || m.status === status)) &&
+        (rosterView !== 'unassigned' || !m.billet_id) &&
+        [
+          m.billet_path,
+          m.rank_track,
+          m.game_name,
+          m.discord,
+          m.identity,
+          m.panel_username,
+          m.rank,
+          m.section,
+          m.position,
+          m.certificates,
+          m.notes,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query),
+    );
+    const key = el('roster-sort').value;
+    rows.sort((a, b) =>
+      key === 'promotion'
+        ? (a.promotion.next_date || '9999').localeCompare(
+            b.promotion.next_date || '9999',
+          ) || a.game_name.localeCompare(b.game_name)
+        : key === 'joined'
+          ? (a.joined_on || '9999').localeCompare(b.joined_on || '9999') ||
+            a.game_name.localeCompare(b.game_name)
+          : a.game_name.localeCompare(b.game_name, undefined, {
+              sensitivity: 'base',
+              numeric: true,
+            }),
+    );
+    const rankInfo = (m) =>
+      (detail.unit.catalog.rank_structures || [])
+        .find((s) => s.name === m.rank_track)
+        ?.ranks.find((r) => r.name === m.rank);
+    el('roster-rows').innerHTML =
+      rows
+        .map((m) => {
+          const p = m.promotion;
+          return `<tr><td><button type="button" class="member-record-link" data-record="${m.id}">${esc(m.game_name)}</button><small>${esc(m.discord || 'Discord not set')}</small><small>${esc(m.identity || 'UUID not linked')}</small>${m.panel_username ? `<small>Panel: ${esc(m.panel_username)}${m.panel_user_enabled ? '' : ' · Disabled'}</small>` : ''}${m.notes ? `<small>${esc(m.notes)}</small>` : ''}${m.joined_on ? `<small>Joined ${esc(m.joined_on)}</small>` : ''}</td><td>${m.archived ? 'Former' : m.status === 'loa' ? 'LOA' : m.status === 'active' ? 'Active' : 'Reserve'}${m.status === 'loa' && m.loa_until ? `<small>Until ${esc(m.loa_until)}</small>` : ''}</td><td>${esc(m.rank || '—')}<small>${esc([m.rank_track, rankInfo(m)?.paygrade].filter(Boolean).join(' · '))}</small></td><td>${esc(m.billet_path || 'Unassigned')}<small>${!m.billet_id && m.section ? 'Previous section: ' + esc(m.section) : ''}</small></td><td>${esc(m.certificates.split(';').join(', ') || '—')}</td><td>${esc(m.last_promo || '—')}</td><td>${p.next_rank ? `<strong>${esc(p.next_rank)}</strong><small>${p.next_date ? esc(p.next_date) : 'Set last promotion date'}</small><small class="${p.eligible ? 'unit-good' : 'unit-warn'}">${p.missing.length ? 'Needs: ' + esc(p.missing.join(', ')) : p.eligible ? 'Eligible for staff review' : 'Qualifications met'}</small>` : '<small>No next rank configured</small>'}</td><td><button type="button" data-record="${m.id}">Open record</button>${detail.can_edit ? `<button data-member="${m.id}">Edit</button>` : ''}</td></tr>`;
+        })
+        .join('') ||
+      '<tr><td colspan="8" class="unit-empty">No members match. Add a member to start.</td></tr>';
+    el('roster-rows')
+      .querySelectorAll('[data-record]')
+      .forEach(
+        (b) => (b.onclick = () => memberRecord(Number(b.dataset.record))),
+      );
+    el('roster-rows')
+      .querySelectorAll('[data-member]')
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            memberEditor(
+              detail.roster.find((m) => m.id === Number(b.dataset.member)),
+            )),
+      );
   }
-  function structurePath(id){
-    const nodes=new Map((detail.structure||[]).map(n=>[n.id,n]));
-    const parts=[];let node=nodes.get(Number(id));
-    while(node){parts.push(node.name);node=nodes.get(node.parent_id);}
+  function structurePath(id) {
+    const nodes = new Map((detail.structure || []).map((n) => [n.id, n]));
+    const parts = [];
+    let node = nodes.get(Number(id));
+    while (node) {
+      parts.push(node.name);
+      node = nodes.get(node.parent_id);
+    }
     return parts.reverse().join(' / ');
   }
-  function renderGroupTabs(){
-    const groups=(detail.structure||[]).filter(n=>n.kind==='group');
-    if(rosterUnit!==unitId){rosterView=String(groups[0]?.id||'all');rosterUnit=unitId;}
-    if(!['all','unassigned'].includes(rosterView)&&!groups.some(g=>String(g.id)===rosterView))rosterView=String(groups[0]?.id||'all');
-    if(el('roster-status').value==='archived')rosterView='all';
-    const unassigned=detail.roster.filter(m=>!m.archived&&!m.billet_id).length;
-    el('roster-groups').innerHTML=[...groups.map(g=>[String(g.id),g.name]),['unassigned',`Unassigned (${unassigned})`],['all','All members']].map(([id,name])=>`<button type="button" aria-pressed="${rosterView===id}" data-roster-view="${esc(id)}">${esc(name)}</button>`).join('');
-    el('roster-groups').querySelectorAll('[data-roster-view]').forEach(button=>button.onclick=()=>{rosterView=button.dataset.rosterView;if(el('roster-status').value==='archived'&&rosterView!=='all')el('roster-status').value='';renderRoster();});
-  }
-  function renderStructuredRoster(query,status){
-    const nodes=detail.structure||[],group=nodes.find(n=>String(n.id)===rosterView);
-    const children=id=>nodes.filter(n=>n.parent_id===id);
-    const assigned=new Map(detail.roster.filter(m=>!m.archived&&m.billet_id).map(m=>[m.billet_id,m]));
-    function counts(node){
-      const slots=[];
-      function visit(n){if(n.kind==='billet')slots.push(n);else children(n.id).forEach(visit);}
-      visit(node);const filled=slots.filter(n=>assigned.has(n.id)).length;
-      return `${filled}/${slots.length}${slots.length>filled?' · '+(slots.length-filled)+' open':''}`;
+  function renderGroupTabs() {
+    const groups = (detail.structure || []).filter((n) => n.kind === 'group');
+    if (rosterUnit !== unitId) {
+      rosterView = String(groups[0]?.id || 'all');
+      rosterUnit = unitId;
     }
-    function billetRows(slots){
-      return slots.map(slot=>{
-        const member=assigned.get(slot.id),path=structurePath(slot.id).toLowerCase();
-        if(member){if(status&&member.status!==status)return '';if(query&&![member.game_name,member.rank,member.rank_track,member.discord,member.identity,member.certificates,path].join(' ').toLowerCase().includes(query))return '';}
-        else if(status||query&&!path.includes(query))return '';
-        return `<tr class="${member?'':'billet-vacant'}"><td>${esc(slot.name)}</td><td>${member?esc(member.rank||'—'):'—'}${member?.rank_track?`<small>${esc(member.rank_track)}</small>`:''}</td><td>${member?`<button type="button" class="member-record-link" data-record="${member.id}">${esc(member.game_name)}</button>${member.status!=='active'?`<small>${member.status==='loa'?'LOA':'Reserve'}</small>`:''}`:'<span class="billet-open">— Open —</span>'}</td><td>${detail.can_edit?`<button type="button" data-assign="${slot.id}">${member?'Change':'Assign'}</button>`:''}</td></tr>`;
-      }).join('');
+    if (
+      !['all', 'unassigned'].includes(rosterView) &&
+      !groups.some((g) => String(g.id) === rosterView)
+    )
+      rosterView = String(groups[0]?.id || 'all');
+    if (el('roster-status').value === 'archived') rosterView = 'all';
+    const unassigned = detail.roster.filter(
+      (m) => !m.archived && !m.billet_id,
+    ).length;
+    el('roster-groups').innerHTML = [
+      ...groups.map((g) => [String(g.id), g.name]),
+      ['unassigned', `Unassigned (${unassigned})`],
+      ['all', 'All members'],
+    ]
+      .map(
+        ([id, name]) =>
+          `<button type="button" aria-pressed="${rosterView === id}" data-roster-view="${esc(id)}">${esc(name)}</button>`,
+      )
+      .join('');
+    el('roster-groups')
+      .querySelectorAll('[data-roster-view]')
+      .forEach(
+        (button) =>
+          (button.onclick = () => {
+            rosterView = button.dataset.rosterView;
+            if (
+              el('roster-status').value === 'archived' &&
+              rosterView !== 'all'
+            )
+              el('roster-status').value = '';
+            renderRoster();
+          }),
+      );
+  }
+  function renderStructuredRoster(query, status) {
+    const nodes = detail.structure || [],
+      group = nodes.find((n) => String(n.id) === rosterView);
+    const children = (id) => nodes.filter((n) => n.parent_id === id);
+    const assigned = new Map(
+      detail.roster
+        .filter((m) => !m.archived && m.billet_id)
+        .map((m) => [m.billet_id, m]),
+    );
+    function counts(node) {
+      const slots = [];
+      function visit(n) {
+        if (n.kind === 'billet') slots.push(n);
+        else children(n.id).forEach(visit);
+      }
+      visit(node);
+      const filled = slots.filter((n) => assigned.has(n.id)).length;
+      return `${filled}/${slots.length}${slots.length > filled ? ' · ' + (slots.length - filled) + ' open' : ''}`;
     }
-    function section(node,depth){
-      let content='',run=[];
-      function flush(){const rows=billetRows(run);if(rows)content+=`<div class="billet-table"><table><thead><tr><th>Billet</th><th>Rank</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;run=[];}
-      for(const child of children(node.id)){if(child.kind==='billet')run.push(child);else{flush();content+=section(child,depth+1);}}flush();
-      if((query||status)&&!content)return '';
-      return `<section class="structure-section depth-${Math.min(depth,2)}"><div class="structure-section-heading"><h3>${esc(node.name)}</h3><span>${counts(node)}</span>${detail.can_staff?`<button type="button" data-new-billet="${node.id}">+ Billet</button>`:''}</div>${content||'<p class="feature-note structure-empty">No billets yet.</p>'}</section>`;
+    function billetRows(slots) {
+      return slots
+        .map((slot) => {
+          const member = assigned.get(slot.id),
+            path = structurePath(slot.id).toLowerCase();
+          if (member) {
+            if (status && member.status !== status) return '';
+            if (
+              query &&
+              ![
+                member.game_name,
+                member.rank,
+                member.rank_track,
+                member.discord,
+                member.identity,
+                member.certificates,
+                path,
+              ]
+                .join(' ')
+                .toLowerCase()
+                .includes(query)
+            )
+              return '';
+          } else if (status || (query && !path.includes(query))) return '';
+          return `<tr class="${member ? '' : 'billet-vacant'}"><td>${esc(slot.name)}</td><td>${member ? esc(member.rank || '—') : '—'}${member?.rank_track ? `<small>${esc(member.rank_track)}</small>` : ''}</td><td>${member ? `<button type="button" class="member-record-link" data-record="${member.id}">${esc(member.game_name)}</button>${member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}` : '<span class="billet-open">— Open —</span>'}</td><td>${detail.can_edit ? `<button type="button" data-assign="${slot.id}">${member ? 'Change' : 'Assign'}</button>` : ''}</td></tr>`;
+        })
+        .join('');
     }
-    const content=children(group.id).map(n=>section(n,0)).join('');
-    el('roster-hierarchy').innerHTML=`<div class="structure-group-heading"><h2>${esc(group.name)}</h2><span>${counts(group)}</span>${detail.can_staff?`<button type="button" data-new-section="${group.id}">+ Section</button>`:''}</div>${content||'<p class="unit-empty">No sections match. Unit administrators can add sections and billets in Structure.</p>'}`;
-    el('roster-hierarchy').querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>memberRecord(Number(b.dataset.record)));
-    el('roster-hierarchy').querySelectorAll('[data-assign]').forEach(b=>b.onclick=()=>assignmentEditor(Number(b.dataset.assign)));
-    el('roster-hierarchy').querySelectorAll('[data-new-section]').forEach(b=>b.onclick=()=>structureEditor('section',Number(b.dataset.newSection)));
-    el('roster-hierarchy').querySelectorAll('[data-new-billet]').forEach(b=>b.onclick=()=>structureEditor('billet',Number(b.dataset.newBillet)));
-  }
-  function assignmentEditor(billetId){
-    const slot=detail.structure.find(n=>n.id===billetId),occupant=detail.roster.find(m=>m.billet_id===billetId);
-    const members=detail.roster.filter(m=>!m.archived&&(!occupant||m.id===occupant.id));
-    openDialog(`Assign ${slot.name}`,`<p>${esc(structurePath(billetId))}</p><label class="unit-field">Primary member<select name="member_id"><option value="">Open / unassigned</option>${members.map(m=>`<option value="${m.id}" ${m.id===occupant?.id?'selected':''}>${esc([m.rank,m.game_name].filter(Boolean).join(' '))}${m.billet_id&&m.billet_id!==billetId?' · Currently '+esc(m.billet_path):''}</option>`).join('')}</select></label><p class="feature-note">One primary billet per member. Moving a member here frees their previous slot.${occupant?' Unassign the current member before filling this billet with someone else.':''}</p>`,async()=>{
-      const memberId=Number(values().member_id)||null,member=detail.roster.find(m=>m.id===memberId);
-      if(member?.billet_id&&member.billet_id!==billetId&&!confirm(`Move ${member.game_name} from ${member.billet_path}? Their old billet will become open.`))throw new Error('Assignment cancelled.');
-      await write(`/api/units/${unitId}/assignment`,{billet_id:billetId,member_id:memberId,revision:detail.unit.revision});
-    });
-  }
-  function structureEditor(kind,parentId=null,node=null){
-    const excluded=new Set();
-    function exclude(id){excluded.add(id);(detail.structure||[]).filter(n=>n.parent_id===id).forEach(n=>exclude(n.id));}
-    if(node)exclude(node.id);
-    const candidates=(detail.structure||[]).filter(n=>!excluded.has(n.id)).filter(n=>kind==='section'?n.kind==='group'||n.kind==='section':n.kind==='section');
-    openDialog(`${node?'Edit':'Add'} ${kind}`,`${field('Name','name',node?.name||'')}${kind!=='group'?`<label class="unit-field">Inside<select name="parent_id">${candidates.map(n=>`<option value="${n.id}" ${(node?node.parent_id:parentId)===n.id?'selected':''}>${esc(structurePath(n.id))}</option>`).join('')}</select></label>`:''}${kind==='billet'?'<p class="feature-note">A billet is one slot. Repeated names such as Rifleman are allowed. There are no rank or qualification requirements.</p>':'<p class="feature-note">Sections can contain subsections, teams or crews as well as billets.</p>'}`,async()=>{
-      const data=values();await write(`/api/units/${unitId}/structure`,{kind,name:data.name,parent_id:kind==='group'?null:Number(data.parent_id),revision:detail.unit.revision,...(node?{id:node.id}:{})});
-    });
-    if(kind==='billet'){
-      const list=document.createElement('datalist');list.id='billet-position-suggestions';
-      for(const name of detail.unit.catalog.positions||[])list.append(new Option(name,name));
-      el('unit-dialog-body').append(list);form.elements.name.setAttribute('list',list.id);
+    function section(node, depth) {
+      let content = '',
+        run = [];
+      function flush() {
+        const rows = billetRows(run);
+        if (rows)
+          content += `<div class="billet-table"><table><thead><tr><th>Billet</th><th>Rank</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        run = [];
+      }
+      for (const child of children(node.id)) {
+        if (child.kind === 'billet') run.push(child);
+        else {
+          flush();
+          content += section(child, depth + 1);
+        }
+      }
+      flush();
+      if ((query || status) && !content) return '';
+      return `<section class="structure-section depth-${Math.min(depth, 2)}"><div class="structure-section-heading"><h3>${esc(node.name)}</h3><span>${counts(node)}</span>${detail.can_staff ? `<button type="button" data-new-billet="${node.id}">+ Billet</button>` : ''}</div>${content || '<p class="feature-note structure-empty">No billets yet.</p>'}</section>`;
     }
-    if(node){const remove=document.createElement('button');remove.type='button';remove.className='member-delete-button';remove.textContent=`Remove ${kind}…`;remove.onclick=()=>removeStructure(node);el('unit-dialog-body').append(remove);}
+    const content = children(group.id)
+      .map((n) => section(n, 0))
+      .join('');
+    el('roster-hierarchy').innerHTML =
+      `<div class="structure-group-heading"><h2>${esc(group.name)}</h2><span>${counts(group)}</span>${detail.can_staff ? `<button type="button" data-new-section="${group.id}">+ Section</button>` : ''}</div>${content || '<p class="unit-empty">No sections match. Unit administrators can add sections and billets in Structure.</p>'}`;
+    el('roster-hierarchy')
+      .querySelectorAll('[data-record]')
+      .forEach(
+        (b) => (b.onclick = () => memberRecord(Number(b.dataset.record))),
+      );
+    el('roster-hierarchy')
+      .querySelectorAll('[data-assign]')
+      .forEach(
+        (b) => (b.onclick = () => assignmentEditor(Number(b.dataset.assign))),
+      );
+    el('roster-hierarchy')
+      .querySelectorAll('[data-new-section]')
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            structureEditor('section', Number(b.dataset.newSection))),
+      );
+    el('roster-hierarchy')
+      .querySelectorAll('[data-new-billet]')
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            structureEditor('billet', Number(b.dataset.newBillet))),
+      );
   }
-  async function removeStructure(node){
-    if(dialogSaving)return;
-    const name=prompt(`Remove ${node.name} and its sections/billets? Assigned members become unassigned; their records and notes are kept. Type the item's name exactly:`);
-    if(name===null)return;
-    dialogSaving=true;
-    try{await write(`/api/units/${unitId}/structure/${node.id}/delete`,{confirm_name:name,revision:detail.unit.revision});dialog.close();await loadListing(unitId);feedback('Structure removed. Member records retained.');}
-    catch(error){el('unit-dialog-error').textContent=error.message;}
-    finally{dialogSaving=false;}
+  function assignmentEditor(billetId) {
+    const slot = detail.structure.find((n) => n.id === billetId),
+      occupant = detail.roster.find((m) => m.billet_id === billetId);
+    const members = detail.roster.filter(
+      (m) => !m.archived && (!occupant || m.id === occupant.id),
+    );
+    openDialog(
+      `Assign ${slot.name}`,
+      `<p>${esc(structurePath(billetId))}</p><label class="unit-field">Primary member<select name="member_id"><option value="">Open / unassigned</option>${members.map((m) => `<option value="${m.id}" ${m.id === occupant?.id ? 'selected' : ''}>${esc([m.rank, m.game_name].filter(Boolean).join(' '))}${m.billet_id && m.billet_id !== billetId ? ' · Currently ' + esc(m.billet_path) : ''}</option>`).join('')}</select></label><p class="feature-note">One primary billet per member. Moving a member here frees their previous slot.${occupant ? ' Unassign the current member before filling this billet with someone else.' : ''}</p>`,
+      async () => {
+        const memberId = Number(values().member_id) || null,
+          member = detail.roster.find((m) => m.id === memberId);
+        if (
+          member?.billet_id &&
+          member.billet_id !== billetId &&
+          !confirm(
+            `Move ${member.game_name} from ${member.billet_path}? Their old billet will become open.`,
+          )
+        )
+          throw new Error('Assignment cancelled.');
+        await write(`/api/units/${unitId}/assignment`, {
+          billet_id: billetId,
+          member_id: memberId,
+          revision: detail.unit.revision,
+        });
+      },
+    );
   }
-  function renderStructure(){
-    const nodes=detail.structure||[];
-    function branch(parent){return nodes.filter(n=>n.parent_id===parent).map(n=>`<div class="structure-admin-node"><div class="structure-admin-row"><span><small>${esc(n.kind)}</small> <strong>${esc(n.name)}</strong></span><div><button type="button" data-structure-edit="${n.id}">Edit</button>${n.kind!=='billet'?`<button type="button" data-structure-add="${n.id}" data-kind="section">+ Section</button>`:''}${n.kind==='section'?`<button type="button" data-structure-add="${n.id}" data-kind="billet">+ Billet</button>`:''}<button type="button" data-structure-order="${n.id}" data-direction="up" aria-label="Move ${esc(n.name)} up">↑</button><button type="button" data-structure-order="${n.id}" data-direction="down" aria-label="Move ${esc(n.name)} down">↓</button></div></div>${branch(n.id)}</div>`).join('');}
-    el('structure-tree').innerHTML=branch(null)||'<p class="unit-empty">Create a group, then add its sections and billet slots.</p>';
-    el('structure-tree').querySelectorAll('[data-structure-edit]').forEach(b=>b.onclick=()=>{const node=nodes.find(n=>n.id===Number(b.dataset.structureEdit));structureEditor(node.kind,node.parent_id,node);});
-    el('structure-tree').querySelectorAll('[data-structure-add]').forEach(b=>b.onclick=()=>structureEditor(b.dataset.kind,Number(b.dataset.structureAdd)));
-    el('structure-tree').querySelectorAll('[data-structure-order]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await write(`/api/units/${unitId}/structure/${b.dataset.structureOrder}/order`,{direction:b.dataset.direction,revision:detail.unit.revision});await loadListing(unitId);}catch(error){feedback(error.message);}finally{b.disabled=false;}});
+  function structureEditor(kind, parentId = null, node = null) {
+    const excluded = new Set();
+    function exclude(id) {
+      excluded.add(id);
+      (detail.structure || [])
+        .filter((n) => n.parent_id === id)
+        .forEach((n) => exclude(n.id));
+    }
+    if (node) exclude(node.id);
+    const candidates = (detail.structure || [])
+      .filter((n) => !excluded.has(n.id))
+      .filter((n) =>
+        kind === 'section'
+          ? n.kind === 'group' || n.kind === 'section'
+          : n.kind === 'section',
+      );
+    openDialog(
+      `${node ? 'Edit' : 'Add'} ${kind}`,
+      `${field('Name', 'name', node?.name || '')}${kind !== 'group' ? `<label class="unit-field">Inside<select name="parent_id">${candidates.map((n) => `<option value="${n.id}" ${(node ? node.parent_id : parentId) === n.id ? 'selected' : ''}>${esc(structurePath(n.id))}</option>`).join('')}</select></label>` : ''}${kind === 'billet' ? '<p class="feature-note">A billet is one slot. Repeated names such as Rifleman are allowed. There are no rank or qualification requirements.</p>' : '<p class="feature-note">Sections can contain subsections, teams or crews as well as billets.</p>'}`,
+      async () => {
+        const data = values();
+        await write(`/api/units/${unitId}/structure`, {
+          kind,
+          name: data.name,
+          parent_id: kind === 'group' ? null : Number(data.parent_id),
+          revision: detail.unit.revision,
+          ...(node ? { id: node.id } : {}),
+        });
+      },
+    );
+    if (kind === 'billet') {
+      const list = document.createElement('datalist');
+      list.id = 'billet-position-suggestions';
+      for (const name of detail.unit.catalog.positions || [])
+        list.append(new Option(name, name));
+      el('unit-dialog-body').append(list);
+      form.elements.name.setAttribute('list', list.id);
+    }
+    if (node) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'member-delete-button';
+      remove.textContent = `Remove ${kind}…`;
+      remove.onclick = () => removeStructure(node);
+      el('unit-dialog-body').append(remove);
+    }
   }
-  async function memberRecord(memberId){
-    const requestedUnit=unitId;
-    const url=`/api/units/${requestedUnit}/roster/${memberId}/record`;
-    try{
-      const record=await read(url);
-      if(requestedUnit!==unitId||dialog.open)return;
-      const m=record.member,p=m.promotion;
-      openDialog(`${m.game_name} — member record`,`<div class="member-record-facts"><div><span>Status</span><strong>${m.archived?'Former member':m.status==='loa'?'LOA':m.status==='reserve'?'Reserve':'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank,m.billet_path||m.section].filter(Boolean).join(' · ')||'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track||'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord||'Not set')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username||'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity||'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary billet & qualifications</h3><p>${esc(m.billet_path||'No primary billet assigned')}</p>${!m.billet_id&&m.position?`<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>`:''}<p>${esc(m.certificates.split(';').join(', ')||'No qualifications recorded')}</p></div>${m.notes?`<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>`:''}${p.next_rank?`<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date?esc(p.next_date):'Last promotion date not set'}${p.missing.length?' · Needs '+esc(p.missing.join(', ')):p.eligible?' · Eligible for staff review':''}</p>`:''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award?'<button type="button" id="member-issue-award">Issue award…</button>':''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write?'<button type="button" id="member-manage-qualifications">Manage qualifications…</button>':''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write?'<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>':'<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,async()=>{
-        await write(url,{note:form.elements.record_note.value});
-        form.elements.record_note.value='';
-        try{showNotes(await read(url),false);el('member-record-status').textContent='Note saved.';}
-        catch(error){el('member-record-status').textContent='Note saved. Reopen the record to refresh its history.';}
-        return false;
+  async function removeStructure(node) {
+    if (dialogSaving) return;
+    const name = prompt(
+      `Remove ${node.name} and its sections/billets? Assigned members become unassigned; their records and notes are kept. Type the item's name exactly:`,
+    );
+    if (name === null) return;
+    dialogSaving = true;
+    try {
+      await write(`/api/units/${unitId}/structure/${node.id}/delete`, {
+        confirm_name: name,
+        revision: detail.unit.revision,
       });
-      const button=form.querySelector('[type="submit"]');button.textContent='Add note';button.hidden=!record.can_write;
-      dialog.dataset.record=requestedUnit+':'+memberId;button.disabled=true;
-      read(`/api/units/${requestedUnit}/roster/${memberId}/attendance`).then(data=>{
-        if(!dialog.open||dialog.dataset.record!==requestedUnit+':'+memberId||!el('member-attendance-history'))return;
-        el('member-attendance-history').innerHTML=data.records.map(r=>`<p><strong>${esc(r.name)}</strong><small>${esc(new Date(r.starts*1000).toLocaleString())} · ${esc(r.outcome)} · ${r.state==='finalized'?'Finalized':'Pending'}${r.exemption?' · '+esc(r.exemption):''}</small></p>`).join('')||'<p>No event attendance recorded.</p>';
-      }).catch(error=>{if(dialog.dataset.record===requestedUnit+':'+memberId&&el('member-attendance-history'))el('member-attendance-history').textContent=error.message;});
-      let awardCursor=null,awardRequest=0;
-      async function loadMemberAwards(append=false){
-        const number=++awardRequest,button=el('member-award-more');button.disabled=true;
-        try{
-          const data=await read(`/api/units/${requestedUnit}/roster/${memberId}/awards`+(append?'?before='+awardCursor:''));
-          if(number!==awardRequest||!dialog.open||dialog.dataset.record!==requestedUnit+':'+memberId)return;
-          const root=el('member-award-history');if(!append)root.replaceChildren();
-          for(const award of data.grants){const article=document.createElement('article');article.className='unit-block award-grant';article.innerHTML=`${award.image_url?`<img class="award-image" src="${esc(award.image_url)}" alt="${esc(award.award_name)}" loading="lazy" referrerpolicy="no-referrer">`:''}<div><strong>${esc(award.award_name)}</strong><small>${esc(award.awarded_on)} · ${esc(award.issuer)}${award.campaign_id?' · Campaign #'+award.campaign_id:''}</small><p class="member-record-note">${esc(award.citation)}</p>${award.state==='revoked'?`<p class="unit-warn">Revoked by ${esc(award.revoked_by)}</p><p>${esc(award.revoke_reason)}</p>`:''}</div>`;root.append(article);}
-          if(!root.children.length)root.textContent='No medals or campaign awards recorded.';
-          awardCursor=data.next_before;button.hidden=!awardCursor;
-        }catch(error){if(number===awardRequest&&dialog.dataset.record===requestedUnit+':'+memberId&&el('member-award-history'))el('member-award-history').textContent=error.message;}
-        finally{button.disabled=false;}
-      }
-      el('member-award-more').onclick=()=>loadMemberAwards(true);loadMemberAwards();
-      el('member-issue-award')?.addEventListener('click',()=>{closeDialog();if(!dialog.open)document.dispatchEvent(new CustomEvent('unit-issue-award',{detail:memberId}));});
-      let timelineCursor=null,timelineRequest=0;
-      function timelineValue(value,kind){
-        if(value===null)return 'None';
-        if(kind==='rank')return [value.rank_track,value.rank,value.last_promo?'Last promotion: '+value.last_promo:''].filter(Boolean).join(' · ')||'No rank';
-        if(kind==='billet')return value.billet_path||'Unassigned';
-        if(kind==='status')return value.archived?'Former member':value.status==='loa'?'LOA':value.status||'Not set';
-        if(kind.startsWith('qualification_'))return [value.certificate,value.awarded_on?'Awarded '+value.awarded_on:'Date unknown',value.issuer?'Issuer: '+value.issuer:'Issuer unknown',value.notes].filter(Boolean).join(' · ');
-        return [value.rank_track,value.rank,value.last_promo?'Last promotion: '+value.last_promo:'',value.billet_path,value.status,value.certificates].filter(Boolean).join(' · ')||'Record created';
-      }
-      async function loadTimeline(append=false){
-        const number=++timelineRequest,button=el('member-timeline-more'),kind=el('member-timeline-filter').value;
-        button.disabled=true;
-        try{
-          const data=await read(`/api/units/${requestedUnit}/roster/${memberId}/timeline?`+new URLSearchParams({kind,before:append?timelineCursor:0}));
-          if(number!==timelineRequest||!dialog.open||dialog.dataset.record!==requestedUnit+':'+memberId)return;
-          const root=el('member-change-timeline');if(!append)root.replaceChildren();
-          const labels={baseline:'Existing record at upgrade',created:'Member record created',rank:'Rank / promotion date changed',billet:'Billet assignment / transfer',status:'Membership status changed',qualification_granted:'Qualification awarded',qualification_revoked:'Qualification revoked',qualification_updated:'Award details corrected'};
-          for(const entry of data.entries){
-            const article=document.createElement('article');article.className='member-timeline-entry';
-            article.innerHTML=`<strong>${esc(labels[entry.kind]||entry.kind)}</strong><small>${esc(entry.actor)} · ${esc(new Date(entry.created_at*1000).toLocaleString())}</small><p>${entry.before_value!==null?esc(timelineValue(entry.before_value,entry.kind))+' → ':''}${esc(timelineValue(entry.after_value,entry.kind))}</p>${entry.reason?`<p class="feature-note">${esc(entry.reason)}</p>`:''}`;
+      dialog.close();
+      await loadListing(unitId);
+      feedback('Structure removed. Member records retained.');
+    } catch (error) {
+      el('unit-dialog-error').textContent = error.message;
+    } finally {
+      dialogSaving = false;
+    }
+  }
+  function renderStructure() {
+    const nodes = detail.structure || [];
+    function branch(parent) {
+      return nodes
+        .filter((n) => n.parent_id === parent)
+        .map(
+          (n) =>
+            `<div class="structure-admin-node"><div class="structure-admin-row"><span><small>${esc(n.kind)}</small> <strong>${esc(n.name)}</strong></span><div><button type="button" data-structure-edit="${n.id}">Edit</button>${n.kind !== 'billet' ? `<button type="button" data-structure-add="${n.id}" data-kind="section">+ Section</button>` : ''}${n.kind === 'section' ? `<button type="button" data-structure-add="${n.id}" data-kind="billet">+ Billet</button>` : ''}<button type="button" data-structure-order="${n.id}" data-direction="up" aria-label="Move ${esc(n.name)} up">↑</button><button type="button" data-structure-order="${n.id}" data-direction="down" aria-label="Move ${esc(n.name)} down">↓</button></div></div>${branch(n.id)}</div>`,
+        )
+        .join('');
+    }
+    el('structure-tree').innerHTML =
+      branch(null) ||
+      '<p class="unit-empty">Create a group, then add its sections and billet slots.</p>';
+    el('structure-tree')
+      .querySelectorAll('[data-structure-edit]')
+      .forEach(
+        (b) =>
+          (b.onclick = () => {
+            const node = nodes.find(
+              (n) => n.id === Number(b.dataset.structureEdit),
+            );
+            structureEditor(node.kind, node.parent_id, node);
+          }),
+      );
+    el('structure-tree')
+      .querySelectorAll('[data-structure-add]')
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            structureEditor(b.dataset.kind, Number(b.dataset.structureAdd))),
+      );
+    el('structure-tree')
+      .querySelectorAll('[data-structure-order]')
+      .forEach(
+        (b) =>
+          (b.onclick = async () => {
+            b.disabled = true;
+            try {
+              await write(
+                `/api/units/${unitId}/structure/${b.dataset.structureOrder}/order`,
+                {
+                  direction: b.dataset.direction,
+                  revision: detail.unit.revision,
+                },
+              );
+              await loadListing(unitId);
+            } catch (error) {
+              feedback(error.message);
+            } finally {
+              b.disabled = false;
+            }
+          }),
+      );
+  }
+  async function memberRecord(memberId) {
+    const requestedUnit = unitId;
+    const url = `/api/units/${requestedUnit}/roster/${memberId}/record`;
+    try {
+      const record = await read(url);
+      if (requestedUnit !== unitId || dialog.open) return;
+      const m = record.member,
+        p = m.promotion;
+      openDialog(
+        `${m.game_name} — member record`,
+        `<div class="member-record-facts"><div><span>Status</span><strong>${m.archived ? 'Former member' : m.status === 'loa' ? 'LOA' : m.status === 'reserve' ? 'Reserve' : 'Active'}</strong></div><div><span>Rank / section</span><strong>${esc([m.rank, m.billet_path || m.section].filter(Boolean).join(' · ') || 'Not assigned')}</strong></div><div><span>Rank structure</span><strong>${esc(m.rank_track || 'Not assigned')}</strong></div><div><span>Discord</span><strong>${esc(m.discord || 'Not set')}</strong></div><div><span>Panel account</span><strong>${esc(m.panel_username || 'Not linked')}</strong></div><div><span>Recorded UUID</span><strong>${esc(m.identity || 'Not linked')}</strong></div></div><div class="unit-block"><h3>Primary billet & qualifications</h3><p>${esc(m.billet_path || 'No primary billet assigned')}</p>${!m.billet_id && m.position ? `<p class="feature-note">Previous position labels: ${esc(m.position.split(';').join(', '))}</p>` : ''}<p>${esc(m.certificates.split(';').join(', ') || 'No qualifications recorded')}</p></div>${m.notes ? `<div class="unit-block"><h3>Roster summary</h3><p class="member-record-note">${esc(m.notes)}</p></div>` : ''}${p.next_rank ? `<p class="feature-note">Next rank: ${esc(p.next_rank)} · ${p.next_date ? esc(p.next_date) : 'Last promotion date not set'}${p.missing.length ? ' · Needs ' + esc(p.missing.join(', ')) : p.eligible ? ' · Eligible for staff review' : ''}</p>` : ''}<details class="unit-block"><summary>Medals & campaign awards</summary><div id="member-award-history">Loading awards…</div><button type="button" id="member-award-more" hidden>Load older awards</button>${record.can_award ? '<button type="button" id="member-issue-award">Issue award…</button>' : ''}</details><details class="unit-block"><summary>Event attendance · latest 50 events</summary><div id="member-attendance-history">Loading attendance…</div></details><details class="unit-block"><summary>Rank, billet & qualification timeline</summary><label class="unit-field">History filter<select id="member-timeline-filter"><option value="all">All changes</option><option value="rank">Rank / promotion dates</option><option value="billet">Billet assignments / transfers</option><option value="qualification">Qualification awards / revocations</option><option value="status">Membership status</option></select></label><div id="member-change-timeline"></div><button type="button" id="member-timeline-more" hidden>Load older changes</button></details>${record.can_write ? '<button type="button" id="member-manage-qualifications">Manage qualifications…</button>' : ''}<h3>Staff record</h3><p class="feature-note">Dated notes stay with this unit’s member record, including after they leave. Authors use their linked name in this unit. Add a follow-up note to correct an earlier entry.</p><div id="member-record-history"></div><button type="button" id="member-record-more" hidden>Load older notes</button>${record.can_write ? '<label class="unit-field">Add a staff note<textarea name="record_note" maxlength="4000" rows="5" placeholder="Training, promotion review, administrative notes…"></textarea></label>' : '<p class="feature-note">Your unit role can view this record. Roster editing permission is required to add notes.</p>'}<p id="member-record-status" class="feature-note" role="status"></p>`,
+        async () => {
+          await write(url, { note: form.elements.record_note.value });
+          form.elements.record_note.value = '';
+          try {
+            showNotes(await read(url), false);
+            el('member-record-status').textContent = 'Note saved.';
+          } catch (error) {
+            el('member-record-status').textContent =
+              'Note saved. Reopen the record to refresh its history.';
+          }
+          return false;
+        },
+      );
+      const button = form.querySelector('[type="submit"]');
+      button.textContent = 'Add note';
+      button.hidden = !record.can_write;
+      dialog.dataset.record = requestedUnit + ':' + memberId;
+      button.disabled = true;
+      read(`/api/units/${requestedUnit}/roster/${memberId}/attendance`)
+        .then((data) => {
+          if (
+            !dialog.open ||
+            dialog.dataset.record !== requestedUnit + ':' + memberId ||
+            !el('member-attendance-history')
+          )
+            return;
+          el('member-attendance-history').innerHTML =
+            data.records
+              .map(
+                (r) =>
+                  `<p><strong>${esc(r.name)}</strong><small>${esc(new Date(r.starts * 1000).toLocaleString())} · ${esc(r.outcome)} · ${r.state === 'finalized' ? 'Finalized' : 'Pending'}${r.exemption ? ' · ' + esc(r.exemption) : ''}</small></p>`,
+              )
+              .join('') || '<p>No event attendance recorded.</p>';
+        })
+        .catch((error) => {
+          if (
+            dialog.dataset.record === requestedUnit + ':' + memberId &&
+            el('member-attendance-history')
+          )
+            el('member-attendance-history').textContent = error.message;
+        });
+      let awardCursor = null,
+        awardRequest = 0;
+      async function loadMemberAwards(append = false) {
+        const number = ++awardRequest,
+          button = el('member-award-more');
+        button.disabled = true;
+        try {
+          const data = await read(
+            `/api/units/${requestedUnit}/roster/${memberId}/awards` +
+              (append ? '?before=' + awardCursor : ''),
+          );
+          if (
+            number !== awardRequest ||
+            !dialog.open ||
+            dialog.dataset.record !== requestedUnit + ':' + memberId
+          )
+            return;
+          const root = el('member-award-history');
+          if (!append) root.replaceChildren();
+          for (const award of data.grants) {
+            const article = document.createElement('article');
+            article.className = 'unit-block award-grant';
+            article.innerHTML = `${award.image_url ? `<img class="award-image" src="${esc(award.image_url)}" alt="${esc(award.award_name)}" loading="lazy" referrerpolicy="no-referrer">` : ''}<div><strong>${esc(award.award_name)}</strong><small>${esc(award.awarded_on)} · ${esc(award.issuer)}${award.campaign_id ? ' · Campaign #' + award.campaign_id : ''}</small><p class="member-record-note">${esc(award.citation)}</p>${award.state === 'revoked' ? `<p class="unit-warn">Revoked by ${esc(award.revoked_by)}</p><p>${esc(award.revoke_reason)}</p>` : ''}</div>`;
             root.append(article);
           }
-          if(!root.children.length)root.textContent='No changes recorded for this filter.';
-          timelineCursor=data.next_before;button.hidden=!timelineCursor;
-        }catch(error){if(number===timelineRequest&&dialog.dataset.record===requestedUnit+':'+memberId&&el('member-change-timeline'))el('member-change-timeline').textContent=error.message;}
-        finally{button.disabled=false;}
-      }
-      el('member-timeline-more').onclick=()=>loadTimeline(true);el('member-timeline-filter').onchange=()=>loadTimeline();loadTimeline();
-      el('member-manage-qualifications')?.addEventListener('click',()=>{closeDialog();if(!dialog.open)document.dispatchEvent(new CustomEvent('unit-manage-qualification',{detail:memberId}));});
-      let before;
-      function showNotes(data,append){
-        if(!dialog.open||dialog.dataset.record!==requestedUnit+':'+memberId||!el('member-record-history'))return;
-        if(!append)el('member-record-history').replaceChildren();
-        for(const note of data.notes){
-          const item=document.createElement('article');item.className='unit-block';
-          const heading=document.createElement('div');heading.className='member-record-note-heading';
-          const author=document.createElement('strong');author.textContent=note.author_name;
-          const date=document.createElement('time');date.dateTime=new Date(note.created_at*1000).toISOString();date.textContent=new Date(note.created_at*1000).toLocaleString();
-          const content=document.createElement('p');content.className='member-record-note';content.textContent=note.note;
-          heading.append(author,date);item.append(heading,content);el('member-record-history').append(item);
+          if (!root.children.length)
+            root.textContent = 'No medals or campaign awards recorded.';
+          awardCursor = data.next_before;
+          button.hidden = !awardCursor;
+        } catch (error) {
+          if (
+            number === awardRequest &&
+            dialog.dataset.record === requestedUnit + ':' + memberId &&
+            el('member-award-history')
+          )
+            el('member-award-history').textContent = error.message;
+        } finally {
+          button.disabled = false;
         }
-        if(!el('member-record-history').children.length)el('member-record-history').textContent='No staff notes yet.';
-        before=data.next_before;el('member-record-more').hidden=!before;
       }
-      showNotes(record,false);
-      el('member-record-more').onclick=async()=>{
-        const button=el('member-record-more');button.disabled=true;
-        try{showNotes(await read(url+'?before='+before),true);}
-        catch(error){if(dialog.dataset.record===requestedUnit+':'+memberId)el('unit-dialog-error').textContent=error.message;}
-        finally{button.disabled=false;}
+      el('member-award-more').onclick = () => loadMemberAwards(true);
+      loadMemberAwards();
+      el('member-issue-award')?.addEventListener('click', () => {
+        closeDialog();
+        if (!dialog.open)
+          document.dispatchEvent(
+            new CustomEvent('unit-issue-award', { detail: memberId }),
+          );
+      });
+      let timelineCursor = null,
+        timelineRequest = 0;
+      function timelineValue(value, kind) {
+        if (value === null) return 'None';
+        if (kind === 'rank')
+          return (
+            [
+              value.rank_track,
+              value.rank,
+              value.last_promo ? 'Last promotion: ' + value.last_promo : '',
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'No rank'
+          );
+        if (kind === 'billet') return value.billet_path || 'Unassigned';
+        if (kind === 'status')
+          return value.archived
+            ? 'Former member'
+            : value.status === 'loa'
+              ? 'LOA'
+              : value.status || 'Not set';
+        if (kind.startsWith('qualification_'))
+          return [
+            value.certificate,
+            value.awarded_on ? 'Awarded ' + value.awarded_on : 'Date unknown',
+            value.issuer ? 'Issuer: ' + value.issuer : 'Issuer unknown',
+            value.notes,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+        return (
+          [
+            value.rank_track,
+            value.rank,
+            value.last_promo ? 'Last promotion: ' + value.last_promo : '',
+            value.billet_path,
+            value.status,
+            value.certificates,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Record created'
+        );
+      }
+      async function loadTimeline(append = false) {
+        const number = ++timelineRequest,
+          button = el('member-timeline-more'),
+          kind = el('member-timeline-filter').value;
+        button.disabled = true;
+        try {
+          const data = await read(
+            `/api/units/${requestedUnit}/roster/${memberId}/timeline?` +
+              new URLSearchParams({
+                kind,
+                before: append ? timelineCursor : 0,
+              }),
+          );
+          if (
+            number !== timelineRequest ||
+            !dialog.open ||
+            dialog.dataset.record !== requestedUnit + ':' + memberId
+          )
+            return;
+          const root = el('member-change-timeline');
+          if (!append) root.replaceChildren();
+          const labels = {
+            baseline: 'Existing record at upgrade',
+            created: 'Member record created',
+            rank: 'Rank / promotion date changed',
+            billet: 'Billet assignment / transfer',
+            status: 'Membership status changed',
+            qualification_granted: 'Qualification awarded',
+            qualification_revoked: 'Qualification revoked',
+            qualification_updated: 'Award details corrected',
+          };
+          for (const entry of data.entries) {
+            const article = document.createElement('article');
+            article.className = 'member-timeline-entry';
+            article.innerHTML = `<strong>${esc(labels[entry.kind] || entry.kind)}</strong><small>${esc(entry.actor)} · ${esc(new Date(entry.created_at * 1000).toLocaleString())}</small><p>${entry.before_value !== null ? esc(timelineValue(entry.before_value, entry.kind)) + ' → ' : ''}${esc(timelineValue(entry.after_value, entry.kind))}</p>${entry.reason ? `<p class="feature-note">${esc(entry.reason)}</p>` : ''}`;
+            root.append(article);
+          }
+          if (!root.children.length)
+            root.textContent = 'No changes recorded for this filter.';
+          timelineCursor = data.next_before;
+          button.hidden = !timelineCursor;
+        } catch (error) {
+          if (
+            number === timelineRequest &&
+            dialog.dataset.record === requestedUnit + ':' + memberId &&
+            el('member-change-timeline')
+          )
+            el('member-change-timeline').textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      }
+      el('member-timeline-more').onclick = () => loadTimeline(true);
+      el('member-timeline-filter').onchange = () => loadTimeline();
+      loadTimeline();
+      el('member-manage-qualifications')?.addEventListener('click', () => {
+        closeDialog();
+        if (!dialog.open)
+          document.dispatchEvent(
+            new CustomEvent('unit-manage-qualification', { detail: memberId }),
+          );
+      });
+      let before;
+      function showNotes(data, append) {
+        if (
+          !dialog.open ||
+          dialog.dataset.record !== requestedUnit + ':' + memberId ||
+          !el('member-record-history')
+        )
+          return;
+        if (!append) el('member-record-history').replaceChildren();
+        for (const note of data.notes) {
+          const item = document.createElement('article');
+          item.className = 'unit-block';
+          const heading = document.createElement('div');
+          heading.className = 'member-record-note-heading';
+          const author = document.createElement('strong');
+          author.textContent = note.author_name;
+          const date = document.createElement('time');
+          date.dateTime = new Date(note.created_at * 1000).toISOString();
+          date.textContent = new Date(note.created_at * 1000).toLocaleString();
+          const content = document.createElement('p');
+          content.className = 'member-record-note';
+          content.textContent = note.note;
+          heading.append(author, date);
+          item.append(heading, content);
+          el('member-record-history').append(item);
+        }
+        if (!el('member-record-history').children.length)
+          el('member-record-history').textContent = 'No staff notes yet.';
+        before = data.next_before;
+        el('member-record-more').hidden = !before;
+      }
+      showNotes(record, false);
+      el('member-record-more').onclick = async () => {
+        const button = el('member-record-more');
+        button.disabled = true;
+        try {
+          showNotes(await read(url + '?before=' + before), true);
+        } catch (error) {
+          if (dialog.dataset.record === requestedUnit + ':' + memberId)
+            el('unit-dialog-error').textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
       };
-    }catch(error){feedback(error.message);}
-  }
-  function memberEditor(member={}){
-    const catalog=detail.unit.catalog;
-    openDialog(member.id?'Edit roster member':'Add roster member',`<div class="unit-form-grid">${field('Game name','game_name',member.game_name||'')}${field('Discord handle','discord',member.discord||'')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity?[member.identity]:[],member.identity||'','Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active','reserve','loa'].map(s=>`<option value="${s}" ${member.status===s?'selected':''}>${s==='loa'?'LOA':s==='active'?'Active':'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options((catalog.rank_structures||[]).map(s=>s.name),member.rank_track||'')}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary billet<select name="billet_id" id="member-billet"></select><small>One primary billet per member. Rank and qualifications do not restrict assignment.</small></label>${field('Joined unit','joined_on',member.joined_on||'','date')}${field('Last promotion date','last_promo',member.last_promo||'','date')}${field('LOA until (optional)','loa_until',member.loa_until||'','date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates',catalog.certificates||[],(member.certificates||'').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes||'')}</textarea></label>${field('Award date for newly checked qualifications','qualification_awarded_on','','date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id?`<label><input type="checkbox" name="archived" ${member.archived?'checked':''}> Former member — retain records and exclude from current roster</label>`:''}`,async()=>{
-      const data=values();await write(`/api/units/${unitId}/roster`,{...Object.fromEntries(['game_name','discord','identity','status','rank','rank_track','joined_on','last_promo','loa_until','notes','history_reason','qualification_awarded_on'].map(k=>[k,data[k]])),section:member.section||'',position:member.position||'',billet_id:data.billet_id?Number(data.billet_id):null,certificates:checked('certificates').join(';'),archived:!!data.archived,panel_user_id:detail.can_staff?(data.panel_user_id?Number(data.panel_user_id):null):(member.panel_user_id??null),revision:detail.unit.revision,...(member.id?{id:member.id}:{})});
-    });
-    function setRankOptions(selected=''){const structure=(catalog.rank_structures||[]).find(s=>s.name===el('member-rank-track').value);el('member-rank').innerHTML=options((structure?.ranks||[]).map(r=>r.name),selected);}
-    setRankOptions(member.rank||'');el('member-rank-track').onchange=()=>setRankOptions();
-    const billetSelect=el('member-billet');billetSelect.append(new Option('Unassigned',''));
-    for(const billet of (detail.structure||[]).filter(n=>n.kind==='billet'&&!detail.roster.some(m=>m.billet_id===n.id&&m.id!==member.id))){const option=new Option(structurePath(billet.id),billet.id);option.selected=billet.id===member.billet_id;billetSelect.append(option);}
-    const accountSelect=el('member-panel-account');
-    accountSelect.disabled=!detail.can_staff;
-    accountSelect.append(new Option('Not linked',''));
-    const accounts=[...(detail.accounts||[])];
-    if(member.panel_user_id&&!accounts.some(a=>a.id===member.panel_user_id))accounts.push({id:member.panel_user_id,username:member.panel_username||'Previously linked account',enabled:member.panel_user_enabled});
-    for(const account of accounts){const option=new Option(account.username+(account.enabled?'':' · Disabled'),account.id);option.selected=account.id===member.panel_user_id;accountSelect.append(option);}
-    if(member.id&&detail.can_delete){
-      const remove=document.createElement('button');remove.type='button';remove.className='member-delete-button';remove.textContent='Delete member…';remove.onclick=()=>deleteMember(member);el('unit-dialog-body').append(remove);
+    } catch (error) {
+      feedback(error.message);
     }
-    baseline=signature();
-    let timer,requestNumber=0;
-    async function identities(){
-      const number=++requestNumber;
-      try{
-        const data=await read(`/api/units/${unitId}/identities?q=`+encodeURIComponent(el('identity-search').value));
-        if(!dialog.open||number!==requestNumber||!el('member-identity'))return;
-        const select=el('member-identity'),selected=select.value;
-        select.innerHTML=options(selected?[selected]:[],selected,'Not linked yet');
-        for(const player of data.players){if(player.identity===selected)continue;const option=document.createElement('option');option.value=player.identity;option.textContent=`${player.name} · ${player.identity}`;select.append(option);}
-        el('identity-note').textContent=data.more?'Showing 100 matches; narrow your search.':`${data.players.length} recorded players. Selection links identity; it does not replace the game name.`;
-      }catch(error){if(el('identity-note'))el('identity-note').textContent=error.message;}
+  }
+  function memberEditor(member = {}) {
+    const catalog = detail.unit.catalog;
+    openDialog(
+      member.id ? 'Edit roster member' : 'Add roster member',
+      `<div class="unit-form-grid">${field('Game name', 'game_name', member.game_name || '')}${field('Discord handle', 'discord', member.discord || '')}<label class="unit-field wide">Linked panel account<select name="panel_user_id" id="member-panel-account"></select><small>Links this person to their login. Note authors use their game name in this unit. This does not grant unit or server access.</small></label><label class="unit-field wide">Recorded player UUID<input type="search" id="identity-search" placeholder="Find a recorded name or UUID" autocomplete="off"><select name="identity" id="member-identity">${options(member.identity ? [member.identity] : [], member.identity || '', 'Not linked yet')}</select><small id="identity-note">Searches player history on this unit’s linked servers. Leave blank for members not recorded yet.</small></label><label class="unit-field">Status<select name="status">${['active', 'reserve', 'loa'].map((s) => `<option value="${s}" ${member.status === s ? 'selected' : ''}>${s === 'loa' ? 'LOA' : s === 'active' ? 'Active' : 'Reserve'}</option>`).join('')}</select></label><label class="unit-field">Rank structure (optional)<select name="rank_track" id="member-rank-track">${options(
+        (catalog.rank_structures || []).map((s) => s.name),
+        member.rank_track || '',
+      )}</select></label><label class="unit-field">Rank (optional)<select name="rank" id="member-rank"></select><small>When changing structure or rank, check the last promotion date.</small></label><label class="unit-field wide">Primary billet<select name="billet_id" id="member-billet"></select><small>One primary billet per member. Rank and qualifications do not restrict assignment.</small></label>${field('Joined unit', 'joined_on', member.joined_on || '', 'date')}${field('Last promotion date', 'last_promo', member.last_promo || '', 'date')}${field('LOA until (optional)', 'loa_until', member.loa_until || '', 'date')}<div class="unit-field wide"><span>Qualifications / certifications</span>${checks('certificates', catalog.certificates || [], (member.certificates || '').split(';'))}</div><label class="unit-field wide">Notes<textarea name="notes" maxlength="2000">${esc(member.notes || '')}</textarea></label>${field('Award date for newly checked qualifications', 'qualification_awarded_on', '', 'date')}<label class="unit-field">Change / award note<textarea name="history_reason" maxlength="1000" placeholder="Optional context for rank, billet or qualification changes"></textarea><small>A blank award date uses the panel’s current date for newly granted qualifications. Existing awards keep their metadata.</small></label></div>${member.id ? `<label><input type="checkbox" name="archived" ${member.archived ? 'checked' : ''}> Former member — retain records and exclude from current roster</label>` : ''}`,
+      async () => {
+        const data = values();
+        await write(`/api/units/${unitId}/roster`, {
+          ...Object.fromEntries(
+            [
+              'game_name',
+              'discord',
+              'identity',
+              'status',
+              'rank',
+              'rank_track',
+              'joined_on',
+              'last_promo',
+              'loa_until',
+              'notes',
+              'history_reason',
+              'qualification_awarded_on',
+            ].map((k) => [k, data[k]]),
+          ),
+          section: member.section || '',
+          position: member.position || '',
+          billet_id: data.billet_id ? Number(data.billet_id) : null,
+          certificates: checked('certificates').join(';'),
+          archived: !!data.archived,
+          panel_user_id: detail.can_staff
+            ? data.panel_user_id
+              ? Number(data.panel_user_id)
+              : null
+            : (member.panel_user_id ?? null),
+          revision: detail.unit.revision,
+          ...(member.id ? { id: member.id } : {}),
+        });
+      },
+    );
+    function setRankOptions(selected = '') {
+      const structure = (catalog.rank_structures || []).find(
+        (s) => s.name === el('member-rank-track').value,
+      );
+      el('member-rank').innerHTML = options(
+        (structure?.ranks || []).map((r) => r.name),
+        selected,
+      );
     }
-    el('identity-search').oninput=()=>{clearTimeout(timer);timer=setTimeout(identities,250);};identities();
-    el('member-identity').onchange=()=>{if(!form.elements.game_name.value){const option=el('member-identity').selectedOptions[0];form.elements.game_name.value=option.textContent.split(' · ')[0];}};
-  }
-  async function deleteMember(member){
-    if(dialogSaving)return;
-    const name=prompt(`Permanently delete ${member.game_name} from this unit, including their saved staff notes, qualification records, medals and member timeline? Their panel account and permissions will remain. To keep their record, use Former member instead. Type their game name exactly to delete:`);
-    if(name===null)return;
-    dialogSaving=true;
-    try{
-      await write(`/api/units/${unitId}/roster/${member.id}/delete`,{confirm_name:name,revision:detail.unit.revision});
-      dialog.close();await loadListing(unitId);feedback('Member deleted from this unit.');
-    }catch(error){el('unit-dialog-error').textContent=error.message;}
-    finally{dialogSaving=false;}
-  }
-  function renderCatalog(){
-    const c=detail.unit.catalog;
-    el('catalog-summary').innerHTML=`<div class="unit-block"><h3>Qualifications / certifications</h3>${esc((c.certificates||[]).join(', ')||'None defined')}</div><div class="unit-block"><h3>Position name suggestions</h3>${esc((c.positions||[]).join(', ')||'None defined')}</div>${(c.rank_structures||[]).map(s=>`<div class="unit-block"><h3>${esc(s.name)}</h3><div class="rank-policy-table"><table><thead><tr><th>Rank</th><th>Paygrade label</th><th>Days to enter</th><th>Required qualifications</th><th>Next rank</th></tr></thead><tbody>${s.ranks.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.paygrade||'—')}</td><td>${r.days}</td><td>${esc(r.certificates.join(', ')||'None')}</td><td>${esc(r.next_rank||'End of structure')}</td></tr>`).join('')}</tbody></table></div></div>`).join('')||'<p class="unit-empty">No rank structures defined. Add Marine, Medical, Officer or your own structures.</p>'}`;
-  }
-  function catalogEditor(){
-    const c=detail.unit.catalog;
-    openDialog('Rank structures & qualifications',`<p class="feature-note">Each rank structure is independent. Marine, Medical and Officer can have different rank names, advancement times and qualification requirements. Paygrade labels are optional and do not share rules between structures.</p><div class="unit-form-grid"><label class="unit-field">Qualification names<textarea name="qualification_names">${esc((c.certificates||[]).join('\n'))}</textarea></label><label class="unit-field">Position name suggestions<textarea name="position_names">${esc((c.positions||[]).join('\n'))}</textarea></label></div><h3>Rank structures</h3><p class="feature-note">Days to enter is the minimum time since the last promotion needed to enter that rank. Requirements use qualification names separated by semicolons. Next rank must name a rank in the same structure. Eligibility is a notice for staff; no automatic promotion.</p><div id="rank-structure-rows"></div><button type="button" id="rank-structure-add">Add rank structure</button>`,async()=>{
-      const split=value=>value.split(/[;\n]/).map(s=>s.trim()).filter(Boolean);
-      const structures=[...form.querySelectorAll('[data-rank-structure]')].map(block=>({name:block.querySelector('[name="structure_name"]').value.trim(),ranks:[...block.querySelectorAll('[data-policy-rank]')].map(row=>({name:row.querySelector('[name="rank_name"]').value.trim(),paygrade:row.querySelector('[name="rank_paygrade"]').value.trim(),days:Number(row.querySelector('[name="rank_days"]').value),next_rank:row.querySelector('[name="rank_next_rank"]').value.trim(),certificates:split(row.querySelector('[name="rank_certificates"]').value)}))}));
-      await write(`/api/units/${unitId}/catalog`,{catalog:{certificates:split(form.elements.qualification_names.value),positions:split(form.elements.position_names.value),rank_structures:structures},revision:detail.unit.revision});
-    });
-    function addStructure(structure={}){
-      const block=document.createElement('section');block.className='rank-structure-editor';block.dataset.rankStructure='';
-      block.innerHTML=`<div class="rank-structure-heading">${field('Structure name','structure_name',structure.name||'')}<button type="button" data-remove-structure>Remove structure</button></div><div data-rank-list></div><button type="button" data-add-rank>Add rank</button>`;
-      function addRank(rank={}){
-        const row=document.createElement('div');row.className='rank-policy-row';row.dataset.policyRank='';
-        row.innerHTML=field('Rank','rank_name',rank.name||'')+field('Paygrade label (optional)','rank_paygrade',rank.paygrade||'')+field('Days to enter','rank_days',rank.days??0,'number')+field('Next rank','rank_next_rank',rank.next_rank||'')+field('Required qualifications','rank_certificates',(rank.certificates||[]).join(';'))+'<button type="button">Remove rank</button>';
-        row.querySelector('button').onclick=()=>row.remove();block.querySelector('[data-rank-list]').append(row);
+    setRankOptions(member.rank || '');
+    el('member-rank-track').onchange = () => setRankOptions();
+    const billetSelect = el('member-billet');
+    billetSelect.append(new Option('Unassigned', ''));
+    for (const billet of (detail.structure || []).filter(
+      (n) =>
+        n.kind === 'billet' &&
+        !detail.roster.some((m) => m.billet_id === n.id && m.id !== member.id),
+    )) {
+      const option = new Option(structurePath(billet.id), billet.id);
+      option.selected = billet.id === member.billet_id;
+      billetSelect.append(option);
+    }
+    const accountSelect = el('member-panel-account');
+    accountSelect.disabled = !detail.can_staff;
+    accountSelect.append(new Option('Not linked', ''));
+    const accounts = [...(detail.accounts || [])];
+    if (
+      member.panel_user_id &&
+      !accounts.some((a) => a.id === member.panel_user_id)
+    )
+      accounts.push({
+        id: member.panel_user_id,
+        username: member.panel_username || 'Previously linked account',
+        enabled: member.panel_user_enabled,
+      });
+    for (const account of accounts) {
+      const option = new Option(
+        account.username + (account.enabled ? '' : ' · Disabled'),
+        account.id,
+      );
+      option.selected = account.id === member.panel_user_id;
+      accountSelect.append(option);
+    }
+    if (member.id && detail.can_delete) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'member-delete-button';
+      remove.textContent = 'Delete member…';
+      remove.onclick = () => deleteMember(member);
+      el('unit-dialog-body').append(remove);
+    }
+    baseline = signature();
+    let timer,
+      requestNumber = 0;
+    async function identities() {
+      const number = ++requestNumber;
+      try {
+        const data = await read(
+          `/api/units/${unitId}/identities?q=` +
+            encodeURIComponent(el('identity-search').value),
+        );
+        if (!dialog.open || number !== requestNumber || !el('member-identity'))
+          return;
+        const select = el('member-identity'),
+          selected = select.value;
+        select.innerHTML = options(
+          selected ? [selected] : [],
+          selected,
+          'Not linked yet',
+        );
+        for (const player of data.players) {
+          if (player.identity === selected) continue;
+          const option = document.createElement('option');
+          option.value = player.identity;
+          option.textContent = `${player.name} · ${player.identity}`;
+          select.append(option);
+        }
+        el('identity-note').textContent = data.more
+          ? 'Showing 100 matches; narrow your search.'
+          : `${data.players.length} recorded players. Selection links identity; it does not replace the game name.`;
+      } catch (error) {
+        if (el('identity-note'))
+          el('identity-note').textContent = error.message;
       }
-      block.querySelector('[data-remove-structure]').onclick=()=>block.remove();block.querySelector('[data-add-rank]').onclick=()=>addRank();
-      (structure.ranks||[]).forEach(addRank);el('rank-structure-rows').append(block);
     }
-    (c.rank_structures||[]).forEach(addStructure);el('rank-structure-add').onclick=()=>addStructure();baseline=signature();
+    el('identity-search').oninput = () => {
+      clearTimeout(timer);
+      timer = setTimeout(identities, 250);
+    };
+    identities();
+    el('member-identity').onchange = () => {
+      if (!form.elements.game_name.value) {
+        const option = el('member-identity').selectedOptions[0];
+        form.elements.game_name.value = option.textContent.split(' · ')[0];
+      }
+    };
   }
-  function renderStaff(){
-    el('staff-list').innerHTML=detail.staff.map(s=>`<div class="unit-block"><strong>${esc(s.username)}</strong> · ${s.role==='admin'?'Unit administrator':s.role==='member'?'Member':'Staff'}${!s.enabled?' · Account disabled':''}<p class="feature-note">${s.role==='admin'?'Full unit administration':s.role==='member'?'Published resources, RSVPs and own profile':'Roster, notes, assignments, qualifications, promotions, events, attendance and resources'}</p><button data-staff="${s.user_id}">Edit membership</button></div>`).join('');
-    el('staff-list').querySelectorAll('[data-staff]').forEach(b=>b.onclick=()=>staffEditor(detail.staff.find(s=>s.user_id===Number(b.dataset.staff))));
+  async function deleteMember(member) {
+    if (dialogSaving) return;
+    const name = prompt(
+      `Permanently delete ${member.game_name} from this unit, including their saved staff notes, qualification records, medals and member timeline? Their panel account and permissions will remain. To keep their record, use Former member instead. Type their game name exactly to delete:`,
+    );
+    if (name === null) return;
+    dialogSaving = true;
+    try {
+      await write(`/api/units/${unitId}/roster/${member.id}/delete`, {
+        confirm_name: name,
+        revision: detail.unit.revision,
+      });
+      dialog.close();
+      await loadListing(unitId);
+      feedback('Member deleted from this unit.');
+    } catch (error) {
+      el('unit-dialog-error').textContent = error.message;
+    } finally {
+      dialogSaving = false;
+    }
   }
-  function staffEditor(staff={}){
-    const editing=!!staff.user_id, mayCreate=detail.can_staff&&!editing;
-    openDialog(editing?'Edit unit access':'Add login to '+detail.unit.name,`${mayCreate?'<label class="unit-field">Account<select name="account_mode"><option value="new">Create new login</option><option value="existing">Use existing account</option></select></label>':''}${field('Username','username',staff.username||'')}<label class="unit-field" id="staff-password-field" ${mayCreate?'':'hidden'}>Initial password<input name="password" type="password" autocomplete="new-password" minlength="10"><small>At least 10 characters; give these credentials to the staff member.</small></label><label class="unit-field">Unit role<select name="role"><option value="member" ${staff.role==='member'||!editing?'selected':''}>Member (self-service)</option><option value="staff" ${staff.role==='staff'?'selected':''}>Staff</option><option value="admin" ${staff.role==='admin'?'selected':''}>Unit administrator</option>${editing?'<option value="remove">Remove from this unit</option>':''}</select></label><label class="unit-field" id="staff-member-field">Link roster member (optional)<select name="link_member_id"></select><small>Uses their game name when recording notes and changes in this unit.</small></label><p id="staff-mode-note" class="feature-note"></p><p class="feature-note">Login: ${esc(new URL('/login',location.origin).href)}. Unit-only accounts land in Units & rosters. Server access is assigned separately.</p>`,async()=>{
-      const data=values(),creating=data.account_mode==='new';
-      await write(`/api/units/${unitId}/staff`,{username:data.username,role:data.role,create_account:creating,...(creating?{password:data.password}:{}),...(data.role==='remove'?{}:{link_member_id:data.link_member_id?Number(data.link_member_id):null}),revision:detail.unit.revision});
-      form.elements.password.value='';
+  function renderCatalog() {
+    const c = detail.unit.catalog;
+    el('catalog-summary').innerHTML =
+      `<div class="unit-block"><h3>Qualifications / certifications</h3>${esc((c.certificates || []).join(', ') || 'None defined')}</div><div class="unit-block"><h3>Position name suggestions</h3>${esc((c.positions || []).join(', ') || 'None defined')}</div>${(c.rank_structures || []).map((s) => `<div class="unit-block"><h3>${esc(s.name)}</h3><div class="rank-policy-table"><table><thead><tr><th>Rank</th><th>Paygrade label</th><th>Days to enter</th><th>Required qualifications</th><th>Next rank</th></tr></thead><tbody>${s.ranks.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.paygrade || '—')}</td><td>${r.days}</td><td>${esc(r.certificates.join(', ') || 'None')}</td><td>${esc(r.next_rank || 'End of structure')}</td></tr>`).join('')}</tbody></table></div></div>`).join('') || '<p class="unit-empty">No rank structures defined. Add Marine, Medical, Officer or your own structures.</p>'}`;
+  }
+  function catalogEditor() {
+    const c = detail.unit.catalog;
+    openDialog(
+      'Rank structures & qualifications',
+      `<p class="feature-note">Each rank structure is independent. Marine, Medical and Officer can have different rank names, advancement times and qualification requirements. Paygrade labels are optional and do not share rules between structures.</p><div class="unit-form-grid"><label class="unit-field">Qualification names<textarea name="qualification_names">${esc((c.certificates || []).join('\n'))}</textarea></label><label class="unit-field">Position name suggestions<textarea name="position_names">${esc((c.positions || []).join('\n'))}</textarea></label></div><h3>Rank structures</h3><p class="feature-note">Days to enter is the minimum time since the last promotion needed to enter that rank. Requirements use qualification names separated by semicolons. Next rank must name a rank in the same structure. Eligibility is a notice for staff; no automatic promotion.</p><div id="rank-structure-rows"></div><button type="button" id="rank-structure-add">Add rank structure</button>`,
+      async () => {
+        const split = (value) =>
+          value
+            .split(/[;\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const structures = [
+          ...form.querySelectorAll('[data-rank-structure]'),
+        ].map((block) => ({
+          name: block.querySelector('[name="structure_name"]').value.trim(),
+          ranks: [...block.querySelectorAll('[data-policy-rank]')].map(
+            (row) => ({
+              name: row.querySelector('[name="rank_name"]').value.trim(),
+              paygrade: row
+                .querySelector('[name="rank_paygrade"]')
+                .value.trim(),
+              days: Number(row.querySelector('[name="rank_days"]').value),
+              next_rank: row
+                .querySelector('[name="rank_next_rank"]')
+                .value.trim(),
+              certificates: split(
+                row.querySelector('[name="rank_certificates"]').value,
+              ),
+            }),
+          ),
+        }));
+        await write(`/api/units/${unitId}/catalog`, {
+          catalog: {
+            certificates: split(form.elements.qualification_names.value),
+            positions: split(form.elements.position_names.value),
+            rank_structures: structures,
+          },
+          revision: detail.unit.revision,
+        });
+      },
+    );
+    function addStructure(structure = {}) {
+      const block = document.createElement('section');
+      block.className = 'rank-structure-editor';
+      block.dataset.rankStructure = '';
+      block.innerHTML = `<div class="rank-structure-heading">${field('Structure name', 'structure_name', structure.name || '')}<button type="button" data-remove-structure>Remove structure</button></div><div data-rank-list></div><button type="button" data-add-rank>Add rank</button>`;
+      function addRank(rank = {}) {
+        const row = document.createElement('div');
+        row.className = 'rank-policy-row';
+        row.dataset.policyRank = '';
+        row.innerHTML =
+          field('Rank', 'rank_name', rank.name || '') +
+          field(
+            'Paygrade label (optional)',
+            'rank_paygrade',
+            rank.paygrade || '',
+          ) +
+          field('Days to enter', 'rank_days', rank.days ?? 0, 'number') +
+          field('Next rank', 'rank_next_rank', rank.next_rank || '') +
+          field(
+            'Required qualifications',
+            'rank_certificates',
+            (rank.certificates || []).join(';'),
+          ) +
+          '<button type="button">Remove rank</button>';
+        row.querySelector('button').onclick = () => row.remove();
+        block.querySelector('[data-rank-list]').append(row);
+      }
+      block.querySelector('[data-remove-structure]').onclick = () =>
+        block.remove();
+      block.querySelector('[data-add-rank]').onclick = () => addRank();
+      (structure.ranks || []).forEach(addRank);
+      el('rank-structure-rows').append(block);
+    }
+    (c.rank_structures || []).forEach(addStructure);
+    el('rank-structure-add').onclick = () => addStructure();
+    baseline = signature();
+  }
+  function renderStaff() {
+    el('staff-list').innerHTML = detail.staff
+      .map(
+        (s) =>
+          `<div class="unit-block"><strong>${esc(s.username)}</strong> · ${s.role === 'admin' ? 'Unit administrator' : s.role === 'member' ? 'Member' : 'Staff'}${!s.enabled ? ' · Account disabled' : ''}<p class="feature-note">${s.role === 'admin' ? 'Full unit administration' : s.role === 'member' ? 'Published resources, RSVPs and own profile' : 'Roster, notes, assignments, qualifications, promotions, events, attendance and resources'}</p><button data-staff="${s.user_id}">Edit membership</button></div>`,
+      )
+      .join('');
+    el('staff-list')
+      .querySelectorAll('[data-staff]')
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            staffEditor(
+              detail.staff.find((s) => s.user_id === Number(b.dataset.staff)),
+            )),
+      );
+  }
+  function staffEditor(staff = {}) {
+    const editing = !!staff.user_id,
+      mayCreate = detail.can_staff && !editing;
+    openDialog(
+      editing ? 'Edit unit access' : 'Add login to ' + detail.unit.name,
+      `${mayCreate ? '<label class="unit-field">Account<select name="account_mode"><option value="new">Create new login</option><option value="existing">Use existing account</option></select></label>' : ''}${field('Username', 'username', staff.username || '')}<label class="unit-field" id="staff-password-field" ${mayCreate ? '' : 'hidden'}>Initial password<input name="password" type="password" autocomplete="new-password" minlength="10"><small>At least 10 characters; give these credentials to the staff member.</small></label><label class="unit-field">Unit role<select name="role"><option value="member" ${staff.role === 'member' || !editing ? 'selected' : ''}>Member (self-service)</option><option value="staff" ${staff.role === 'staff' ? 'selected' : ''}>Staff</option><option value="admin" ${staff.role === 'admin' ? 'selected' : ''}>Unit administrator</option>${editing ? '<option value="remove">Remove from this unit</option>' : ''}</select></label><label class="unit-field" id="staff-member-field">Link roster member (optional)<select name="link_member_id"></select><small>Uses their game name when recording notes and changes in this unit.</small></label><p id="staff-mode-note" class="feature-note"></p><p class="feature-note">Login: ${esc(new URL('/login', location.origin).href)}. Unit-only accounts land in Units & rosters. Server access is assigned separately.</p>`,
+      async () => {
+        const data = values(),
+          creating = data.account_mode === 'new';
+        await write(`/api/units/${unitId}/staff`, {
+          username: data.username,
+          role: data.role,
+          create_account: creating,
+          ...(creating ? { password: data.password } : {}),
+          ...(data.role === 'remove'
+            ? {}
+            : {
+                link_member_id: data.link_member_id
+                  ? Number(data.link_member_id)
+                  : null,
+              }),
+          revision: detail.unit.revision,
+        });
+        form.elements.password.value = '';
+      },
+    );
+    form.elements.username.required = true;
+    form.elements.username.minLength = 3;
+    form.elements.username.maxLength = 32;
+    form.elements.username.pattern = '[A-Za-z0-9_.\\-]{3,32}';
+    form.elements.username.title =
+      '3–32 letters, numbers, underscores, dots or hyphens';
+    form.elements.username.autocomplete = 'off';
+    if (editing) form.elements.username.readOnly = true;
+    let accountKey = '';
+    function links() {
+      const key = form.elements.username.value.trim().toLowerCase(),
+        select = form.elements.link_member_id,
+        previous = select.value;
+      const own = (m) => m.panel_username?.toLowerCase() === key;
+      select.replaceChildren(new Option('Not linked', ''));
+      for (const member of detail.roster.filter(
+        (m) => (!m.archived || own(m)) && (!m.panel_user_id || own(m)),
+      ))
+        select.add(
+          new Option(
+            member.game_name + (member.archived ? ' · Former member' : ''),
+            member.id,
+          ),
+        );
+      const linked = detail.roster.find(own);
+      select.value =
+        accountKey === key &&
+        [...select.options].some((o) => o.value === previous)
+          ? previous
+          : String(linked?.id || '');
+      accountKey = key;
+    }
+    function mode() {
+      const creating = mayCreate && form.elements.account_mode.value === 'new',
+        role = form.elements.role.value;
+      el('staff-password-field').hidden = !creating;
+      form.elements.password.disabled = !creating;
+      form.elements.password.required = creating;
+      if (!creating) form.elements.password.value = '';
+      el('staff-member-field').hidden = role === 'remove';
+      el('staff-mode-note').textContent =
+        role === 'remove'
+          ? 'Removes access to this unit. Their login, roster record and direct server permissions remain.'
+          : role === 'member'
+            ? 'Members can read published resources, acknowledge reading, RSVP and view their own profile. Staff records and server controls stay private.'
+            : role === 'admin'
+              ? 'Unit administrators manage this unit’s members, structure, events, attendance and staff.'
+              : creating
+                ? 'Creates a login with day-to-day access to this unit. Hosting access stays separate.'
+                : 'Staff manage unit records, events, attendance and resources. Unit administrators also manage staff, structure, rank rules and branding.';
+      form.querySelector('[type="submit"]').textContent = editing
+        ? 'Save membership'
+        : creating
+          ? 'Create account & assign'
+          : 'Assign staff';
+    }
+    form.elements.username.oninput = links;
+    form.elements.role.onchange = mode;
+    if (mayCreate)
+      form.elements.account_mode.onchange = () => {
+        mode();
+        links();
+      };
+    mode();
+    links();
+    baseline = signature();
+  }
+  async function renderServers(unit) {
+    el('unit-server-list').textContent = 'Loading health…';
+    try {
+      const data = await read(`/api/units/${unitId}/health`);
+      if (unit.id !== unitId) return;
+      el('unit-server-list').innerHTML =
+        data.servers
+          .map(
+            (s) =>
+              `<div class="unit-block"><strong>${esc(listing.servers.find((item) => item.id === s.id)?.name || 'Unavailable server')}</strong><p>${s.unavailable ? 'Unavailable' : s.running ? 'Online' : 'Offline'}${!s.unavailable ? ' · CPU ' + Number(s.cpu).toFixed(1) + '% · ' + (s.ram_process / 1024).toFixed(2) + ' GiB' : ''}</p>${s.can_open ? `<a class="manager-link" href="${s.id ? '/?server=' + encodeURIComponent(s.id) : '/?legacy=1'}">Open server</a>` : ''}</div>`,
+          )
+          .join('') ||
+        '<p>No servers linked. A panel administrator can assign them in Unit settings.</p>';
+    } catch (error) {
+      el('unit-server-list').textContent = error.message;
+    }
+  }
+  function selectTab(key, notify = true) {
+    if (notify && key !== activeTab && !UnitUX.canLeave()) return;
+    const target = el('unit-tab-' + key);
+    if (!target || target.dataset.restricted === 'true')
+      key = detail?.role === 'member' ? 'home' : 'roster';
+    activeTab = key;
+    document.querySelectorAll('[data-unit-tab]').forEach((b) => {
+      const selected = b.dataset.unitTab === key;
+      b.hidden = b.dataset.restricted === 'true';
+      b.setAttribute('aria-selected', String(selected));
+      b.tabIndex = selected ? 0 : -1;
+      el('unit-' + b.dataset.unitTab).hidden = !selected;
     });
-    form.elements.username.required=true;form.elements.username.minLength=3;form.elements.username.maxLength=32;
-    form.elements.username.pattern='[A-Za-z0-9_.\\-]{3,32}';form.elements.username.title='3–32 letters, numbers, underscores, dots or hyphens';form.elements.username.autocomplete='off';
-    if(editing)form.elements.username.readOnly=true;
-    let accountKey='';
-    function links(){
-      const key=form.elements.username.value.trim().toLowerCase(),select=form.elements.link_member_id,previous=select.value;
-      const own=m=>m.panel_username?.toLowerCase()===key;
-      select.replaceChildren(new Option('Not linked',''));
-      for(const member of detail.roster.filter(m=>(!m.archived||own(m))&&(!m.panel_user_id||own(m))))select.add(new Option(member.game_name+(member.archived?' · Former member':''),member.id));
-      const linked=detail.roster.find(own);
-      select.value=accountKey===key&&[...select.options].some(o=>o.value===previous)?previous:String(linked?.id||'');accountKey=key;
+    document.querySelectorAll('.unit-sidebar-group').forEach((group) => {
+      group.hidden = ![...group.querySelectorAll('[data-unit-tab]')].some(
+        (b) => !b.hidden,
+      );
+    });
+    el('unit-nav-current').textContent = el('unit-tab-' + key).textContent;
+    el('unit-nav-toggle').setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('navigation-open');
+    el('unit-section-title').textContent = el('unit-tab-' + key).textContent;
+    el('unit-section-note').textContent = pageNotes[key];
+    const params = new URLSearchParams(location.search);
+    params.set('tab', key);
+    if (unitId) params.set('unit', unitId);
+    history.replaceState(null, '', '/units?' + params);
+    if (detail) {
+      if (key === 'roster') renderRoster();
+      if (key === 'structure') renderStructure();
+      if (key === 'catalog') renderCatalog();
+      if (key === 'staff') renderStaff();
+      if (key === 'servers')
+        renderServers(listing.units.find((u) => u.id === unitId));
     }
-    function mode(){
-      const creating=mayCreate&&form.elements.account_mode.value==='new',role=form.elements.role.value;
-      el('staff-password-field').hidden=!creating;form.elements.password.disabled=!creating;form.elements.password.required=creating;
-      if(!creating)form.elements.password.value='';
-      el('staff-member-field').hidden=role==='remove';
-      el('staff-mode-note').textContent=role==='remove'?'Removes access to this unit. Their login, roster record and direct server permissions remain.':role==='member'?'Members can read published resources, acknowledge reading, RSVP and view their own profile. Staff records and server controls stay private.':role==='admin'?'Unit administrators manage this unit’s members, structure, events, attendance and staff.':creating?'Creates a login with day-to-day access to this unit. Hosting access stays separate.':'Staff manage unit records, events, attendance and resources. Unit administrators also manage staff, structure, rank rules and branding.';
-      form.querySelector('[type="submit"]').textContent=editing?'Save membership':creating?'Create account & assign':'Assign staff';
+    if (notify)
+      document.dispatchEvent(
+        new CustomEvent('unit-section-changed', { detail: { tab: key } }),
+      );
+  }
+  el('unit-nav-toggle').onclick = () => {
+    const open = document.body.classList.toggle('navigation-open');
+    el('unit-nav-toggle').setAttribute('aria-expanded', String(open));
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.body.classList.remove('navigation-open');
+      el('unit-nav-toggle').setAttribute('aria-expanded', 'false');
     }
-    form.elements.username.oninput=links;form.elements.role.onchange=mode;
-    if(mayCreate)form.elements.account_mode.onchange=()=>{mode();links();};
-    mode();links();baseline=signature();
-  }
-  async function renderServers(unit){
-    el('unit-server-list').textContent='Loading health…';
-    try{const data=await read(`/api/units/${unitId}/health`);if(unit.id!==unitId)return;
-      el('unit-server-list').innerHTML=data.servers.map(s=>`<div class="unit-block"><strong>${esc(listing.servers.find(item=>item.id===s.id)?.name||'Unavailable server')}</strong><p>${s.unavailable?'Unavailable':s.running?'Online':'Offline'}${!s.unavailable?' · CPU '+Number(s.cpu).toFixed(1)+'% · '+(s.ram_process/1024).toFixed(2)+' GiB':''}</p>${s.can_open?`<a class="manager-link" href="${s.id?'/?server='+encodeURIComponent(s.id):'/?legacy=1'}">Open server</a>`:''}</div>`).join('')||'<p>No servers linked. A panel administrator can assign them in Unit settings.</p>';
-    }catch(error){el('unit-server-list').textContent=error.message;}
-  }
-  function selectTab(key,notify=true){
-    if(notify&&key!==activeTab&&!UnitUX.canLeave())return;
-    const target=el('unit-tab-'+key);
-    if(!target||target.dataset.restricted==='true')key=detail?.role==='member'?'home':'roster';
-    activeTab=key;
-    const area=Object.keys(areas).find(group=>areas[group].includes(key));areaPages[area]=key;
-    document.querySelectorAll('[data-unit-tab]').forEach(b=>{const selected=b.dataset.unitTab===key;b.hidden=b.dataset.restricted==='true';b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;el('unit-'+b.dataset.unitTab).hidden=!selected;});
-    document.querySelectorAll('.unit-sidebar-group').forEach(group=>{group.hidden=![...group.querySelectorAll('[data-unit-tab]')].some(b=>!b.hidden);});
-    el('unit-nav-current').textContent=el('unit-tab-'+key).textContent;
-    el('unit-nav-toggle').setAttribute('aria-expanded','false');document.body.classList.remove('navigation-open');
-    el('unit-section-title').textContent=el('unit-tab-'+key).textContent;el('unit-section-note').textContent=pageNotes[key];
-    const params=new URLSearchParams(location.search);params.set('tab',key);if(unitId)params.set('unit',unitId);history.replaceState(null,'','/units?'+params);
-    if(detail){if(key==='roster')renderRoster();if(key==='structure')renderStructure();if(key==='catalog')renderCatalog();if(key==='staff')renderStaff();if(key==='servers')renderServers(listing.units.find(u=>u.id===unitId));}
-    if(notify)document.dispatchEvent(new CustomEvent('unit-section-changed',{detail:{tab:key}}));
-  }
-  el('unit-nav-toggle').onclick=()=>{const open=document.body.classList.toggle('navigation-open');el('unit-nav-toggle').setAttribute('aria-expanded',String(open));};
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('navigation-open');el('unit-nav-toggle').setAttribute('aria-expanded','false');}});
-  el('unit-logout').onclick=async()=>{await postJson('/logout',{});location.href='/login';};
-
-  document.querySelectorAll('[data-unit-tab]').forEach(b=>{
-    b.onclick=()=>selectTab(b.dataset.unitTab);
-    b.onkeydown=e=>{const tabs=[...document.querySelectorAll('[data-unit-tab]')].filter(t=>!t.hidden);let i=tabs.indexOf(b);if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(['ArrowRight','ArrowDown'].includes(e.key)?1:-1)+tabs.length)%tabs.length;tabs[i].click();tabs[i].focus();};
   });
-  document.addEventListener('unit-navigate',e=>selectTab(e.detail));
-  document.addEventListener('unit-access-changed',()=>loadListing());
-  document.addEventListener('unit-open-member',e=>memberRecord(e.detail));
-  el('position-rename').onclick=()=>openDialog('Rename position',`<label class="unit-field">Existing position<select name="old">${options(detail.unit.catalog.positions||[],'','Choose position')}</select></label>${field('New name','name')}<p class="feature-note">Updates this unit’s current and former roster assignments together.</p>`,async()=>{const data=values();await write(`/api/units/${unitId}/positions/rename`,{...data,revision:detail.unit.revision});});
-  el('roster-structure').onclick=()=>selectTab('structure');
-  el('structure-add-group').onclick=()=>structureEditor('group');
-  let brandDirty=false,brandSaving=false;
-  const brandForm=el('unit-brand-form'),previewURLs={};
-  function applyBranding(){
-    brandDirty=false;
-    const brand=detail.unit.branding||{},url=kind=>`/api/units/${unitId}/branding/${kind}?v=${detail.unit.revision}`;
-    const header=el('unit-brand-header'),icon=el('unit-brand-icon');
-    header.classList.toggle('has-banner',!!brand.banner);
-    header.style.backgroundImage=brand.banner?`linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.55)),url("${url('banner')}")`:'';
-    icon.hidden=!brand.icon;if(brand.icon)icon.src=url('icon');else icon.removeAttribute('src');
-    el('unit-page-subtitle').textContent=brand.description||'Unit workspace · people, operations and resources';
-    brandForm.reset();brandForm.elements.description.value=brand.description||'';el('unit-brand-error').textContent='';
-    for(const kind of ['icon','banner']){if(previewURLs[kind])URL.revokeObjectURL(previewURLs[kind]);delete previewURLs[kind];const img=el('unit-'+kind+'-preview');img.hidden=!brand[kind];if(brand[kind])img.src=url(kind);else img.removeAttribute('src');}
+  el('unit-logout').onclick = async () => {
+    await postJson('/logout', {});
+    location.href = '/login';
+  };
+
+  document.querySelectorAll('[data-unit-tab]').forEach((b) => {
+    b.onclick = () => selectTab(b.dataset.unitTab);
+    b.onkeydown = (e) => {
+      const tabs = [...document.querySelectorAll('[data-unit-tab]')].filter(
+        (t) => !t.hidden,
+      );
+      let i = tabs.indexOf(b);
+      if (
+        ![
+          'ArrowLeft',
+          'ArrowRight',
+          'ArrowUp',
+          'ArrowDown',
+          'Home',
+          'End',
+        ].includes(e.key)
+      )
+        return;
+      e.preventDefault();
+      i =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? tabs.length - 1
+            : (i +
+                (['ArrowRight', 'ArrowDown'].includes(e.key) ? 1 : -1) +
+                tabs.length) %
+              tabs.length;
+      tabs[i].click();
+      tabs[i].focus();
+    };
+  });
+  document.addEventListener('unit-navigate', (e) => selectTab(e.detail));
+  document.addEventListener('unit-access-changed', () => loadListing());
+  document.addEventListener('unit-open-member', (e) => memberRecord(e.detail));
+  el('position-rename').onclick = () =>
+    openDialog(
+      'Rename position',
+      `<label class="unit-field">Existing position<select name="old">${options(detail.unit.catalog.positions || [], '', 'Choose position')}</select></label>${field('New name', 'name')}<p class="feature-note">Updates this unit’s current and former roster assignments together.</p>`,
+      async () => {
+        const data = values();
+        await write(`/api/units/${unitId}/positions/rename`, {
+          ...data,
+          revision: detail.unit.revision,
+        });
+      },
+    );
+  el('roster-structure').onclick = () => selectTab('structure');
+  el('structure-add-group').onclick = () => structureEditor('group');
+  let brandDirty = false,
+    brandSaving = false;
+  const brandForm = el('unit-brand-form'),
+    previewURLs = {};
+  function applyBranding() {
+    brandDirty = false;
+    const brand = detail.unit.branding || {},
+      url = (kind) =>
+        `/api/units/${unitId}/branding/${kind}?v=${detail.unit.revision}`;
+    const header = el('unit-brand-header'),
+      icon = el('unit-brand-icon');
+    header.classList.toggle('has-banner', !!brand.banner);
+    header.style.backgroundImage = brand.banner
+      ? `linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.55)),url("${url('banner')}")`
+      : '';
+    icon.hidden = !brand.icon;
+    if (brand.icon) icon.src = url('icon');
+    else icon.removeAttribute('src');
+    el('unit-page-subtitle').textContent =
+      brand.description || 'Unit workspace · people, operations and resources';
+    brandForm.reset();
+    brandForm.elements.description.value = brand.description || '';
+    el('unit-brand-error').textContent = '';
+    for (const kind of ['icon', 'banner']) {
+      if (previewURLs[kind]) URL.revokeObjectURL(previewURLs[kind]);
+      delete previewURLs[kind];
+      const img = el('unit-' + kind + '-preview');
+      img.hidden = !brand[kind];
+      if (brand[kind]) img.src = url(kind);
+      else img.removeAttribute('src');
+    }
   }
-  brandForm.oninput=()=>{brandDirty=true;};
-  for(const kind of ['icon','banner'])brandForm.elements[kind].onchange=()=>{
-    const file=brandForm.elements[kind].files[0],img=el('unit-'+kind+'-preview');
-    if(!file)return;
-    if(file.size>4*1024*1024||!['image/png','image/jpeg','image/webp'].includes(file.type)){el('unit-brand-error').textContent='Choose a PNG, JPEG or WebP image up to 4 MB.';brandForm.elements[kind].value='';return;}
-    if(previewURLs[kind])URL.revokeObjectURL(previewURLs[kind]);previewURLs[kind]=URL.createObjectURL(file);img.src=previewURLs[kind];img.hidden=false;brandForm.elements['remove_'+kind].checked=false;el('unit-brand-error').textContent='';brandDirty=true;
+  brandForm.oninput = () => {
+    brandDirty = true;
   };
-  el('unit-brand-reset').onclick=()=>{if(UnitUX.canLeave())applyBranding();};
-  brandForm.onsubmit=async event=>{
-    event.preventDefault();const button=brandForm.querySelector('[type="submit"]');if(button.disabled)return;button.disabled=true;brandSaving=true;
-    try{const data=new FormData(brandForm);data.set('revision',detail.unit.revision);await readJson(await postForm(`/api/units/${unitId}/branding`,data));brandDirty=false;brandSaving=false;await loadListing(unitId);feedback('Unit branding saved.');}
-    catch(error){el('unit-brand-error').textContent=error.message;}
-    finally{brandSaving=false;button.disabled=false;}
+  for (const kind of ['icon', 'banner'])
+    brandForm.elements[kind].onchange = () => {
+      const file = brandForm.elements[kind].files[0],
+        img = el('unit-' + kind + '-preview');
+      if (!file) return;
+      if (
+        file.size > 4 * 1024 * 1024 ||
+        !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
+      ) {
+        el('unit-brand-error').textContent =
+          'Choose a PNG, JPEG or WebP image up to 4 MB.';
+        brandForm.elements[kind].value = '';
+        return;
+      }
+      if (previewURLs[kind]) URL.revokeObjectURL(previewURLs[kind]);
+      previewURLs[kind] = URL.createObjectURL(file);
+      img.src = previewURLs[kind];
+      img.hidden = false;
+      brandForm.elements['remove_' + kind].checked = false;
+      el('unit-brand-error').textContent = '';
+      brandDirty = true;
+    };
+  el('unit-brand-reset').onclick = () => {
+    if (UnitUX.canLeave()) applyBranding();
   };
-  UnitUX.registerDraft({dirty:()=>brandDirty,busy:()=>brandSaving,discard:()=>applyBranding()});
-  el('unit-new').onclick=()=>unitSettings(true);el('unit-settings').onclick=()=>unitSettings();el('roster-add').onclick=()=>memberEditor();el('catalog-edit').onclick=catalogEditor;el('staff-add').onclick=()=>staffEditor();
-  for(const id of ['roster-search','roster-status','roster-sort'])el(id).addEventListener(id==='roster-search'?'input':'change',renderRoster);
-  el('unit-select').onchange=()=>{if(!UnitUX.canLeave()){el('unit-select').value=unitId;return;}unitId=Number(el('unit-select').value);loadUnit();};el('unit-refresh').onclick=()=>loadListing();
-  el('unit-users').onclick=async()=>{el('panel-users').hidden=!el('panel-users').hidden;if(!el('panel-users').hidden){await loadUsers();el('panel-users').scrollIntoView();}};
-  el('users-new').onclick=()=>openUserEditor();
-  read('/api/me').then(account=>{window.unitAccount=account;return loadListing(Number(new URLSearchParams(location.search).get('unit')));}).then(async()=>{if(listing?.panel_admin&&new URLSearchParams(location.search).has('users')){el('panel-users').hidden=false;await loadUsers();}}).catch(error=>feedback(error.message));
+  brandForm.onsubmit = async (event) => {
+    event.preventDefault();
+    const button = brandForm.querySelector('[type="submit"]');
+    if (button.disabled) return;
+    button.disabled = true;
+    brandSaving = true;
+    try {
+      const data = new FormData(brandForm);
+      data.set('revision', detail.unit.revision);
+      await readJson(await postForm(`/api/units/${unitId}/branding`, data));
+      brandDirty = false;
+      brandSaving = false;
+      await loadListing(unitId);
+      feedback('Unit branding saved.');
+    } catch (error) {
+      el('unit-brand-error').textContent = error.message;
+    } finally {
+      brandSaving = false;
+      button.disabled = false;
+    }
+  };
+  UnitUX.registerDraft({
+    dirty: () => brandDirty,
+    busy: () => brandSaving,
+    discard: () => applyBranding(),
+  });
+  el('unit-new').onclick = () => unitSettings(true);
+  el('unit-settings').onclick = () => unitSettings();
+  el('roster-add').onclick = () => memberEditor();
+  el('catalog-edit').onclick = catalogEditor;
+  el('staff-add').onclick = () => staffEditor();
+  for (const id of ['roster-search', 'roster-status', 'roster-sort'])
+    el(id).addEventListener(
+      id === 'roster-search' ? 'input' : 'change',
+      renderRoster,
+    );
+  el('unit-select').onchange = () => {
+    if (!UnitUX.canLeave()) {
+      el('unit-select').value = unitId;
+      return;
+    }
+    unitId = Number(el('unit-select').value);
+    loadUnit();
+  };
+  el('unit-refresh').onclick = () => loadListing();
+  el('unit-users').onclick = async () => {
+    el('panel-users').hidden = !el('panel-users').hidden;
+    if (!el('panel-users').hidden) {
+      await loadUsers();
+      el('panel-users').scrollIntoView();
+    }
+  };
+  el('users-new').onclick = () => openUserEditor();
+  read('/api/me')
+    .then((account) => {
+      window.unitAccount = account;
+      return loadListing(
+        Number(new URLSearchParams(location.search).get('unit')),
+      );
+    })
+    .then(async () => {
+      if (
+        listing?.panel_admin &&
+        new URLSearchParams(location.search).has('users')
+      ) {
+        el('panel-users').hidden = false;
+        await loadUsers();
+      }
+    })
+    .catch((error) => feedback(error.message));
 })();
