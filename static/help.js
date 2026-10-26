@@ -31,7 +31,7 @@
   dialog.innerHTML='<div class="mods-dialog-heading"><h2 id="panel-help-title">Help for this page</h2><button type="button" class="btn-logout" data-close>Close</button></div><p role="status" data-status></p><article class="manual-content" data-content></article><div class="help-dialog-footer"><a data-section href="/help">Read this section in the manual</a><a href="/help/manual/server">Server management manual</a><a href="/help/manual/full">Full manual</a><a href="/help/manual/staff">Unit staff manual</a></div>';
   document.body.append(dialog);const el=selector=>dialog.querySelector(selector);el('[data-close]').onclick=()=>dialog.close();let serial=0;
   function topic(){
-    if(location.pathname==='/servers')return 'servers';if(location.pathname==='/account')return 'account';if(location.pathname==='/setup')return 'setup';
+    if(location.pathname==='/admin/users')return 'account';if(location.pathname==='/servers')return 'servers';if(location.pathname==='/account')return 'account';if(location.pathname==='/setup')return 'setup';
     if(location.pathname==='/units'){const tab=document.querySelector('[data-unit-tab][aria-selected="true"]');return document.getElementById('unit-workspace')?.hidden?'units':tab?'unit-'+tab.dataset.unitTab:'units';}
     const tab=document.querySelector('.panel-tab[aria-selected="true"]');const name=tab?.id.replace(/^tab-/,'')||'dashboard';
     if(name==='mods'){const section=document.querySelector('[data-section-group="mods"][aria-selected="true"]');return section?'mods-'+section.dataset.sectionKey:'mods';}

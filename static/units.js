@@ -170,13 +170,6 @@
         ? Number(preferred)
         : listing.units[0]?.id;
       el('unit-section-tabs').hidden = true;
-      if (
-        listing.panel_admin &&
-        new URLSearchParams(location.search).get('admin') === 'users'
-      ) {
-        el('panel-users').hidden = false;
-        await loadUsers();
-      }
       el('unit-workspace').hidden = !unitId;
       el('unit-select').disabled = !unitId;
       if (!unitId) {
@@ -1860,15 +1853,6 @@
     loadUnit();
   };
   el('unit-refresh').onclick = () => loadListing();
-  el('unit-users').onclick = async (event) => {
-    event.preventDefault();
-    el('panel-users').hidden = !el('panel-users').hidden;
-    if (!el('panel-users').hidden) {
-      await loadUsers();
-      el('panel-users').scrollIntoView();
-    }
-  };
-  el('users-new').onclick = () => openUserEditor();
   read('/api/me')
     .then((account) => {
       window.unitAccount = account;
@@ -1876,15 +1860,6 @@
       return loadListing(
         Number(new URLSearchParams(location.search).get('unit')),
       );
-    })
-    .then(async () => {
-      if (
-        listing?.panel_admin &&
-        new URLSearchParams(location.search).has('users')
-      ) {
-        el('panel-users').hidden = false;
-        await loadUsers();
-      }
     })
     .catch((error) => feedback(error.message));
 })();

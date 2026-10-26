@@ -19,7 +19,7 @@ PANEL_PY_FILES=(app.py startup_settings.py moderation.py account_recovery.py sto
 
 copy_panel_files() {
     local destination="$1" file
-    for file in "${PANEL_PY_FILES[@]}" index.html login.html setup.html servers.html account.html units.html help.html LICENSE ATTRIBUTION.md; do
+    for file in "${PANEL_PY_FILES[@]}" index.html login.html setup.html servers.html account.html units.html users.html help.html LICENSE ATTRIBUTION.md; do
         if [[ ! -f "$SCRIPT_DIR/$file" ]]; then
             echo "ERROR: Required panel file $file is missing from the checkout." >&2
             return 1
@@ -36,7 +36,7 @@ copy_panel_files() {
         fi
     done
     mkdir -p "$destination/static" "$destination/docs"
-    for file in "${PANEL_PY_FILES[@]}" index.html login.html setup.html servers.html account.html units.html help.html LICENSE ATTRIBUTION.md; do
+    for file in "${PANEL_PY_FILES[@]}" index.html login.html setup.html servers.html account.html units.html users.html help.html LICENSE ATTRIBUTION.md; do
         cp "$SCRIPT_DIR/$file" "$destination/"
     done
     cp -R "$SCRIPT_DIR/static/." "$destination/static/"
@@ -192,7 +192,7 @@ update_panel_with_recovery() (
     copy_panel_files "$panel_dir"
     rm -f "$panel_dir/save_library.py" "$panel_dir/static/saves.js"
     local file
-    for file in "${PANEL_PY_FILES[@]}" index.html login.html setup.html servers.html account.html units.html help.html LICENSE ATTRIBUTION.md; do
+    for file in "${PANEL_PY_FILES[@]}" index.html login.html setup.html servers.html account.html units.html users.html help.html LICENSE ATTRIBUTION.md; do
         chown "$panel_user:$panel_user" "$panel_dir/$file"
     done
     chown -R "$panel_user:$panel_user" "$panel_dir/static" "$panel_dir/docs"

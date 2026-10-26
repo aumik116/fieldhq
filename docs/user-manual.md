@@ -120,6 +120,8 @@ Members use the same `/login` page as staff. A unit administrator creates the ac
 Published reading and announcements work without a roster link. Personal profiles, targeted reading and RSVPs require the login-to-member link. Unit and hosting permissions remain separate.
 
 
+Panel-wide login administration opens on its own **Panel users** page at `/admin/users`, accessible from the header to panel administrators. It is independent of the selected unit and never appears below a roster. Unit administrators continue using their unit’s **Accounts & access** page for local role management.
+
 ## 3. All servers
 
 **All servers** is the hosting overview. Its counters summarize the fleet and host; rows show individual servers. Use search, unit and status filters to narrow the list.

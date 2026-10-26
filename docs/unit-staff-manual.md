@@ -416,3 +416,5 @@ The demo is an ordinary editable unit. It creates no passwords, player UUIDs, ga
 Formation rosters are collapsible: companies/platoons start open and deeper formations start closed. Expand all / Collapse all controls affect the current view, and parent-path links open and jump to the parent formation. Search temporarily opens matching branches. Expansion choices are retained while the unit workspace remains open.
 
 Analytics includes an interactive current-rank bar chart. Filter by rank structure, then click a bar to see matching member names and open their staff records. Counts and percentages describe the current roster, independently of the historical date range.
+
+Panel-wide login administration opens on its own **Panel users** page at `/admin/users`, accessible from the header to panel administrators. It is independent of the selected unit and never appears below a roster. Unit administrators continue using their unit’s **Accounts & access** page for local role management.

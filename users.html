@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" /><meta
+      name="viewport"
+      content="width=device-width,initial-scale=1"
+    />
+    <title>Panel users — FIELDHQ</title>
+    <script src="/static/theme.js?v=themes-8"></script>
+    <link rel="stylesheet" href="/static/base.css" /><link
+      rel="stylesheet"
+      href="/static/workspace.css"
+    /><link rel="stylesheet" href="/static/sharp.css?v=cleanup-1" /><link
+      rel="stylesheet"
+      href="/static/themes.css?v=themes-8"
+    /><link rel="stylesheet" href="/static/manager-layout.css" /><link
+      rel="stylesheet"
+      href="/static/panel.css?v=roster-chart-2"
+    /><link rel="stylesheet" href="/static/help.css?v=manuals-3" />
+  </head>
+  <body class="manager-page panel-users-page">
+    <header class="manager-header">
+      <a class="fieldhq-brand" href="/servers" aria-label="FIELDHQ hosting"
+        >FIELD<span>HQ</span></a
+      >
+      <nav class="fieldhq-areas" aria-label="Workspace"
+        ><a href="/servers"
+          ><svg class="ui-icon" aria-hidden="true">
+            <use href="/static/icons.svg#servers"></use></svg
+          >Hosting</a
+        ><a href="/units"
+          ><svg class="ui-icon" aria-hidden="true">
+            <use href="/static/icons.svg#players"></use></svg
+          >Units</a
+        ></nav
+      >
+      <div class="fieldhq-account"
+        ><a class="workspace-back" href="/admin/users" aria-current="page"
+          >Panel users</a
+        ><a class="workspace-back" href="/account"
+          ><span id="users-account-name"></span> · Account settings</a
+        ><button type="button" class="btn-logout" id="users-logout"
+          >Logout</button
+        ></div
+      >
+    </header>
+    <main class="manager-main">
+      <div class="manager-heading"
+        ><div
+          ><div class="eyebrow">Panel administration</div><h1>Panel users</h1
+          ><p class="feature-note"
+            >Manage login accounts, panel permissions, server access and unit
+            memberships across FIELDHQ.</p
+          ></div
+        ><button type="button" class="btn-save" id="users-new" disabled
+          >New account</button
+        ></div
+      >
+      <p class="feature-note"
+        >For a person’s rank, billet, qualifications or notes, open their unit
+        roster. Unit administrators manage their own unit’s roles through
+        Accounts &amp; access.</p
+      >
+      <div class="unit-toolbar"
+        ><button type="button" id="users-refresh">Refresh accounts</button></div
+      >
+      <p id="users-restricted" role="alert" hidden></p
+      ><div id="users-list" aria-live="polite">Loading accounts…</div>
+    </main>
+    <script src="/static/api.js?v=cleanup-1"></script
+    ><script src="/static/ui.js?v=cleanup-1"></script
+    ><script src="/static/user-editor.js?v=formations-1"></script
+    ><script src="/static/panel-users.js?v=users-page-1"></script
+    ><script src="/static/help.js?v=users-page-1"></script>
+  </body>
+</html>

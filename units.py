@@ -8,7 +8,7 @@ import json
 import sqlite3
 import time
 
-from flask import abort, g, jsonify, request, send_file, send_from_directory
+from flask import abort, g, jsonify, redirect, request, send_file, send_from_directory
 
 from unit_common import (
     CAPABILITIES,
@@ -396,6 +396,7 @@ def install(api):
         "unit_roster_export",
         "unit_health",
         "units_page",
+        "panel_users_page",
         "unit_catalog_save",
         "unit_position_rename",
         "unit_member_record",
@@ -431,7 +432,17 @@ def install(api):
 
     @api.app.get("/units")
     def units_page():
+        if request.args.get("admin") == "users" or "users" in request.args:
+            return redirect("/admin/users")
         return send_from_directory(api._BASE_DIR, "units.html")
+
+    @api.app.get("/admin/users")
+    def panel_users_page():
+        if not panel_admin():
+            abort(
+                403, description="Only panel administrators can manage panel accounts"
+            )
+        return send_from_directory(api._BASE_DIR, "users.html")
 
     @api.app.get("/api/units")
     def units_list():
