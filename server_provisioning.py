@@ -393,8 +393,22 @@ def install(api):
     @api.app.get('/api/servers/<server_id>/removal')
     def server_removal_info(server_id):
         try:
-            server=registry.get(server_id)
-            return jsonify(ok=True,id=server.id,name=server.name,path=str(server.directory))
+            server = registry.get(server_id)
+            from storage_usage import scan_storage
+            paths = server.paths
+            categories = [
+                ('server', 'Game installation'), ('workshop', 'Workshop mods'),
+                ('profile', 'Profile and saves'), ('logs', 'Logs'),
+                ('backups', 'Backups'), ('config', 'Configuration'),
+            ]
+            storage = scan_storage(
+                [(key, label, paths[key]) for key, label in categories]
+                + [('trash', 'Retained file trash', paths['profile'] / '.panel-trash'),
+                   ('other', 'Other server files', server.directory)],
+                seconds=3, max_entries=100000,
+            )
+            return jsonify(ok=True, id=server.id, name=server.name,
+                           path=str(server.directory), storage=storage)
         except KeyError:return jsonify(ok=False,error='Server was already removed. Refresh the server list.'),404
 
     def executable():

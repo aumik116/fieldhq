@@ -27,6 +27,7 @@ window.UnitUX = {
     dialog,
     { title, body, content, save = true, button = 'Save changes' },
   ) {
+    document.dispatchEvent(new Event('unit-editor-reset'));
     if (dialog.open) dialog.close();
     dialog.querySelector('h2').textContent = title;
     body.innerHTML = content;
@@ -45,7 +46,60 @@ window.UnitUX = {
     try {
       await onSaved(await action());
     } catch (failure) {
-      error.textContent = failure.message;
+      error.textContent =
+        failure.message + ' Your draft and selected files are still here.';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.textContent = 'Copy error details';
+      copy.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(failure.message);
+          copy.textContent = 'Copied';
+        } catch (_) {
+          copy.textContent = 'Select and copy the error text';
+        }
+      };
+      error.append(document.createElement('br'), copy);
+      if (failure.status === 409) {
+        const draft = document.createElement('button');
+        draft.type = 'button';
+        draft.textContent = 'Copy my draft';
+        draft.onclick = async () => {
+          const fields = [...new FormData(dialog.querySelector('form'))]
+            .filter(
+              ([name]) =>
+                !dialog.querySelector(
+                  `[name="${CSS.escape(name)}"][type="password"]`,
+                ) &&
+                ![
+                  'password',
+                  '_csrf',
+                  'member_token',
+                  'branding_token',
+                ].includes(name),
+            )
+            .map(([name, value]) => [
+              name,
+              value instanceof File ? value.name : value,
+            ]);
+          try {
+            await navigator.clipboard.writeText(
+              JSON.stringify(fields, null, 2),
+            );
+            draft.textContent = 'Draft copied';
+          } catch (_) {
+            draft.textContent = 'Clipboard unavailable; keep this form open';
+          }
+        };
+        error.append(draft);
+      }
+      if (failure.status !== 409) {
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.textContent = 'Try again';
+        retry.onclick = () => dialog.querySelector('form').requestSubmit();
+        error.append(retry);
+      }
       error.tabIndex = -1;
       error.focus({ preventScroll: true });
       error.scrollIntoView({ block: 'nearest' });

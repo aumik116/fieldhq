@@ -313,6 +313,13 @@
         `${versionId ? `<p class="unit-warn">Historical revision · ${esc(dateTime(data.created_at))} · ${esc(data.actor)}</p><button type="button" id="reference-current">Back to current document</button>` : ''}${versionId && data.current ? referenceComparison(item, data.current, data.files || [], data.current_files || []) : ''}${image(item.image_url, item.title)}<p class="feature-note">${esc(item.folder || 'Root')} · ${esc(item.status || 'published')} · ${esc(item.category)}${item.role ? ' · ' + esc(item.role) : ''}${item.archived ? ' · Archived' : ''} · Updated ${esc(dateTime(item.updated_at))} · ${esc(item.updated_by)}</p>${referenceContent(item, data.files || [])}${item.slots.length ? `<div class="unit-table loadout-table"><table><thead><tr><th>Slot</th><th>Standard item</th><th>Alternatives</th><th>Notes</th></tr></thead><tbody>${item.slots.map((s) => `<tr><td>${esc(s.slot)}</td><td>${esc(s.standard)}</td><td>${esc(s.alternatives)}</td><td>${esc(s.notes)}</td></tr>`).join('')}</tbody></table></div>` : ''}${link(item.url)}${data.files?.length ? `<section class="unit-block"><h3>Attachments</h3>${data.files.map((f) => `<p><a href="${base()}/library/files/${f.token}" target="_blank" rel="noopener noreferrer">${esc(f.filename)}</a> <small>${(f.size / 1024 / 1024).toFixed(2)} MB${f.mime.startsWith('image/') ? ' · Image' : ' · Download'}</small></p>`).join('')}</section>` : ''}<div class="unit-toolbar">${item.kind === 'sop' ? '<button type="button" id="reference-download">Download text</button>' : ''}${data.permissions?.references && !versionId && !data.published_view ? '<button type="button" id="reference-edit">Edit reference</button>' : ''}${data.permissions?.references && !versionId && item.kind === 'sop' ? '<button type="button" id="reference-rules">Reading & review</button>' : ''}${data.acknowledgement ? `<button type="button" id="reference-acknowledge" ${data.acknowledgement.acknowledged_at ? 'disabled' : ''}>${data.acknowledgement.acknowledged_at ? 'Acknowledged this version' : 'I have read this version'}</button>` : ''}${data.permissions?.references && versionId ? '<button type="button" id="reference-restore">Restore as draft</button>' : ''}${data.permissions?.references && !versionId && item.status === 'template' ? '<button type="button" id="reference-from-template">Create SOP from template</button>' : ''}</div>${data.related?.length ? `<section class="unit-block"><h3>Related guidance</h3>${data.related.map((r) => (r.kind === 'sop' ? `<button type="button" data-related-sop="${r.id}">${esc(r.title)}</button>` : `<p>${esc(r.kind)} · ${esc(r.title)}</p>`)).join('')}</section>` : ''}${data.history?.length ? `<details class="unit-block"><summary>Revision history · latest 50</summary>${data.history.map((h) => `<p><strong>${esc(h.actor)}</strong> · ${esc(h.action)}<small>${esc(dateTime(h.created_at))}</small><button type="button" data-reference-version="${h.id}">View revision</button></p>`).join('')}</details>` : ''}`,
       );
       wireReference(item);
+      if (item.kind === 'loadout') {
+        const slots = dialog.querySelector('.loadout-table');
+        if (slots) UnitLoadouts.display(slots, item.slots);
+        const templateButton = el('reference-from-template');
+        if (templateButton)
+          templateButton.textContent = 'Create loadout from template';
+      }
       el('reference-rules')?.addEventListener('click', () =>
         referenceRules(id),
       );
@@ -469,15 +476,7 @@
       }${itemKind === 'loadout' ? '<h3>Kit slots</h3><div id="loadout-slot-rows"></div><button type="button" id="loadout-add-slot">Add slot</button><p class="feature-note">For example: Helmet, Primary weapon, Vest, Backpack or Medical supplies.</p>' : ''}${item ? `<label><input type="checkbox" name="archived" ${item.archived ? 'checked' : ''}> Archive this reference (can be restored)</label>` : ''}`,
       async () => {
         const values = Object.fromEntries(new FormData(form));
-        const slots = [...form.querySelectorAll('[data-loadout-slot]')].map(
-          (row) =>
-            Object.fromEntries(
-              ['slot', 'standard', 'alternatives', 'notes'].map((key) => [
-                key,
-                row.querySelector(`[name="slot_${key}"]`).value,
-              ]),
-            ),
-        );
+        const slots = UnitLoadouts.collect(form);
         const data = {
           kind: itemKind,
           title: values.title,
@@ -517,28 +516,65 @@
     form.elements.title.maxLength = 120;
     form.elements.category.required = true;
     form.elements.category.maxLength = 80;
-    function addSlot(slot = {}) {
-      const row = document.createElement('div');
-      row.className = 'loadout-slot-editor';
-      row.dataset.loadoutSlot = '';
-      row.innerHTML =
-        field('Slot', 'slot_slot', slot.slot || '') +
-        field('Standard item', 'slot_standard', slot.standard || '') +
-        textArea(
-          'Alternatives',
-          'slot_alternatives',
-          slot.alternatives || '',
-          2000,
-        ) +
-        textArea('Notes', 'slot_notes', slot.notes || '', 2000) +
-        '<button type="button">Remove slot</button>';
-      row.querySelector('[name="slot_slot"]').required = true;
-      row.querySelector('button').onclick = () => row.remove();
-      el('loadout-slot-rows').append(row);
-    }
     if (itemKind === 'loadout') {
-      (item?.slots || []).forEach(addSlot);
-      el('loadout-add-slot').onclick = () => addSlot();
+      const root = el('loadout-slot-rows');
+      const fill = (slots) => {
+        root.replaceChildren();
+        slots.forEach((slot) => UnitLoadouts.addSlot(root, slot));
+      };
+      fill(
+        item
+          ? item.slots || []
+          : UnitLoadouts.standard.map((slot) => ({ slot })),
+      );
+      el('loadout-add-slot').onclick = () => UnitLoadouts.addSlot(root);
+      form.elements.status.add(
+        new Option('Reusable template — staff only', 'template'),
+      );
+      form.elements.status.value = item?.status || 'published';
+      const holder = document.createElement('label');
+      holder.className = 'unit-field';
+      holder.innerHTML = `Slot layout<select><option value="">Choose a layout…</option><option value="standard">Standard · 24 slots</option><option value="blank">Custom · start empty</option>${!item?.id ? (referenceData?.templates || []).map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('') : ''}</select><small>Add, rename or remove slots. Save as “Reusable template” to reuse a custom layout.</small>`;
+      root.before(holder);
+      const choice = holder.querySelector('select');
+      choice.onchange = async () => {
+        const value = choice.value;
+        choice.value = '';
+        if (
+          !value ||
+          !confirm('Replace the current loadout slots and their contents?')
+        )
+          return;
+        if (value === 'standard' || value === 'blank') {
+          fill(
+            value === 'standard'
+              ? UnitLoadouts.standard.map((slot) => ({ slot }))
+              : [],
+          );
+          form.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+        if (!UnitUX.canLeave()) return;
+        const current = epoch,
+          request = ++modalRequest;
+        try {
+          const data = await read(`${base()}/library/${Number(value)}`);
+          if (current !== epoch || request !== modalRequest) return;
+          referenceEditor(
+            {
+              ...data.item,
+              id: undefined,
+              template_id: data.item.id,
+              title: data.item.title + ' copy',
+              status: 'draft',
+              archived: 0,
+            },
+            data.revision,
+          );
+        } catch (error) {
+          el('resource-error').textContent = error.message;
+        }
+      };
     }
     if (itemKind === 'sop') {
       setupSopEditor(files);

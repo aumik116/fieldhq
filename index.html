@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="/static/themes.css?v=themes-8" />
     <link rel="stylesheet" href="/static/manager-layout.css" />
     <link rel="stylesheet" href="/static/workshop.css" />
-    <link rel="stylesheet" href="/static/panel.css?v=personnel-tools-1" />
+    <link rel="stylesheet" href="/static/panel.css?v=release-tools-1" />
 
     <link rel="stylesheet" href="/static/server-experience.css" /><link
       rel="stylesheet"
@@ -1666,6 +1666,12 @@
         role="tabpanel"
         aria-labelledby="tab-mods"
         hidden
+        ><div
+          id="mod-lifecycle-summary"
+          class="mod-lifecycle-summary"
+          aria-live="polite"
+        ></div
+        ><p id="mod-lifecycle-help" class="feature-note"></p
         ><div class="section-tabs" role="tablist" aria-label="mods sections"
           ><button
             type="button"
@@ -3345,15 +3351,16 @@
       <footer> Refresh in <span id="refresh-timer">10</span>s </footer>
     </div>
 
-    <script src="/static/api.js?v=cleanup-1"></script
+    <script src="/static/api.js?v=release-tools-1"></script
+    ><script src="/static/server-operations.js?v=release-tools-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script>
     <script src="/static/dashboard.js"></script>
     <script src="/static/log_stream.js?v=cleanup-1"></script>
     <script src="/static/status.js?v=cleanup-1"></script>
     <script src="/static/mod_actions.js"></script>
-    <script src="/static/server_controls.js?v=cleanup-1"></script>
+    <script src="/static/server_controls.js?v=release-tools-1"></script>
     <script src="/static/persistence.js?v=cleanup-1"></script>
-    <script src="/static/mods.js"></script>
+    <script src="/static/mods.js?v=release-tools-1"></script>
     <script src="/static/mod-inventory.js"></script>
     <script src="/static/user-editor.js?v=cleanup-2"></script>
     <script src="/static/features.js?v=cleanup-1"></script>
@@ -3365,7 +3372,7 @@
     <script src="/static/mod_compare.js?v=cleanup-1"></script>
     <script src="/static/network.js"></script>
     <script src="/static/files.js"></script>
-    <script src="/static/software.js?v=cleanup-1"></script>
+    <script src="/static/software.js?v=release-tools-1"></script>
     <script src="/static/page_sections.js"></script>
     <script src="/static/server-selector.js"></script>
     <script src="/static/operator-tools.js?v=cleanup-1"></script>
@@ -3376,6 +3383,7 @@
     <script src="/static/pwa.js"></script>
 
     <script src="/static/mod-staging.js?v=cleanup-1"></script
+    ><script src="/static/mod-workspace.js?v=release-tools-1"></script
     ><script src="/static/server-experience.js?v=cleanup-1"></script
     ><script src="/static/help.js?v=manuals-3"></script
   ></body>

@@ -127,6 +127,7 @@ window.UnitRoster = (() => {
         return;
       }
       const data = await readJson(response);
+      UnitPresence.show(data.editing || []);
       if (unavailable) {
         unavailable = false;
         status('');

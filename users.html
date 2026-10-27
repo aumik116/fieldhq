@@ -15,7 +15,7 @@
       href="/static/themes.css?v=themes-8"
     /><link rel="stylesheet" href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=personnel-tools-1"
+      href="/static/panel.css?v=release-tools-1"
     /><link rel="stylesheet" href="/static/help.css?v=manuals-3" />
   </head>
   <body class="manager-page panel-users-page">
@@ -56,6 +56,17 @@
           >New account</button
         ></div
       >
+      <p id="panel-backup-owner" class="feature-note" hidden
+        ><a
+          id="panel-backup-download"
+          class="manager-link"
+          href="/api/panel/backup"
+          download
+          >Download panel-data backup</a
+        >
+        Includes private records and credentials. Game files and world saves
+        need separate backups. Recovery instructions are inside the ZIP.</p
+      >
       <p class="feature-note"
         >For a person’s rank, billet, qualifications or notes, open their unit
         roster. Unit administrators manage their own unit’s roles through
@@ -67,10 +78,10 @@
       <p id="users-restricted" role="alert" hidden></p
       ><div id="users-list" aria-live="polite">Loading accounts…</div>
     </main>
-    <script src="/static/api.js?v=cleanup-1"></script
+    <script src="/static/api.js?v=release-tools-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script
     ><script src="/static/user-editor.js?v=formations-1"></script
-    ><script src="/static/panel-users.js?v=users-page-1"></script
+    ><script src="/static/panel-users.js?v=release-tools-1"></script
     ><script src="/static/help.js?v=users-page-1"></script>
   </body>
 </html>

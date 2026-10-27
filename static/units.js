@@ -247,6 +247,8 @@
       el('unit-backup').hidden = !detail.can_staff;
       el('unit-backup').href = `/api/units/${unitId}/backup`;
       el('roster-bulk').hidden = !detail.can_edit;
+      el('roster-bulk-menu').hidden = !detail.can_edit;
+      el('roster-management').hidden = !detail.can_edit;
       el('roster-status').querySelector('[value="archived"]').hidden =
         detail.role === 'member';
       if (detail.role === 'member' && el('roster-status').value === 'archived')
@@ -1159,6 +1161,9 @@
           );
       });
       let before;
+      form.elements.record_note?.addEventListener('focus', () =>
+        UnitPresence.start(requestedUnit, 'note:' + memberId + ':new', dialog),
+      );
       function showNotes(data, append) {
         if (
           !dialog.open ||
@@ -1203,6 +1208,11 @@
                 return;
               const editor = document.createElement('div');
               editor.className = 'record-note-editor';
+              UnitPresence.start(
+                requestedUnit,
+                'note:' + memberId + ':' + note.id,
+                dialog,
+              );
               const label = document.createElement('label');
               label.className = 'unit-field';
               label.textContent = 'Edit note';
@@ -1220,6 +1230,7 @@
               cancel.type = 'button';
               cancel.textContent = 'Cancel';
               function finish() {
+                UnitPresence.stop();
                 editor.remove();
                 edit.disabled = false;
                 content.hidden = false;
@@ -1352,7 +1363,8 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.id = 'record-tab-' + name;
-      button.textContent = name;
+      button.textContent =
+        { History: 'Service history', Notes: 'Staff notes' }[name] || name;
       button.setAttribute('role', 'tab');
       button.setAttribute('aria-controls', pane.id);
       button.setAttribute('aria-selected', String(name === 'Overview'));
@@ -1406,6 +1418,22 @@
     qual.className = 'unit-table';
     qual.innerHTML = `<table><thead><tr><th>Qualification</th><th>Awarded</th><th>Expires</th><th>Instructor</th><th>Notes</th></tr></thead><tbody>${(record.qualifications || []).map((q) => `<tr><td>${esc(q.certificate)}</td><td>${esc(q.awarded_on || 'Unknown')}</td><td>${esc(q.expires_on || 'No expiry')}</td><td>${esc(q.issuer || 'Unknown')}</td><td>${esc(q.notes || '—')}</td></tr>`).join('') || '<tr><td colspan="5">No qualifications recorded.</td></tr>'}</tbody></table>`;
     panes.get('Qualifications').prepend(qual);
+    const renewalNames = new Set(
+      (record.catalog.qualification_details || [])
+        .filter((item) => item.renewal_required)
+        .map((item) => item.name),
+    );
+    qual.querySelectorAll('tbody tr').forEach((row, index) => {
+      if (
+        !renewalNames.has(record.qualifications[index]?.certificate) &&
+        row.children.length === 5
+      )
+        row.children[2].textContent = '—';
+    });
+    if (!renewalNames.size)
+      qual.querySelectorAll('tr').forEach((row) => {
+        if (row.children.length === 5) row.children[2].remove();
+      });
     if (record.can_write) {
       const edit = document.createElement('button');
       edit.type = 'button';
@@ -1491,7 +1519,10 @@
           }
       }
     } else if (!access.children.length) access.textContent = 'No linked login.';
-    body.replaceChildren(tabs, ...panes.values());
+    const identity = document.createElement('div');
+    identity.className = 'record-identity';
+    identity.innerHTML = `<div><strong>${esc([member.rank_display || member.rank, member.game_name].filter(Boolean).join(' · '))}</strong><small>${esc(member.assignment_path || 'No primary assignment')}</small></div><span class="record-status">${esc(member.archived ? 'Former member' : member.status.toUpperCase())}</span>${member.effective_callsign ? `<span>${esc(member.effective_callsign)}</span>` : ''}`;
+    body.replaceChildren(identity, tabs, ...panes.values());
     form.querySelector('[type="submit"]').hidden = true;
   }
   function loginManagementEditor(member, action) {
@@ -1569,6 +1600,7 @@
       },
     );
     form.elements.game_name.required = true;
+    UnitPresence.start(unitId, 'member:' + (member.id || 'new'), dialog);
     form.elements.game_name.oninput = () =>
       form.elements.game_name.setCustomValidity(
         form.elements.game_name.value.trim() ? '' : 'Enter a game name',
@@ -1747,6 +1779,7 @@
             if (values().confirm_name !== structure.name)
               throw new Error('Enter the exact structure name.');
             await write(`/api/units/${unitId}/catalog`, {
+              catalog_base: detail.unit.catalog,
               catalog: {
                 ...detail.unit.catalog,
                 rank_structures: detail.unit.catalog.rank_structures.filter(
@@ -2029,6 +2062,7 @@
     ]),
   );
   function applyBranding() {
+    delete brandForm.dataset.editing;
     brandDirty = false;
     const brand = detail.unit.branding || {},
       url = (kind) =>
@@ -2057,6 +2091,16 @@
   brandForm.oninput = () => {
     brandDirty = true;
   };
+  brandForm.addEventListener('focusin', () => {
+    if (!brandForm.dataset.editing) {
+      brandForm.dataset.editing = 'true';
+      UnitPresence.start(unitId, 'branding:unit', el('unit-customization'));
+    }
+  });
+  document.addEventListener(
+    'unit-editor-reset',
+    () => delete brandForm.dataset.editing,
+  );
   for (const kind of ['icon', 'banner'])
     brandForm.elements[kind].onchange = () => {
       const file = brandForm.elements[kind].files[0];
@@ -2096,6 +2140,7 @@
           await brandCrops[kind].append(data);
       }
       data.set('revision', detail.unit.revision);
+      data.set('branding_token', detail.unit.branding.token);
       await readJson(await postForm(`/api/units/${unitId}/branding`, data));
       brandDirty = false;
       brandSaving = false;

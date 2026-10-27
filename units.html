@@ -16,7 +16,7 @@
       rel="stylesheet"
       href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=roster-polish-1" /><link
+      href="/static/panel.css?v=loadout-slots-1" /><link
       rel="stylesheet"
       href="/static/help.css?v=manuals-3"
   /></head>
@@ -493,15 +493,32 @@
               ><option value="name">Name A–Z</option
               ><option value="promotion">Next promotion date</option
               ><option value="joined">Join date</option></select
-            ><button id="roster-structure" hidden>Manage structure</button
             ><button id="roster-add" class="btn-save" hidden>Add member</button
-            ><button type="button" id="roster-bulk" hidden>Bulk edit…</button
+            ><details id="roster-bulk-menu" class="roster-action-menu" hidden
+              ><summary>Bulk actions</summary
+              ><div class="roster-action-items"
+                ><button type="button" id="roster-bulk" hidden
+                  >Award qualifications…</button
+                ><button type="button" data-bulk-action="revoke"
+                  >Revoke qualifications…</button
+                ><button type="button" data-bulk-action="status"
+                  >Change status…</button
+                ><button type="button" data-bulk-action="section"
+                  >Move into open billets…</button
+                ><button type="button" data-bulk-action="unassign"
+                  >Remove primary placement…</button
+                ></div
+              ></details
+            ><button type="button" id="roster-print">Print roster</button
+            ><a id="roster-export" class="manager-link">Export CSV</a></div
+          ><div id="roster-management" class="roster-management" hidden
+            ><span>Management</span
+            ><button id="roster-structure" hidden>Manage structure</button
             ><button type="button" id="roster-vacancies" hidden
               >Open billets</button
             ><button type="button" id="roster-temporary" hidden
               >Temporary cover</button
-            ><button type="button" id="roster-print">Print roster</button
-            ><a id="roster-export" class="manager-link">Export CSV</a></div
+            ></div
           ><p class="feature-note"
             >Saved changes sync about every 3 seconds while this page is
             visible. Unsaved forms are kept.</p
@@ -605,6 +622,9 @@
             editors can grant, update or revoke qualifications. Coverage follows
             the member/status/section search before the Holds/Missing filter.</p
           ><div id="matrix-coverage" class="qualification-coverage"></div
+          ><details class="unit-block" hidden
+            ><summary>Qualification renewal queue</summary
+            ><div id="renewal-queue"></div></details
           ><div
             id="qualification-matrix"
             class="unit-table qualification-matrix"
@@ -863,19 +883,21 @@
         ></form
       ></dialog
     >
-    <script src="/static/api.js?v=cleanup-1"></script
+    <script src="/static/api.js?v=release-tools-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script
-    ><script src="/static/unit-ux.js?v=roster-collaboration-1"></script
-    ><script src="/static/unit-events.js?v=roster-polish-1"></script
-    ><script src="/static/roster-tools.js?v=roster-polish-1"></script
-    ><script src="/static/unit-resources.js?v=roster-chart-1"></script
+    ><script src="/static/unit-ux.js?v=collaboration-ui-1"></script
+    ><script src="/static/unit-events.js?v=release-tools-1"></script
+    ><script src="/static/roster-tools.js?v=release-tools-1"></script
+    ><script src="/static/unit-loadouts.js?v=loadout-slots-1"></script
+    ><script src="/static/unit-resources.js?v=loadout-slots-1"></script
     ><script src="/static/unit-members.js?v=personnel-tools-1"></script
     ><script src="/static/unit-structure.js?v=roster-polish-1"></script
-    ><script src="/static/unit-catalog.js?v=qualification-delete-1"></script
-    ><script src="/static/unit-roster.js?v=roster-polish-1"></script
-    ><script src="/static/unit-personnel.js?v=personnel-tools-1"></script
+    ><script src="/static/unit-catalog.js?v=release-tools-1"></script
+    ><script src="/static/unit-roster.js?v=collaboration-ui-1"></script
+    ><script src="/static/unit-personnel.js?v=release-tools-1"></script
     ><script src="/static/unit-brand-crop.js?v=branding-crop-1"></script
     ><script src="/static/unit-roster-print.js?v=roster-polish-1"></script
-    ><script src="/static/units.js?v=roster-polish-1"></script
+    ><script src="/static/unit-presence.js?v=collaboration-ui-1"></script
+    ><script src="/static/units.js?v=release-tools-1"></script
     ><script src="/static/help.js?v=manuals-3"></script></body
 ></html>

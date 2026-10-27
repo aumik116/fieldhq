@@ -10,6 +10,7 @@ window.UnitCatalog = (() => {
       abbreviation: '',
       description: '',
       archived: false,
+      renewal_required: false,
       ...(catalog.qualification_details || []).find(
         (item) => item.name === name,
       ),
@@ -143,6 +144,7 @@ window.UnitCatalog = (() => {
           abbreviation: String(data.get('qualification_abbreviation')).trim(),
           description: String(data.get('qualification_description')).trim(),
           archived: data.has('qualification_archived'),
+          renewal_required: data.has('qualification_renewal'),
         };
         const details = definitions(catalog);
         if (existing)
@@ -150,6 +152,7 @@ window.UnitCatalog = (() => {
             item;
         else details.push(item);
         await write(`/api/units/${unitId}/catalog`, {
+          catalog_base: catalog,
           catalog: {
             ...catalog,
             certificates: details.map((qual) => qual.name),
@@ -158,6 +161,14 @@ window.UnitCatalog = (() => {
           revision: detail.unit.revision,
         });
       },
+    );
+    const renewal = document.createElement('label');
+    renewal.innerHTML = `<input type="checkbox" name="qualification_renewal" ${existing?.renewal_required ? 'checked' : ''}> Requires renewal (enables expiry dates and renewal tools)`;
+    form.querySelector('#unit-dialog-body').append(renewal);
+    UnitPresence.start(
+      unitId,
+      'qualification:' + (existing?.name || 'new'),
+      form.closest('dialog'),
     );
     if (existing) {
       const remove = document.createElement('button');
@@ -226,6 +237,7 @@ window.UnitCatalog = (() => {
       async () => {
         const next = collect();
         await write(`/api/units/${unitId}/catalog`, {
+          catalog_base: catalog,
           catalog: next,
           revision: detail.unit.revision,
         });
@@ -234,6 +246,11 @@ window.UnitCatalog = (() => {
       },
     );
     const list = form.querySelector('#setup-rank-list');
+    UnitPresence.start(
+      unitId,
+      'rank:' + (existing && !duplicate ? existing.name : 'new'),
+      form.closest('dialog'),
+    );
     let nextId = 0,
       request = 0;
     function addRank(rank = {}) {

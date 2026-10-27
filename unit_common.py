@@ -161,6 +161,14 @@ def roster_status(member, on=None):
 def effective_certificates(conn, unit_id, member, on=None):
     """Recorded awards remain in history; only date-valid awards satisfy requirements."""
     day = on or date.today().isoformat()
+    catalog = json.loads(
+        conn.execute("SELECT catalog FROM units WHERE id=?", (unit_id,)).fetchone()[0]
+    )
+    renewing = {
+        entry["name"]
+        for entry in catalog.get("qualification_details", [])
+        if entry.get("renewal_required")
+    }
     awards = {
         row["certificate"]: row
         for row in conn.execute(
@@ -177,7 +185,9 @@ def effective_certificates(conn, unit_id, member, on=None):
             or (
                 (not awards[name]["awarded_on"] or awards[name]["awarded_on"] <= day)
                 and (
-                    not awards[name]["expires_on"] or awards[name]["expires_on"] >= day
+                    name not in renewing
+                    or not awards[name]["expires_on"]
+                    or awards[name]["expires_on"] >= day
                 )
             )
         )

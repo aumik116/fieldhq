@@ -25,6 +25,19 @@ def install(
     assign_placement,
     member_revision,
 ):
+    def configured_expiry(conn, unit_id, certificate, value, awarded_on):
+        catalog = json.loads(
+            conn.execute("SELECT catalog FROM units WHERE id=?", (unit_id,)).fetchone()[
+                0
+            ]
+        )
+        if not any(
+            entry["name"] == certificate and entry.get("renewal_required")
+            for entry in catalog.get("qualification_details", [])
+        ):
+            return ""
+        return expiry_date(value, awarded_on)
+
     def state(conn, unit_id, member_id):
         row = conn.execute(
             "SELECT * FROM unit_roster WHERE unit_id=? AND id=?", (unit_id, member_id)
@@ -164,8 +177,12 @@ def install(
                 "INSERT INTO unit_qualification_awards(unit_id,member_id,certificate,awarded_on,issuer,notes) VALUES(?,?,?,?,?,?)",
                 (unit_id, member_id, certificate, awarded_on, issuer, notes),
             )
-            expires_on = expiry_date(
-                data.get("qualification_expires_on", ""), awarded_on
+            expires_on = configured_expiry(
+                conn,
+                unit_id,
+                certificate,
+                data.get("qualification_expires_on", ""),
+                awarded_on,
             )
             conn.execute(
                 "UPDATE unit_qualification_awards SET expires_on=? WHERE unit_id=? AND member_id=? AND certificate=?",
@@ -190,8 +207,7 @@ def install(
         record_strength(conn, unit_id, before, after)
 
     with db() as conn:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS unit_qualification_awards (
                 unit_id INTEGER NOT NULL, member_id INTEGER NOT NULL, certificate TEXT NOT NULL,
                 awarded_on TEXT, issuer TEXT, notes TEXT NOT NULL DEFAULT '',
@@ -202,8 +218,7 @@ def install(
                 created_at REAL NOT NULL, before_value TEXT NOT NULL,
                 after_value TEXT NOT NULL, reason TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS unit_roster_history_member ON unit_roster_history(unit_id,member_id,id);
-        """
-        )
+        """)
         if "expires_on" not in {
             row["name"]
             for row in conn.execute("PRAGMA table_info(unit_qualification_awards)")
@@ -212,6 +227,33 @@ def install(
                 "ALTER TABLE unit_qualification_awards ADD COLUMN expires_on TEXT NOT NULL DEFAULT ''"
             )
         conn.execute("BEGIN IMMEDIATE")
+        # Explicit expiry dates from the previous release already opted these awards in.
+        for row in conn.execute("SELECT id,catalog FROM units").fetchall():
+            catalog = json.loads(row["catalog"])
+            details = {
+                entry["name"]: entry
+                for entry in catalog.get("qualification_details", [])
+            }
+            changed = False
+            for name in catalog.get("certificates", []):
+                entry = details.setdefault(
+                    name,
+                    dict(name=name, abbreviation="", description="", archived=False),
+                )
+                if "renewal_required" not in entry:
+                    entry["renewal_required"] = bool(
+                        conn.execute(
+                            "SELECT 1 FROM unit_qualification_awards WHERE unit_id=? AND certificate=? AND expires_on!='' LIMIT 1",
+                            (row["id"], name),
+                        ).fetchone()
+                    )
+                    changed = True
+            if changed:
+                catalog["qualification_details"] = list(details.values())
+                conn.execute(
+                    "UPDATE units SET catalog=?,revision=revision+1 WHERE id=?",
+                    (json.dumps(catalog), row["id"]),
+                )
         # Existing data is a baseline, not evidence of when or by whom it was awarded.
         for member in conn.execute(
             "SELECT id,unit_id,certificates FROM unit_roster"
@@ -250,6 +292,7 @@ def install(
         "unit_promotion_preview",
         "unit_roster_bulk_preview",
         "unit_roster_bulk_apply",
+        "unit_qualification_renew",
     }
     endpoints.update(names)
     api.PANEL_WIDE_ENDPOINTS.update(names)
@@ -263,6 +306,7 @@ def install(
                 "unit_qualification_delete",
                 "unit_member_promote",
                 "unit_roster_bulk_apply",
+                "unit_qualification_renew",
             )
         }
     )
@@ -279,12 +323,163 @@ def install(
                 )
             ]
             actor_name = author(conn, unit_id)
+            renewing = {
+                entry["name"]
+                for entry in json.loads(unit["catalog"]).get(
+                    "qualification_details", []
+                )
+                if entry.get("renewal_required")
+            }
+            for award in awards:
+                if award["certificate"] not in renewing:
+                    award["expires_on"] = ""
         return jsonify(
             awards=awards,
             revision=unit["revision"],
             today=date.today().isoformat(),
             actor=actor_name,
         )
+
+    @api.app.post("/api/units/<int:unit_id>/qualifications/renew")
+    def unit_qualification_renew(unit_id):
+        data = request.get_json()
+        try:
+            selected = data.get("awards")
+            if not isinstance(selected, list) or not 1 <= len(selected) <= 500:
+                raise ValueError("Choose 1–500 qualification awards")
+            awarded_on = award_date(data.get("awarded_on"))
+            expires_on = expiry_date(data.get("expires_on", ""), awarded_on)
+            if not expires_on:
+                raise ValueError(
+                    "Choose the new expiry date for these renewable qualifications"
+                )
+            reason = text(data.get("reason"), "Renewal reason", 1000, True)
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                unit = access(conn, unit_id, "roster")
+                issuer = text(
+                    data.get("issuer", author(conn, unit_id)), "Instructor", 120, True
+                )
+                catalog = json.loads(unit["catalog"])
+                seen = set()
+                changes = []
+                for item in selected:
+                    if (
+                        not isinstance(item, dict)
+                        or type(item.get("member_id")) is not int
+                        or not 1 <= item["member_id"] <= 9223372036854775807
+                    ):
+                        raise ValueError("Choose a valid member award")
+                    certificate = text(
+                        item.get("certificate"), "Qualification", 80, True
+                    )
+                    key = (item["member_id"], certificate)
+                    if key in seen:
+                        raise ValueError("Each award can only be selected once")
+                    seen.add(key)
+                    member = conn.execute(
+                        "SELECT game_name,certificates,archived FROM unit_roster WHERE unit_id=? AND id=?",
+                        (unit_id, key[0]),
+                    ).fetchone()
+                    if (
+                        not member
+                        or member["archived"]
+                        or certificate not in member["certificates"].split(";")
+                    ):
+                        raise ValueError(
+                            "A selected award is no longer held by a current member"
+                        )
+                    definition = next(
+                        (
+                            entry
+                            for entry in catalog.get("qualification_details", [])
+                            if entry["name"] == certificate
+                        ),
+                        {},
+                    )
+                    if not definition.get("renewal_required"):
+                        raise ValueError(
+                            "Renewal is not configured for this qualification"
+                        )
+                    if certificate not in catalog.get(
+                        "certificates", []
+                    ) or definition.get("archived"):
+                        raise ValueError("Restore the qualification before renewing it")
+                    award = conn.execute(
+                        "SELECT * FROM unit_qualification_awards WHERE unit_id=? AND member_id=? AND certificate=?",
+                        (unit_id, *key),
+                    ).fetchone()
+                    if not award:
+                        raise ValueError(
+                            "A selected award changed; refresh the renewal queue"
+                        )
+                    before = dict(award)
+                    after = dict(
+                        before,
+                        awarded_on=awarded_on,
+                        expires_on=expires_on,
+                        issuer=issuer,
+                    )
+                    changes.append(
+                        dict(
+                            member_id=key[0],
+                            name=member["game_name"],
+                            certificate=certificate,
+                            before=before,
+                            after=after,
+                        )
+                    )
+                digest = hashlib.sha256(
+                    json.dumps(
+                        dict(changes=changes, reason=reason), sort_keys=True
+                    ).encode()
+                ).hexdigest()
+                changed = sum(row["before"] != row["after"] for row in changes)
+                if data.get("confirmed") is not True:
+                    return jsonify(
+                        ok=True, changes=changes, changed=changed, preview_token=digest
+                    )
+                if data.get("preview_token") != digest:
+                    abort(
+                        409,
+                        description="These awards changed. Review a fresh renewal preview; your entered dates are still here.",
+                    )
+                for row in changes:
+                    if row["before"] == row["after"]:
+                        continue
+                    conn.execute(
+                        "UPDATE unit_qualification_awards SET awarded_on=?,expires_on=?,issuer=? WHERE unit_id=? AND member_id=? AND certificate=?",
+                        (
+                            awarded_on,
+                            expires_on,
+                            issuer,
+                            unit_id,
+                            row["member_id"],
+                            row["certificate"],
+                        ),
+                    )
+                    history(
+                        conn,
+                        unit_id,
+                        row["member_id"],
+                        "qualification_updated",
+                        row["before"],
+                        row["after"],
+                        reason,
+                    )
+                if changed:
+                    conn.execute(
+                        "UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,)
+                    )
+            g.audit_details = dict(
+                unit_id=unit_id,
+                member_ids=[row["member_id"] for row in changes],
+                change="qualification renewal",
+                changed=changed,
+            )
+            return jsonify(ok=True, changed=changed)
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
 
     @api.app.get("/api/units/<int:unit_id>/roster/<int:member_id>/timeline")
     def unit_roster_timeline(unit_id, member_id):
@@ -507,6 +702,21 @@ def install(
                     raise ValueError("Choose a qualification from this unit’s catalog")
                 held = set(filter(None, before["certificates"].split(";")))
                 action = data.get("action")
+                renewing = any(
+                    entry["name"] == certificate and entry.get("renewal_required")
+                    for entry in json.loads(unit["catalog"]).get(
+                        "qualification_details", []
+                    )
+                )
+                if action != "revoke" and data.get("expires_on") and not renewing:
+                    abort(
+                        409,
+                        description="Renewal is no longer enabled for this qualification. Your draft is kept; review the current settings before saving.",
+                    )
+                if action == "grant" and renewing and not data.get("expires_on"):
+                    raise ValueError(
+                        "Choose an expiry date for this renewable qualification"
+                    )
                 reason = text(
                     data.get("reason", ""), "Reason", 1000, action == "revoke"
                 )
@@ -535,8 +745,12 @@ def install(
                         (unit_id, member_id, certificate),
                     ).fetchone()
                     awarded_on = award_date(data.get("awarded_on"), allow_unknown=True)
-                    expires_on = expiry_date(
-                        data.get("expires_on", old["expires_on"]), awarded_on
+                    expires_on = configured_expiry(
+                        conn,
+                        unit_id,
+                        certificate,
+                        data.get("expires_on", old["expires_on"]),
+                        awarded_on,
                     )
                     notes = text(data.get("notes", ""), "Award notes", 1000)
                     issuer = (

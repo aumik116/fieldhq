@@ -133,6 +133,8 @@ def install(api):
 
     api.authenticate_user = authenticate
     api.audit_event = audit
+    from panel_backup import install as install_panel_backup
+    install_panel_backup(api, owner_id, path)
     def get_admin_labels():
         with db() as conn:
             return {row['identity']: row['name'] for row in conn.execute('SELECT identity,name FROM admin_labels')}
@@ -252,14 +254,19 @@ def install(api):
 
     @app.teardown_request
     def release_lock(exc):
-        held_lock = g.pop('mutation_lock', None)
+        held_lock = g.pop("mutation_lock", None)
         if held_lock is not None:
             held_lock.release()
 
     @app.after_request
     def record_action(response):
         response.headers["Cache-Control"] = "no-store"
-        if request.method == "POST" and request.endpoint in MUTATIONS and hasattr(g, "audit_actor"):
+        if (
+            request.method == "POST"
+            and request.endpoint != "unit_editing"
+            and request.endpoint in MUTATIONS
+            and hasattr(g, "audit_actor")
+        ):
             result = response.get_json(silent=True) or {}
             ok = response.status_code < 400 and result.get("ok") is True
             details = g.audit_details

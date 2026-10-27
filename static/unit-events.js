@@ -361,6 +361,56 @@
           : null,
       );
       el('event-edit')?.addEventListener('click', () => eventEditor(e));
+      const memberTable = form.querySelector('.event-member-table');
+      if (memberTable) {
+        const summary = document.createElement('div');
+        summary.className = 'unit-summary';
+        summary.innerHTML = `<span>Expected <strong>${data.members.filter((member) => member.expected).length}</strong></span><span>Observed by collector <strong>${data.members.filter((member) => member.evidence).length}</strong></span><span>${e.starts > now ? 'Awaiting event' : 'Unknown outcome'} <strong>${data.members.filter((member) => member.resolved === 'unknown').length}</strong></span><span>Staff corrections <strong>${data.members.filter((member) => member.manual).length}</strong></span>`;
+        const legend = document.createElement('p');
+        legend.className = 'feature-note';
+        legend.textContent =
+          'Unknown means insufficient evidence, not an automatic absence. Collector gaps need review. Staff corrections take precedence and are recorded in the audit.';
+        const filter = document.createElement('label');
+        filter.className = 'unit-field';
+        filter.textContent = 'Event roster filter';
+        const select = document.createElement('select');
+        select.innerHTML =
+          '<option value="all">All invited members</option><option value="unknown">Unknown outcome</option><option value="unlinked">Missing UUID</option><option value="manual">Staff corrections</option><option value="observed">Observed by collector</option>';
+        filter.append(select);
+        const rows = [...memberTable.querySelectorAll('tbody tr')];
+        rows.forEach((row, index) => {
+          const member = data.members[index];
+          if (!member) return;
+          const badge = document.createElement('small');
+          badge.className = member.manual
+            ? 'attendance-correction'
+            : 'feature-note';
+          badge.textContent = member.manual
+            ? 'Staff correction'
+            : member.evidence
+              ? 'Collector evidence'
+              : e.starts > now
+                ? 'Waiting for event'
+                : 'No collector observation';
+          row.lastElementChild.append(badge);
+        });
+        select.onchange = () =>
+          rows.forEach((row, index) => {
+            const member = data.members[index];
+            if (!member) return;
+            row.hidden =
+              select.value === 'unknown'
+                ? member.resolved !== 'unknown'
+                : select.value === 'unlinked'
+                  ? !!member.identity
+                  : select.value === 'manual'
+                    ? !member.manual
+                    : select.value === 'observed'
+                      ? !member.evidence
+                      : false;
+          });
+        memberTable.before(summary, legend, filter);
+      }
       el('event-duplicate')?.addEventListener('click', () => {
         if (UnitUX.canLeave()) eventEditor(e, true);
       });

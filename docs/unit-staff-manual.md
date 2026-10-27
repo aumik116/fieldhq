@@ -309,6 +309,10 @@ Member records show recent attendance, but the Attendance page is the place to i
 
 Under **Resources → SOPs & loadouts**, search by category, role or text. Permitted staff can maintain SOP text and external links, or loadouts with an image URL, kit slots, alternatives and notes. Archive obsolete references to retain editing history.
 
+New loadouts start with the standard 24-slot equipment layout, from Helmet through Sidearm. Expand a slot to set its main item, inventory contents and attachments. Each inventory item or attachment supports a quantity and notes. Empty slots can be left unfilled or removed.
+
+Use **Slot layout → Custom · start empty** to build your own layout, then add and name slots. Choose **Save as → Reusable template** to keep a staff-only template. When creating a new loadout, select a saved unit template to copy it, fill out the equipment and publish it for members. Templates are independent copies; changing one does not change loadouts already created from it. Switching layouts replaces the current slot contents after confirmation. Editing an existing loadout keeps its original slots.
+
 
 The unit’s SOP repository includes category filtering, full-text search and sorting by title or update date. Staff and unit administrators can create and edit documents in their own units; panel administrators can access all units.
 
@@ -467,7 +471,7 @@ Choose **Vacancies** for a list of open named billets, their formation paths and
 
 Promotion review includes an **Effective promotion date**, defaulting to today. Staff can record an earlier effective date; the panel checks time in rank and recorded award/expiry dates on that date. It cannot predate the previous promotion or be in the future. Approval and a staff note are still required. Editing the member's previous promotion date remains available when entering records from sheets.
 
-In **Manage qualifications**, an award can have an optional **Expires on** date. Leave it blank for a permanent qualification. Expired awards stay in the member record and timeline but do not satisfy promotion requirements after their expiry. Renew an award by updating its award and expiry dates; the timeline retains the previous values. Awards with unknown original dates cannot establish a precise historical award date.
+Renewal is off by default. A unit administrator can enable **Requires renewal** for individual qualifications in Rank rules & catalogs. Only enabled qualifications expose expiry controls or renewal tools. Existing explicit expiry dates retain their behavior when upgrading. Expired enabled awards remain in history but do not satisfy promotion requirements after expiry. Disabling renewal makes the qualification permanent for eligibility. Historical dates are retained in the change history.
 
 New member forms require a game name. Recorded UUID choices show when another current or former member already uses that identity; the server also rejects duplicate UUIDs in the same unit. Different units keep independent records.
 
@@ -503,3 +507,19 @@ In **Customization**, choose an icon or banner and drag its preview to frame the
 - **Edit notes:** Staff with roster editing access can choose **Edit note** beside a dated note, change the text, then **Save note** or **Cancel**. Original author/date stay visible, with an edited-by name and time. Saving rejects a note changed by another staff member so their edit is not overwritten.
 - **Print roster:** Choose **Print roster**, select formation or flat layout, and optionally include callsigns, qualifications and status. It prints all current members and open billets in formation order. Private notes, Discord handles, UUIDs and account details are excluded. Use the browser's print dialog to print or save a PDF.
 - **Duplicate event:** Open an event and choose **Duplicate event**. The new-event form copies its briefing, server, event type, location, tracking setting and formation audience, with a new future start time. Choose the intended date/end and save. Attendance, RSVPs, audit history and recurrence are not copied; the original event remains unchanged. A copied event uses the current roster for its new date.
+
+### Collaborative editing and workspace layout
+
+The roster keeps collapsible formation tables. Daily actions are in the main toolbar; Manage structure, Open billets and Temporary cover are in the Management row. Bulk actions opens directly to qualification awards/revocations, status changes, placement or unassignment. Member records show an identity header with rank/name, formation, status and callsign, followed by their section tabs. Notes is labelled **Staff notes**, and History is labelled **Service history**.
+
+Branding changes no longer invalidate rank edits. Different rank structures or qualification definitions can save from the same starting catalog without overwriting each other. Member A and member B can save independently. Conflicts on the same entry, member or note keep the draft open and reject the stale save. Structural operations and bulk previews retain their revision checks.
+
+Editing status shows other staff working on the same rank structure, qualification, member, note or branding. Roster names can show **Editing:** labels. This is advisory: editors can still work together, and the API checks conflicts when saving. Presence refreshes periodically and expires within about 45 seconds after a heartbeat stops.
+
+Unit-dialog errors keep entered values and selected files. **Copy error details** copies the failure message. For a conflict, **Copy my draft** copies entered fields before reopening the latest record; passwords and security tokens are excluded. Files are represented by their names. For other failures, **Try again** resubmits the form after you review its contents.
+
+### Optional renewals and clearer attendance review
+
+Units with renewable qualifications see **Qualifications → Qualification renewal queue**. Filter expired or upcoming awards by member and qualification; enabled awards with no expiry date are flagged for review. Select up to 500 awards, set the renewal date, new expiry, instructor and reason, then review and confirm. Existing award notes stay intact. The preview checks only the selected award records, so unrelated work does not invalidate it. If those awards change, return to the renewal details and prepare a new preview. Units with no qualifications configured for renewal do not show the queue or expiry controls.
+
+Event details separate expected members, collector observations, unknown outcomes and staff corrections. Filter the roster to focus on unknown results, missing UUIDs, observations or manual corrections. Collector gaps warn about evidence quality; they do not prove absence. Staff corrections override automatic results and remain in the audit history.

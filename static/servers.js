@@ -261,8 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
     busy.add(server.id);
     button.disabled = true;
     try {
-      await controlServer(command, server.id);
-      feedback.textContent = `${server.name}: ${command} requested.`;
+      await controlServer(command, server.id, server.name);
+      feedback.textContent = `${server.name}: ${command} completed.`;
     } catch (error) {
       feedback.textContent = error.message;
     } finally {

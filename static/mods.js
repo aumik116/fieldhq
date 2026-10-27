@@ -26,6 +26,7 @@ modEl('mods-list').addEventListener('focusout', () => requestAnimationFrame(() =
   if (['recent','oldest','largest','smallest'].includes(modLibrary.sort) && !modEl('mods-list').contains(document.activeElement)) drawModLibrary();
 }));
 function updateModLibrary(mods) {
+  document.dispatchEvent(new CustomEvent('mod-library-state',{detail:mods}));
   const signature = JSON.stringify(mods);
   if (signature === modLibrary.signature) return;
   modLibrary.signature = signature; modLibrary.mods = mods;
@@ -43,6 +44,7 @@ function modButton(text, action, className='') {
 function drawModLibrary() {
   const search = modEl('mods-search').value.trim().toLowerCase();
   let mods = modLibrary.mods.filter(m => `${m.name || ''} ${m.modId}`.toLowerCase().includes(search));
+  if(document.getElementById('mods-pinned-only')?.checked)mods=mods.filter(mod=>!!mod.version);
   const compareName = (a,b) => (a.name || a.modId).localeCompare(b.name || b.modId, undefined, {numeric:true,sensitivity:'base'});
   const sort = modLibrary.sort;
   if (sort === 'name' || sort === 'name-desc') mods.sort((a,b) => (sort === 'name' ? 1 : -1) * compareName(a,b));
@@ -98,7 +100,7 @@ function drawModLibrary() {
     }
     card.append(art,body); grid.append(card);
   });
-  if (!mods.length) { const empty=document.createElement('p'); empty.className='mods-empty'; empty.textContent=search ? 'No mods match your search.' : 'No mods configured. Add a mod or import a JSON list to get started.'; grid.append(empty); }
+  if (!mods.length) { const empty=document.createElement('p'); empty.className='mods-empty'; empty.textContent=modEl('mods-pinned-only')?.checked?'No pinned mods match your filters.':search ? 'No mods match your search.' : 'No mods configured. Add a mod or import a JSON list to get started.'; grid.append(empty); }
   modEl('mods-range').textContent=`Showing ${mods.length ? start+1 : 0}–${Math.min(start+modLibrary.size,mods.length)} of ${mods.length}`;
   const pagination=modEl('mods-pagination'); pagination.replaceChildren();
   const pageButton=(label,page)=>{ const b=modButton(label,()=>{modLibrary.page=page;drawModLibrary();}); b.disabled=page<1 || page>pages; return b; };

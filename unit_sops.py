@@ -28,8 +28,7 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
     is_member = partial(unit_is_member, panel_admin=panel_admin)
     permissions = partial(unit_permissions, panel_admin=panel_admin)
     with db() as conn:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS unit_references (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, unit_id INTEGER NOT NULL,
                 kind TEXT NOT NULL, title TEXT NOT NULL, category TEXT NOT NULL,
@@ -43,8 +42,7 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
                 filename TEXT NOT NULL, mime TEXT NOT NULL, content BLOB NOT NULL,
                 created_by TEXT NOT NULL, created_at REAL NOT NULL);
             CREATE INDEX IF NOT EXISTS unit_reference_files_reference ON unit_reference_files(unit_id,reference_id);
-        """
-        )
+        """)
 
     with db() as conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -224,8 +222,8 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
                     else [
                         dict(r)
                         for r in conn.execute(
-                            "SELECT id,title FROM unit_references WHERE unit_id=? AND kind='sop' AND status='template' AND archived=0 ORDER BY title COLLATE NOCASE LIMIT 1000",
-                            (unit_id,),
+                            "SELECT id,title FROM unit_references WHERE unit_id=? AND kind=? AND status='template' AND archived=0 ORDER BY title COLLATE NOCASE LIMIT 1000",
+                            (unit_id, kind),
                         )
                     ]
                 )
@@ -597,11 +595,7 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
             if any(part in (".", "..") for part in folder.split("/")):
                 raise ValueError("Use folder names without . or .. segments")
             status = data.get("status", "draft" if kind == "sop" else "published")
-            if (
-                status not in ("draft", "published", "template")
-                or kind != "sop"
-                and status == "template"
-            ):
+            if status not in ("draft", "published", "template"):
                 raise ValueError("Choose Draft, Published or Template")
             related = data.get("related", [])
             if not isinstance(related, list) or len(related) > 30:
@@ -624,6 +618,28 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
                         for key in ("slot", "standard", "alternatives", "notes")
                     }
                 )
+                for collection in ("inventory", "attachments"):
+                    entries = slot.get(collection, [])
+                    if not isinstance(entries, list) or len(entries) > 100:
+                        raise ValueError("Keep at most 100 items per slot list")
+                    cleaned_entries = []
+                    for entry in entries:
+                        if not isinstance(entry, dict):
+                            raise ValueError(
+                                "Choose valid inventory items and attachments"
+                            )
+                        cleaned_entries.append(
+                            dict(
+                                name=text(
+                                    entry.get("name", ""), "Item name", 120, True
+                                ),
+                                quantity=number(
+                                    entry.get("quantity", 1), "Quantity", 1, 999
+                                ),
+                                notes=text(entry.get("notes", ""), "Item notes", 1000),
+                            )
+                        )
+                    clean[-1][collection] = cleaned_entries
             if files and kind != "sop":
                 raise ValueError("Attachments are available for SOPs")
             if kind == "sop":
@@ -708,14 +724,16 @@ def install(api, db, access, revision, panel_admin, endpoints, required_reading)
                 template_id = data.get("template_id")
                 if template_id is not None:
                     if old:
-                        raise ValueError("Use templates when creating a new SOP")
+                        raise ValueError("Use templates when creating a new resource")
                     source = get_row(conn, "unit_references", unit_id, template_id)
                     if (
                         source["status"] != "template"
                         or source["archived"]
-                        or source["kind"] != "sop"
+                        or source["kind"] != kind
                     ):
-                        raise ValueError("Choose an active SOP template")
+                        raise ValueError(
+                            "Choose an active template of the same resource type"
+                        )
                     for attachment in conn.execute(
                         "SELECT * FROM unit_reference_files WHERE unit_id=? AND reference_id=?",
                         (unit_id, template_id),

@@ -13,13 +13,11 @@ from unit_common import actor, audit, number, text
 
 def initialize(db):
     with db() as conn:
-        conn.executescript(
-            """
+        conn.executescript("""
         CREATE TABLE IF NOT EXISTS unit_temporary_assignments(id INTEGER PRIMARY KEY AUTOINCREMENT,unit_id INTEGER NOT NULL,member_id INTEGER NOT NULL,billet_id INTEGER NOT NULL,starts_on TEXT NOT NULL,ends_on TEXT NOT NULL DEFAULT '',notes TEXT NOT NULL DEFAULT '',cancelled INTEGER NOT NULL DEFAULT 0);
         CREATE INDEX IF NOT EXISTS unit_temporary_unit ON unit_temporary_assignments(unit_id,billet_id,starts_on);
         CREATE TABLE IF NOT EXISTS unit_followups(id INTEGER PRIMARY KEY AUTOINCREMENT,unit_id INTEGER NOT NULL,member_id INTEGER,title TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',due_on TEXT NOT NULL DEFAULT '',completed INTEGER NOT NULL DEFAULT 0,author TEXT NOT NULL,updated_at REAL NOT NULL);
-        """
-        )
+        """)
 
 
 def install(
@@ -138,6 +136,11 @@ def install(
                 for row in conn.execute(
                     "SELECT q.member_id,r.game_name,q.certificate,q.awarded_on,q.expires_on FROM unit_qualification_awards q JOIN unit_roster r ON r.id=q.member_id AND r.unit_id=q.unit_id WHERE q.unit_id=? AND r.archived=0 AND q.expires_on!='' AND q.expires_on<=? ORDER BY q.expires_on,r.game_name",
                     (unit_id, horizon),
+                )
+                if any(
+                    entry["name"] == row["certificate"]
+                    and entry.get("renewal_required")
+                    for entry in catalog.get("qualification_details", [])
                 )
             ]
             eligible = [

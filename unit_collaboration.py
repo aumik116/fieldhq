@@ -4,20 +4,75 @@ from datetime import date
 import hashlib
 import json
 import math
+import time
+import re
 from flask import g, jsonify, request
 
 
 def install(api, db, access, panel_admin, endpoints):
     with db() as conn:
         conn.execute(
+            "CREATE TABLE IF NOT EXISTS unit_editors(unit_id INTEGER NOT NULL,user_id INTEGER NOT NULL,client TEXT NOT NULL,resource TEXT NOT NULL,expires REAL NOT NULL,PRIMARY KEY(unit_id,user_id,client))"
+        )
+        conn.execute(
             "CREATE INDEX IF NOT EXISTS unit_notes_sync ON unit_member_notes(unit_id,id)"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS unit_attendance_sync ON unit_attendance_audit(unit_id,id)"
         )
-    names = {"unit_collab_state", "unit_roster_feed"}
+    names = {"unit_collab_state", "unit_roster_feed", "unit_editing"}
     endpoints.update(names)
     api.PANEL_WIDE_ENDPOINTS.update(names)
+    from panel_features import MUTATIONS
+
+    MUTATIONS["unit_editing"] = "view"
+
+    @api.app.post("/api/units/<int:unit_id>/editing")
+    def unit_editing(unit_id):
+        data = request.get_json()
+        client = data.get("client", "")
+        resource = data.get("resource", "")
+        if (
+            not isinstance(client, str)
+            or not re.fullmatch(r"[a-zA-Z0-9-]{1,80}", client)
+            or not isinstance(resource, str)
+            or not 1 <= len(resource) <= 180
+            or resource.split(":")[0]
+            not in ("rank", "qualification", "member", "note", "branding")
+            or type(data.get("active")) is not bool
+        ):
+            return jsonify(ok=False, error="Choose a valid editor"), 400
+        with db() as conn:
+            access(
+                conn,
+                unit_id,
+                (
+                    "staff"
+                    if resource.split(":")[0] in ("rank", "qualification", "branding")
+                    else "roster"
+                ),
+            )
+            conn.execute("DELETE FROM unit_editors WHERE expires<?", (time.time(),))
+            conn.execute(
+                "DELETE FROM unit_editors WHERE unit_id=? AND user_id=? AND client=? AND (? OR resource=?)",
+                (unit_id, g.user["id"], client, data["active"], resource),
+            )
+            if data["active"]:
+                conn.execute(
+                    "INSERT INTO unit_editors VALUES(?,?,?,?,?)",
+                    (unit_id, g.user["id"], client, resource, time.time() + 45),
+                )
+            editors = []
+            for row in conn.execute(
+                "SELECT DISTINCT e.user_id,u.username FROM unit_editors e JOIN users u ON u.id=e.user_id WHERE e.unit_id=? AND e.resource=? AND u.enabled=1 AND NOT(e.user_id=? AND e.client=?) AND NOT EXISTS(SELECT 1 FROM unit_account_suspensions s WHERE s.unit_id=e.unit_id AND s.user_id=e.user_id)",
+                (unit_id, resource, g.user["id"], client),
+            ):
+                name = conn.execute(
+                    "SELECT game_name FROM unit_roster WHERE unit_id=? AND panel_user_id=?",
+                    (unit_id, row["user_id"]),
+                ).fetchone()
+                editors.append(name["game_name"] if name else row["username"])
+        return jsonify(ok=True, editors=editors)
 
     def snapshot(conn, unit_id):
         unit = access(conn, unit_id)
@@ -56,6 +111,13 @@ def install(api, db, access, panel_admin, endpoints):
         with db() as conn:
             conn.execute("BEGIN")
             result = snapshot(conn, unit_id)
+            result["editing"] = []
+            if result["staff"]:
+                for row in conn.execute(
+                    "SELECT DISTINCT e.resource,COALESCE(r.game_name,u.username) AS name FROM unit_editors e JOIN users u ON u.id=e.user_id LEFT JOIN unit_roster r ON r.unit_id=e.unit_id AND r.panel_user_id=e.user_id WHERE e.unit_id=? AND e.expires>? AND u.enabled=1 AND (u.panel_admin=1 OR EXISTS(SELECT 1 FROM panel_owner p WHERE p.user_id=u.id) OR EXISTS(SELECT 1 FROM unit_staff s WHERE s.unit_id=e.unit_id AND s.user_id=u.id AND s.role!='member')) AND NOT EXISTS(SELECT 1 FROM unit_account_suspensions s WHERE s.unit_id=e.unit_id AND s.user_id=u.id)",
+                    (unit_id, time.time()),
+                ):
+                    result["editing"].append(dict(row))
             latest = (
                 conn.execute(
                     "SELECT actor,action,ts,details FROM activity WHERE outcome='success' AND json_extract(details,'$.unit_id')=? AND action NOT LIKE '%preview%' AND coalesce(json_extract(details,'$.change'),'') NOT LIKE '%preview%' ORDER BY id DESC LIMIT 1",

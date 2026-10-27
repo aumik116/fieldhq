@@ -213,6 +213,15 @@ window.UnitPersonnel = (() => {
             .join('') || '<p>None recorded.</p>'
         }</details></section>`;
       const root = el('meeting-content');
+      if (
+        !context.detail.unit.catalog.qualification_details?.some(
+          (item) => item.renewal_required,
+        )
+      ) {
+        root.querySelector('.unit-summary>span:nth-child(3)').hidden = true;
+        root.querySelector('.unit-dashboard-grid>section:nth-child(3)').hidden =
+          true;
+      }
       bind(root);
       el('meeting-add-followup').onclick = () => followup();
       root.querySelectorAll('[data-agenda-promote]').forEach(

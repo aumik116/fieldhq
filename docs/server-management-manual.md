@@ -144,6 +144,10 @@ The clone copies configuration and mod selections, with fresh endpoints and sepa
 
 ## 5. Dashboard and console
 
+A lost or unreadable control response is labelled **Unconfirmed**. The server action may still finish; use **Check server status** before sending another request. The panel does not offer a blind retry for an unconfirmed result.
+
+Server start, stop and restart requests show a shared action card with In progress, Completed or Failed status. A spinner means the request is still awaiting its response; it is not a measured percentage. Failed control requests offer error copying and a confirmed Retry. Software workers report their actual update/check states in the same area, with their existing detailed output still available. These cards describe actions on the current page; Activity remains the saved history. Successful process control does not establish that clients can join the mission.
+
 The dashboard is arranged as:
 
 1. Population counters: players, AI and vehicles; uptime and resource counters.
@@ -210,6 +214,8 @@ Use **Startup diagnostics** and recent output when a server fails to start. Avoi
 The Network page shows host interface traffic and available player/network readings. Host traffic includes other services and other game servers; dividing it by the player count is only a rough estimate. Review game/query/RCON endpoints and listener information when investigating connectivity. Public reachability still depends on firewall, routing and NAT outside the panel. Supported configuration edits apply on the next game-server start.
 
 ## 7. Mods and the addition queue
+
+The Mods summary distinguishes **Configured**, **Queued additions**, **Downloaded versions** and **Pinned**. Click a counter to open the corresponding view. Pinned opens the configured list with **Pinned versions only** selected. Queued additions have not been applied to configuration. Downloaded versions describe local files and can include dependencies or files no longer configured. Counts can show a dash while the local inventory is scanning or unavailable. Switching tabs explains that view's effect; it does not apply a change.
 
 The Mods pages separate different tasks:
 
@@ -385,6 +391,10 @@ Server administrators can configure notifications under Administration → Notif
 
 ## 11. Files, saves and recovery
 
+### Owner panel-data download
+
+The panel Owner can open **Panel users → Download panel-data backup**. Other panel administrators cannot download this complete archive. The ZIP includes a consistent SQLite snapshot, `config.env`, `.panel-secret` and available managed-server JSON configuration files, plus a manifest and recovery instructions. It contains private records and credentials; keep it private. Game installations, Workshop files, profiles/world saves and logs are excluded and need separate backups. Configuration files are read individually after the database snapshot. The manifest lists missing files and the configured database path. Restore with the panel stopped, preserve service-user ownership/private permissions, and review paths before restoring on another host. The archive includes step-by-step recovery guidance.
+
 ### Files
 
 Use **Files** to browse permitted server locations, upload files and edit supported text files. Save edits explicitly. Deleted items moved to panel Trash can be restored through its controls.
@@ -414,6 +424,8 @@ Scheduler's **Backup** action is a configuration backup, not a full server backu
 4. Type the exact server ID and confirm.
 
 The server is stopped before removal. Retained files can be cleaned up later through Storage. Permanent deletion includes that installation's game files, mods, profile/saves, logs and backups. It cannot be undone through the panel.
+
+The removal dialog measures game files, Workshop mods, profiles/saves, logs, backups, configuration and other server files before confirmation. It shows whether those files will be retained or deleted. A partial measurement is a lower bound. Sizes describe logical file contents; compression and shared storage blocks can change the space actually reclaimed. **Archive files and remove** moves the installation to retained storage and frees no disk space. Other servers' copies are kept. The exact folder and typed server-ID confirmation remain visible.
 
 ## 12. Common problems
 

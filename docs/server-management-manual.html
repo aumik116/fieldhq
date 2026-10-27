@@ -239,6 +239,19 @@ endpoints and separate server files. Passwords, in-game administrator
 assignments and save files are not copied. Existing local game/mod
 downloads can be reused; this is not a shared writable installation.</p>
 <h2 id="5-dashboard-and-console">5. Dashboard and console</h2>
+<p>A lost or unreadable control response is labelled
+<strong>Unconfirmed</strong>. The server action may still finish; use
+<strong>Check server status</strong> before sending another request. The
+panel does not offer a blind retry for an unconfirmed result.</p>
+<p>Server start, stop and restart requests show a shared action card
+with In progress, Completed or Failed status. A spinner means the
+request is still awaiting its response; it is not a measured percentage.
+Failed control requests offer error copying and a confirmed Retry.
+Software workers report their actual update/check states in the same
+area, with their existing detailed output still available. These cards
+describe actions on the current page; Activity remains the saved
+history. Successful process control does not establish that clients can
+join the mission.</p>
 <p>The dashboard is arranged as:</p>
 <ol type="1">
 <li>Population counters: players, AI and vehicles; uptime and resource
@@ -332,6 +345,15 @@ firewall, routing and NAT outside the panel. Supported configuration
 edits apply on the next game-server start.</p>
 <h2 id="7-mods-and-the-addition-queue">7. Mods and the addition
 queue</h2>
+<p>The Mods summary distinguishes <strong>Configured</strong>,
+<strong>Queued additions</strong>, <strong>Downloaded versions</strong>
+and <strong>Pinned</strong>. Click a counter to open the corresponding
+view. Pinned opens the configured list with <strong>Pinned versions
+only</strong> selected. Queued additions have not been applied to
+configuration. Downloaded versions describe local files and can include
+dependencies or files no longer configured. Counts can show a dash while
+the local inventory is scanning or unavailable. Switching tabs explains
+that view's effect; it does not apply a change.</p>
 <p>The Mods pages separate different tasks:</p>
 <table>
 <thead>
@@ -612,6 +634,20 @@ and use the offered test action to confirm delivery. Notification
 history is separate from live game logs; a notification does not prove a
 mission is reachable by players.</p>
 <h2 id="11-files-saves-and-recovery">11. Files, saves and recovery</h2>
+<h3 id="owner-panel-data-download">Owner panel-data download</h3>
+<p>The panel Owner can open <strong>Panel users → Download panel-data
+backup</strong>. Other panel administrators cannot download this
+complete archive. The ZIP includes a consistent SQLite snapshot,
+<code>config.env</code>, <code>.panel-secret</code> and available
+managed-server JSON configuration files, plus a manifest and recovery
+instructions. It contains private records and credentials; keep it
+private. Game installations, Workshop files, profiles/world saves and
+logs are excluded and need separate backups. Configuration files are
+read individually after the database snapshot. The manifest lists
+missing files and the configured database path. Restore with the panel
+stopped, preserve service-user ownership/private permissions, and review
+paths before restoring on another host. The archive includes
+step-by-step recovery guidance.</p>
 <h3 id="files">Files</h3>
 <p>Use <strong>Files</strong> to browse permitted server locations,
 upload files and edit supported text files. Save edits explicitly.
@@ -652,6 +688,15 @@ with your administrator.</p>
 up later through Storage. Permanent deletion includes that
 installation's game files, mods, profile/saves, logs and backups. It
 cannot be undone through the panel.</p>
+<p>The removal dialog measures game files, Workshop mods,
+profiles/saves, logs, backups, configuration and other server files
+before confirmation. It shows whether those files will be retained or
+deleted. A partial measurement is a lower bound. Sizes describe logical
+file contents; compression and shared storage blocks can change the
+space actually reclaimed. <strong>Archive files and remove</strong>
+moves the installation to retained storage and frees no disk space.
+Other servers' copies are kept. The exact folder and typed server-ID
+confirmation remain visible.</p>
 <h2 id="12-common-problems">12. Common problems</h2>
 <table>
 <thead>

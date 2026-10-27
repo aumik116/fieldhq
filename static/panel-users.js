@@ -22,6 +22,15 @@
   };
   try {
     window.unitAccount = await readJson(await fetch('/api/me'));
+    el('panel-backup-owner').hidden = !window.unitAccount.is_owner;
+    el('panel-backup-download').onclick = (event) => {
+      if (
+        !confirm(
+          'Download the complete panel-data backup? It contains private records, account password hashes and configuration credentials. Keep it in private storage. Game files and world saves are excluded.',
+        )
+      )
+        event.preventDefault();
+    };
     el('users-account-name').textContent = window.unitAccount.username;
     await refresh();
   } catch (error) {

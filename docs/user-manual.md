@@ -182,6 +182,10 @@ The clone copies configuration and mod selections, with fresh endpoints and sepa
 
 ## 5. Dashboard and console
 
+A lost or unreadable control response is labelled **Unconfirmed**. The server action may still finish; use **Check server status** before sending another request. The panel does not offer a blind retry for an unconfirmed result.
+
+Server start, stop and restart requests show a shared action card with In progress, Completed or Failed status. A spinner means the request is still awaiting its response; it is not a measured percentage. Failed control requests offer error copying and a confirmed Retry. Software workers report their actual update/check states in the same area, with their existing detailed output still available. These cards describe actions on the current page; Activity remains the saved history. Successful process control does not establish that clients can join the mission.
+
 The dashboard is arranged as:
 
 1. Population counters: players, AI and vehicles; uptime and resource counters.
@@ -248,6 +252,8 @@ Use **Startup diagnostics** and recent output when a server fails to start. Avoi
 The Network page shows host interface traffic and available player/network readings. Host traffic includes other services and other game servers; dividing it by the player count is only a rough estimate. Review game/query/RCON endpoints and listener information when investigating connectivity. Public reachability still depends on firewall, routing and NAT outside the panel. Supported configuration edits apply on the next game-server start.
 
 ## 7. Mods and the addition queue
+
+The Mods summary distinguishes **Configured**, **Queued additions**, **Downloaded versions** and **Pinned**. Click a counter to open the corresponding view. Pinned opens the configured list with **Pinned versions only** selected. Queued additions have not been applied to configuration. Downloaded versions describe local files and can include dependencies or files no longer configured. Counts can show a dash while the local inventory is scanning or unavailable. Switching tabs explains that view's effect; it does not apply a change.
 
 The Mods pages separate different tasks:
 
@@ -423,6 +429,10 @@ Server administrators can configure notifications under Administration → Notif
 
 ## 11. Files, saves and recovery
 
+### Owner panel-data download
+
+The panel Owner can open **Panel users → Download panel-data backup**. Other panel administrators cannot download this complete archive. The ZIP includes a consistent SQLite snapshot, `config.env`, `.panel-secret` and available managed-server JSON configuration files, plus a manifest and recovery instructions. It contains private records and credentials; keep it private. Game installations, Workshop files, profiles/world saves and logs are excluded and need separate backups. Configuration files are read individually after the database snapshot. The manifest lists missing files and the configured database path. Restore with the panel stopped, preserve service-user ownership/private permissions, and review paths before restoring on another host. The archive includes step-by-step recovery guidance.
+
 ### Files
 
 Use **Files** to browse permitted server locations, upload files and edit supported text files. Save edits explicitly. Deleted items moved to panel Trash can be restored through its controls.
@@ -452,6 +462,8 @@ Scheduler's **Backup** action is a configuration backup, not a full server backu
 4. Type the exact server ID and confirm.
 
 The server is stopped before removal. Retained files can be cleaned up later through Storage. Permanent deletion includes that installation's game files, mods, profile/saves, logs and backups. It cannot be undone through the panel.
+
+The removal dialog measures game files, Workshop mods, profiles/saves, logs, backups, configuration and other server files before confirmation. It shows whether those files will be retained or deleted. A partial measurement is a lower bound. Sizes describe logical file contents; compression and shared storage blocks can change the space actually reclaimed. **Archive files and remove** moves the installation to retained storage and frees no disk space. Other servers' copies are kept. The exact folder and typed server-ID confirmation remain visible.
 
 ## 12. Set up a unit
 
@@ -669,6 +681,8 @@ Normal attendance percentages use finalized, expected Present/Absent decisions. 
 
 Use **SOPs & loadouts** to search references by category, role or text. Permitted staff can create SOP text/external links and loadouts with image URLs, kit slots, alternatives and notes. Archive obsolete references rather than losing their editing history.
 
+New loadouts use a standard 24-slot layout: Helmet, Jacket, ArmoredVest, Pants, Boots, Back, Vest, HandWear, Head, Eyes, Ears, Face, Neck, Extra, Extra 2–6, Waist, NVS_NVGSLOT, Primary Weapon, Secondary Weapon and Sidearm. Expand each slot to enter its main item, inventory contents and attachments, including quantities and notes. Staff can add, rename or remove slots, or select **Slot layout → Custom · start empty**. Save a custom layout as a **Reusable template** to copy into future loadouts; templates remain staff-only. Publish completed loadouts for members. Existing loadouts retain their slots when edited, and template changes do not update existing copies.
+
 
 The unit’s SOP repository includes category filtering, full-text search and sorting by title or update date. Staff and unit administrators can create and edit documents in their own units; panel administrators can access all units.
 
@@ -767,7 +781,7 @@ Choose **Vacancies** for a list of open named billets, their formation paths and
 
 Promotion review includes an **Effective promotion date**, defaulting to today. Staff can record an earlier effective date; the panel checks time in rank and recorded award/expiry dates on that date. It cannot predate the previous promotion or be in the future. Approval and a staff note are still required. Editing the member's previous promotion date remains available when entering records from sheets.
 
-In **Manage qualifications**, an award can have an optional **Expires on** date. Leave it blank for a permanent qualification. Expired awards stay in the member record and timeline but do not satisfy promotion requirements after their expiry. Renew an award by updating its award and expiry dates; the timeline retains the previous values. Awards with unknown original dates cannot establish a precise historical award date.
+Qualification renewal is off by default. A unit administrator can enable **Requires renewal** on an individual qualification in Rank rules & catalogs. Only enabled qualifications show expiry controls and appear in the renewal queue. Existing explicit expiry dates retain their renewal behavior when upgrading. Expired enabled awards stay in the member record and timeline but do not satisfy promotion requirements after expiry. Disabling renewal makes that qualification permanent for eligibility; historical dates remain in its history. Awards with unknown original dates cannot establish a precise historical award date.
 
 New member forms require a game name. Recorded UUID choices show when another current or former member already uses that identity; the server also rejects duplicate UUIDs in the same unit. Different units keep independent records.
 
@@ -803,3 +817,19 @@ In **Customization**, choose an icon or banner and drag its preview to frame the
 - **Edit notes:** Staff with roster editing access can choose **Edit note** beside a dated note, change the text, then **Save note** or **Cancel**. Original author/date stay visible, with an edited-by name and time. Saving rejects a note changed by another staff member so their edit is not overwritten.
 - **Print roster:** Choose **Print roster**, select formation or flat layout, and optionally include callsigns, qualifications and status. It prints all current members and open billets in formation order. Private notes, Discord handles, UUIDs and account details are excluded. Use the browser's print dialog to print or save a PDF.
 - **Duplicate event:** Open an event and choose **Duplicate event**. The new-event form copies its briefing, server, event type, location, tracking setting and formation audience, with a new future start time. Choose the intended date/end and save. Attendance, RSVPs, audit history and recurrence are not copied; the original event remains unchanged. A copied event uses the current roster for its new date.
+
+### Collaborative editing and workspace layout
+
+Roster search, status/sort filters, Add member, Bulk actions, Print and CSV export stay in the main toolbar. Manage structure, Open billets and Temporary cover are grouped in a separate Management row. Formation tables remain collapsible. Member records show rank/name, formation, status and callsign above their tabs; Notes is labelled **Staff notes**, and History is labelled **Service history**.
+
+Branding and rank rules save independently. Catalog saves merge changes to different rank structures or qualification definitions; an overlapping change to the same entry is rejected. Member A and member B also save independently. Same-member and same-note changes retain their conflict protection. Rank/qualification forms and branding use these checks even if another unit action changed the general revision in the meantime. Structural operations and bulk previews retain their own revision checks.
+
+Staff can see other editors working on the same rank structure, qualification, member or note; branding also shows its editing status. Roster names can show an **Editing:** indicator. Presence is advisory and refreshes periodically while the editor is open. It expires within about 45 seconds without a heartbeat. It does not lock an item or approve a save.
+
+Failed unit-dialog saves keep the form open. **Copy error details** provides the message for an administrator. Conflicts offer **Copy my draft** so entered values can be retained before reopening; password fields and security tokens are excluded. File names are included in copied drafts, not file contents. **Try again** is available for other failures. Review the error and your inputs before resubmitting.
+
+### Renewal queue and attendance review
+
+If a unit has renewable qualifications, **Qualifications → Qualification renewal queue** lists expired awards, awards due within 30/90 days, and enabled awards missing an expiry date. Filter by qualification or member, select up to 500 awards, then enter the renewal date, new expiry, instructor and reason. Review the named members before applying. Existing award notes are retained and the history records the update. Changes to a selected award invalidate its preview; unrelated branding or member changes do not. Use **Back to renewal details** to keep the entered values while preparing a fresh preview. Units with no renewable qualifications do not show these tools.
+
+Event details show expected members, collector observations, unknown outcomes and staff corrections separately. Filters isolate unknown outcomes, missing UUIDs, observed players or staff corrections. Unknown is not an automatic absence. Collector gaps are event-level evidence warnings; they do not establish that a particular member missed the event. Manual corrections take precedence and retain their audit trail.

@@ -12,8 +12,7 @@ from unit_common import actor, can, publication_digest, text, roster_status
 def install(api, db, access, revision, panel_admin, endpoints):
     staff = partial(can, panel_admin=panel_admin)
     with db() as conn:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS unit_document_rules (
                 unit_id INTEGER NOT NULL, reference_id INTEGER NOT NULL,
                 targets TEXT NOT NULL DEFAULT '[]', reading_due TEXT NOT NULL DEFAULT '',
@@ -32,8 +31,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
                 title TEXT NOT NULL, body TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0,
                 expires_on TEXT NOT NULL DEFAULT '', archived INTEGER NOT NULL DEFAULT 0,
                 author TEXT NOT NULL, updated_at REAL NOT NULL);
-        """
-        )
+        """)
     names = {
         "unit_member_home",
         "unit_self_profile",
@@ -191,7 +189,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
             invited_events = {
                 row[0]
                 for row in conn.execute(
-                    'SELECT m.event_id FROM unit_event_members m JOIN unit_events e ON e.id=m.event_id WHERE e.unit_id=? AND m.member_id=? AND e.state=? AND e.starts>?',
+                    "SELECT m.event_id FROM unit_event_members m JOIN unit_events e ON e.id=m.event_id WHERE e.unit_id=? AND m.member_id=? AND e.state=? AND e.starts>?",
                     (unit_id, member["id"] if member else -1, "scheduled", now),
                 )
             }
@@ -239,7 +237,7 @@ def install(api, db, access, revision, panel_admin, endpoints):
     @api.app.get("/api/units/<int:unit_id>/my-profile")
     def unit_self_profile(unit_id):
         with db() as conn:
-            access(conn, unit_id)
+            unit = access(conn, unit_id)
             member = own_member(conn, unit_id)
             if not member:
                 return jsonify(
@@ -267,6 +265,16 @@ def install(api, db, access, revision, panel_admin, endpoints):
                     (unit_id, member["id"]),
                 )
             ]
+            renewing = {
+                entry["name"]
+                for entry in json.loads(unit["catalog"]).get(
+                    "qualification_details", []
+                )
+                if entry.get("renewal_required")
+            }
+            for qualification in qualifications:
+                if qualification["certificate"] not in renewing:
+                    qualification["expires_on"] = ""
             positions = [
                 dict(r)
                 for r in conn.execute(

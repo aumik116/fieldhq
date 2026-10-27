@@ -98,6 +98,7 @@
   }
   function renderMatrix() {
     if (!context || !metadata) return;
+    renderRenewals();
     const certificates = context.detail.unit.catalog.certificates || [];
     const status = el('matrix-status').value,
       search = el('matrix-search').value.trim().toLowerCase();
@@ -189,6 +190,198 @@
             )),
       );
   }
+  const renewalSelection = new Set();
+  let renewalDraft = null;
+  function renderRenewals() {
+    const root = el('renewal-queue');
+    if (!root || !context || !metadata) return;
+    const renewing = new Set(
+      (context.detail.unit.catalog.qualification_details || [])
+        .filter((item) => item.renewal_required)
+        .map((item) => item.name),
+    );
+    root.closest('details').hidden = !renewing.size;
+    if (!renewing.size) return;
+    if (root.dataset.unit !== String(context.unitId)) {
+      renewalSelection.clear();
+      renewalDraft = null;
+      root.dataset.unit = context.unitId;
+      root.innerHTML =
+        '<h3>Qualification renewals</h3><div class="unit-toolbar"><label>Due<select id="renewal-range"><option value="30">Expired / within 30 days</option><option value="expired">Expired only</option><option value="90">Expired / within 90 days</option></select></label><label>Qualification<select id="renewal-certificate"></select></label><input type="search" id="renewal-search" placeholder="Search members" aria-label="Search renewal members"><button type="button" id="renewal-select">Select shown</button><button type="button" id="renewal-clear">Clear</button><button type="button" id="renewal-open">Renew selected</button></div><p id="renewal-count" role="status"></p><div class="unit-table renewal-table"><table><thead><tr><th>Select</th><th>Member</th><th>Qualification</th><th>Expiry</th></tr></thead><tbody id="renewal-rows"></tbody></table></div>';
+    }
+    const members = new Map(current().map((member) => [member.id, member]));
+    const awards = (metadata.awards || []).filter(
+      (award) =>
+        members.has(award.member_id) && renewing.has(award.certificate),
+    );
+    const keys = new Set(
+      awards.map((award) =>
+        JSON.stringify([award.member_id, award.certificate]),
+      ),
+    );
+    for (const key of renewalSelection)
+      if (!keys.has(key)) renewalSelection.delete(key);
+    const certificate = el('renewal-certificate'),
+      previous = certificate.value;
+    certificate.innerHTML =
+      '<option value="">All qualifications</option>' +
+      [...new Set(awards.map((award) => award.certificate))]
+        .sort()
+        .map((name) => `<option>${esc(name)}</option>`)
+        .join('');
+    certificate.value = previous;
+    if (certificate.selectedIndex < 0) certificate.value = '';
+    let shown = [];
+    function draw() {
+      [...renewalSelection]
+        .slice(500)
+        .forEach((key) => renewalSelection.delete(key));
+      const range = el('renewal-range').value,
+        query = el('renewal-search').value.trim().toLowerCase();
+      const horizon = new Date(
+        Date.parse(metadata.today + 'T00:00:00Z') +
+          (range === 'expired' ? 0 : Number(range)) * 86400000,
+      )
+        .toISOString()
+        .slice(0, 10);
+      const matches = awards
+        .filter(
+          (award) =>
+            (range === 'expired'
+              ? !!award.expires_on && award.expires_on < metadata.today
+              : !award.expires_on || award.expires_on <= horizon) &&
+            (!certificate.value || award.certificate === certificate.value) &&
+            members
+              .get(award.member_id)
+              .game_name.toLowerCase()
+              .includes(query),
+        )
+        .sort((a, b) => a.expires_on.localeCompare(b.expires_on));
+      shown = matches.slice(0, 500);
+      el('renewal-rows').innerHTML =
+        shown
+          .map((award) => {
+            const key = JSON.stringify([award.member_id, award.certificate]);
+            return `<tr><td><input type="checkbox" data-renewal-key="${esc(key)}" ${renewalSelection.has(key) ? 'checked' : ''} aria-label="Select ${esc(members.get(award.member_id).game_name + ' ' + award.certificate)}"></td><td>${esc(members.get(award.member_id).game_name)}</td><td>${esc(award.certificate)}</td><td><span class="${award.expires_on < metadata.today ? 'unit-warn' : ''}">${esc(award.expires_on)}${award.expires_on < metadata.today ? ' · Expired' : ''}</span></td></tr>`;
+          })
+          .join('') || '<tr><td colspan="4">No renewals match.</td></tr>';
+      el('renewal-count').textContent =
+        `${matches.length} due · ${renewalSelection.size} selected${matches.length > 500 ? ' · Showing first 500; narrow your filters' : ''}`;
+      el('renewal-open').disabled =
+        !context.detail.can_edit || !renewalSelection.size;
+      el('renewal-rows')
+        .querySelectorAll('tr')
+        .forEach((row, index) => {
+          if (shown[index] && !shown[index].expires_on) {
+            row.lastElementChild.textContent = 'Expiry not set';
+            row.lastElementChild.className = 'unit-warn';
+          }
+        });
+      el('renewal-select').disabled = !context.detail.can_edit;
+      el('renewal-clear').disabled = !context.detail.can_edit;
+      root.querySelectorAll('[data-renewal-key]').forEach((input) => {
+        input.disabled = !context.detail.can_edit;
+        input.onchange = () => {
+          if (
+            input.checked &&
+            !renewalSelection.has(input.dataset.renewalKey) &&
+            renewalSelection.size >= 500
+          ) {
+            input.checked = false;
+            el('renewal-count').textContent =
+              'Select at most 500 awards per renewal batch.';
+            return;
+          }
+          if (input.checked) renewalSelection.add(input.dataset.renewalKey);
+          else renewalSelection.delete(input.dataset.renewalKey);
+          el('renewal-count').textContent =
+            `${matches.length} due · ${renewalSelection.size} selected${matches.length > 500 ? ' · Showing first 500' : ''}`;
+          el('renewal-open').disabled =
+            !context.detail.can_edit || !renewalSelection.size;
+        };
+      });
+    }
+    for (const id of ['renewal-range', 'renewal-certificate'])
+      el(id).onchange = draw;
+    el('renewal-search').oninput = draw;
+    el('renewal-select').onclick = () => {
+      shown.forEach((award) =>
+        renewalSelection.add(
+          JSON.stringify([award.member_id, award.certificate]),
+        ),
+      );
+      draw();
+    };
+    el('renewal-clear').onclick = () => {
+      renewalSelection.clear();
+      draw();
+    };
+    el('renewal-open').onclick = () => {
+      const chosen = [...renewalSelection].map((key) => {
+        const [member_id, certificate] = JSON.parse(key);
+        return { member_id, certificate };
+      });
+      open(
+        'Renew selected qualifications',
+        `<p>${chosen.length} selected awards. Existing award notes are retained.</p><label class="unit-field">Renewal date<input name="awarded_on" type="date" required max="${metadata.today}" value="${metadata.today}"></label><label class="unit-field">New expiry (blank = permanent)<input name="expires_on" type="date"></label><label class="unit-field">Instructor<input name="issuer" maxlength="120" required value="${esc(metadata.actor)}"></label><label class="unit-field">Reason<textarea name="reason" maxlength="1000" required></textarea></label>`,
+        async () => {
+          const payload = {
+            ...Object.fromEntries(new FormData(form)),
+            awards: chosen,
+          };
+          renewalDraft = payload;
+          const preview = await write(
+            `${base()}/qualifications/renew`,
+            payload,
+          );
+          open(
+            'Review qualification renewals',
+            `<p>${preview.changed} awards will change.</p><p>Renewal date: ${esc(payload.awarded_on)} · New expiry: ${esc(payload.expires_on || 'Permanent')} · Instructor: ${esc(payload.issuer)}</p><div class="unit-table"><table><thead><tr><th>Member</th><th>Qualification</th><th>Old expiry</th></tr></thead><tbody>${preview.changes.map((row) => `<tr><td>${esc(row.name)}</td><td>${esc(row.certificate)}</td><td>${esc(row.before.expires_on || 'Permanent')}</td></tr>`).join('')}</tbody></table></div><label><input type="checkbox" required> Confirm these renewals.</label>`,
+            async () => {
+              if (!preview.changed)
+                throw new Error('There are no changes to apply.');
+              await write(`${base()}/qualifications/renew`, {
+                ...payload,
+                confirmed: true,
+                preview_token: preview.preview_token,
+              });
+              renewalSelection.clear();
+              renewalDraft = null;
+            },
+            'Apply renewals',
+          );
+          const body = el('roster-tools-body'),
+            back = document.createElement('button');
+          back.type = 'button';
+          back.textContent = 'Back to renewal details';
+          back.onclick = () => el('renewal-open').onclick();
+          const reason = document.createElement('p');
+          reason.textContent = 'Reason: ' + payload.reason;
+          body.append(reason, back);
+          for (const [name, value] of Object.entries({
+            ...payload,
+            awards: JSON.stringify(payload.awards),
+          })) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            body.append(input);
+          }
+          return false;
+        },
+        'Review renewals',
+      );
+      form.elements.expires_on.required = true;
+      if (renewalDraft)
+        for (const name of ['awarded_on', 'expires_on', 'issuer', 'reason'])
+          form.elements[name].value = renewalDraft[name];
+      form.elements.expires_on.closest('label').firstChild.textContent =
+        'New expiry date';
+      baseline = sign();
+    };
+    draw();
+  }
   function qualificationEditor(memberId, certificate = '') {
     if (saving) return;
     if (!metadata) {
@@ -235,15 +428,28 @@
       el('qualification-award-fields').innerHTML =
         `<p>${has ? 'Currently held' : 'Not held'} · Issuer: ${esc(award?.issuer || (has ? 'Unknown — existing record' : 'Defaults to your name in this unit; enter the original instructor if needed'))}</p>${canEdit ? `<label class="unit-field">Action<select name="action">${has ? '<option value="update">Update award details</option><option value="revoke">Revoke qualification</option>' : '<option value="grant">Grant qualification</option>'}</select></label>` : ''}<label class="unit-field">Award date<input type="date" name="awarded_on" value="${esc(has ? award?.awarded_on || '' : metadata.today)}" max="${metadata.today}" ${canEdit ? '' : 'disabled'}></label><label class="unit-field">Expires on (optional)<input type="date" name="expires_on" value="${esc(award?.expires_on || '')}" ${canEdit ? '' : 'disabled'}></label><label class="unit-field">Issuing staff / instructor<input name="issuer" maxlength="120" value="${esc(has ? award?.issuer || '' : metadata.actor)}" ${canEdit ? '' : 'disabled'} placeholder="Unknown if left blank"></label><label class="unit-field">Award notes<textarea name="notes" maxlength="1000" ${canEdit ? '' : 'disabled'}>${esc(award?.notes || '')}</textarea></label>${canEdit ? '<label class="unit-field">Change / revocation reason<textarea name="reason" maxlength="1000"></textarea></label>' : ''}<p class="feature-note">Grant/revoke changes affect promotion readiness. Earlier grant and revocation entries remain in the member timeline. The issuing name changes only when you edit it; the timeline separately records who saved the change.</p>`;
       if (canEdit) {
+        const renews = context.detail.unit.catalog.qualification_details?.some(
+          (item) => item.name === chosen && item.renewal_required,
+        );
+        form.elements.expires_on.closest('label').hidden = !renews;
+        form.elements.expires_on.closest('label').firstChild.textContent =
+          'Expiry date';
+        form.elements.expires_on.disabled = !renews;
         const setRequired = () => {
           form.elements.awarded_on.required =
             form.elements.action.value === 'grant';
           form.elements.reason.required =
             form.elements.action.value === 'revoke';
+          form.elements.expires_on.required =
+            !!renews && form.elements.action.value !== 'revoke';
         };
         form.elements.action.onchange = setRequired;
         setRequired();
-      }
+      } else
+        form.elements.expires_on.closest('label').hidden =
+          !context.detail.unit.catalog.qualification_details?.some(
+            (item) => item.name === chosen && item.renewal_required,
+          );
       baseline = sign();
     }
     fields();
@@ -408,8 +614,27 @@
               ? `<label class="unit-field">Target section<select name="section_id" required>${sections.map((s) => `<option value="${s.id}" ${s.id === initial.section_id ? 'selected' : ''}>${esc(path(s.id))}</option>`).join('')}</select></label><p class="feature-note">Members already in this section stay in their billets. Others receive vacant billets in structure order. The preview lists each assignment. No change is applied if there are too few vacancies.</p>${!sections.length ? '<p class="unit-warn">Create sections and billets in Structure first.</p>' : ''}`
               : '<p>Selected members will become unassigned. Their roster records remain.</p>';
     }
-    fields();
-    form.elements.action.onchange = fields;
+    const renderFields = () => {
+      fields();
+      const expiry = form.elements.expires_on;
+      if (expiry) {
+        const toggle = () => {
+          const enabled =
+            context.detail.unit.catalog.qualification_details?.some(
+              (item) =>
+                item.name === form.elements.certificate.value &&
+                item.renewal_required,
+            );
+          expiry.closest('label').hidden = !enabled;
+          expiry.disabled = !enabled;
+          expiry.required = !!enabled;
+        };
+        form.elements.certificate.onchange = toggle;
+        toggle();
+      }
+    };
+    renderFields();
+    form.elements.action.onchange = renderFields;
     const updateCount = () => {
       el('bulk-count').textContent =
         `${form.querySelectorAll('[name="bulk_members"]:checked').length} selected`;
@@ -468,6 +693,12 @@
       },
       'Apply reviewed changes',
     );
+    if (payload.action === 'grant') {
+      const description = form.querySelector(
+        '.bulk-preview-table',
+      ).previousElementSibling;
+      description.textContent = `Award date: ${payload.awarded_on} · Instructor: ${payload.issuer || metadata.actor}${payload.expires_on ? ' · Expiry: ' + payload.expires_on : ''}`;
+    }
     el('bulk-back').onclick = () =>
       bulkEditor({ ...payload, fromPreview: true });
     baseline = sign();
@@ -537,7 +768,17 @@
       typeof e.detail === 'object' ? e.detail.certificate : '',
     ),
   );
-  el('roster-bulk').onclick = () => bulkEditor();
+  el('roster-bulk').onclick = () => {
+    el('roster-bulk').closest('details')?.removeAttribute('open');
+    bulkEditor();
+  };
+  document.querySelectorAll('[data-bulk-action]').forEach(
+    (button) =>
+      (button.onclick = () => {
+        button.closest('details').open = false;
+        bulkEditor({ action: button.dataset.bulkAction });
+      }),
+  );
   for (const id of [
     'matrix-search',
     'matrix-status',

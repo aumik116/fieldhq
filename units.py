@@ -23,7 +23,6 @@ from unit_common import (
     unit_role_capabilities,
 )
 
-
 FIELDS = (
     "game_name",
     "discord",
@@ -117,8 +116,7 @@ def install(api):
             conn.close()
 
     with db() as conn:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS units (
                 id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE,
                 tag TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 1);
@@ -162,8 +160,7 @@ def install(api):
                 author_name TEXT NOT NULL, created_at REAL NOT NULL, note TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS unit_member_notes_member ON unit_member_notes(unit_id,member_id,id);
 
-        """
-        )
+        """)
         note_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(unit_member_notes)")
         }
@@ -621,15 +618,25 @@ def install(api):
                 )
             if type(entry.get("archived", False)) is not bool:
                 raise ValueError("Archived must be true or false")
+            if type(entry.get("renewal_required", False)) is not bool:
+                raise ValueError("Choose whether renewal is required")
             detail_by_name[name] = dict(
                 name=name,
                 abbreviation=text(entry.get("abbreviation", ""), "Abbreviation", 20),
                 description=text(entry.get("description", ""), "Description", 1000),
                 archived=entry.get("archived", False),
+                renewal_required=entry.get("renewal_required", False),
             )
         qualification_details = [
             detail_by_name.get(
-                name, dict(name=name, abbreviation="", description="", archived=False)
+                name,
+                dict(
+                    name=name,
+                    abbreviation="",
+                    description="",
+                    archived=False,
+                    renewal_required=False,
+                ),
             )
             for name in certificates
         ]
@@ -718,7 +725,44 @@ def install(api):
             with db() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 access(conn, unit_id, "staff")
-                revision(conn, unit_id, data)
+                if "catalog_base" in data:
+                    base = catalog_values(data["catalog_base"])
+                    current = catalog_values(
+                        json.loads(
+                            conn.execute(
+                                "SELECT catalog FROM units WHERE id=?", (unit_id,)
+                            ).fetchone()[0]
+                        )
+                    )
+                    merged = {}
+                    for field in current:
+                        key = lambda item: (
+                            item["name"] if isinstance(item, dict) else item
+                        )
+                        old = {key(item): item for item in base[field]}
+                        proposed = {key(item): item for item in catalog[field]}
+                        live = {key(item): item for item in current[field]}
+                        for name in dict.fromkeys([*old, *proposed]):
+                            if old.get(name) == proposed.get(name):
+                                continue
+                            if live.get(name) != old.get(name) and live.get(
+                                name
+                            ) != proposed.get(name):
+                                abort(
+                                    409,
+                                    description=f"{name} was changed by another editor. Your draft is preserved. Copy your draft before reopening this item.",
+                                )
+                            if name in proposed:
+                                live[name] = proposed[name]
+                            else:
+                                live.pop(name, None)
+                        merged[field] = list(live.values())
+                    catalog = catalog_values(merged)
+                    conn.execute(
+                        "UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,)
+                    )
+                else:
+                    revision(conn, unit_id, data)
                 if "qualification_details" not in data.get("catalog", {}):
                     previous = json.loads(
                         conn.execute(
@@ -1028,6 +1072,16 @@ def install(api):
             ]
         for member in members:
             member["qualification_expiries"] = expiries.get(member["id"], {})
+            renewing = {
+                entry["name"]
+                for entry in catalog.get("qualification_details", [])
+                if entry.get("renewal_required")
+            }
+            member["qualification_expiries"] = {
+                name: value
+                for name, value in member["qualification_expiries"].items()
+                if name in renewing
+            }
             member["expired_certificates"] = [
                 name
                 for name, expiry in member["qualification_expiries"].items()
@@ -1037,8 +1091,9 @@ def install(api):
                 conn, unit_id, member
             )
             payload = {field: member[field] for field in FIELDS}
+            # Catalog selections are validated against current rules on save.
+            # Editing rules must not invalidate an unchanged member record.
             payload.update(
-                catalog=catalog,
                 id=member["id"],
                 unit_id=unit_id,
                 archived=member["archived"],
@@ -1548,10 +1603,29 @@ def install(api):
 
     def branding(conn, unit_id):
         row = conn.execute(
-            "SELECT description,icon IS NOT NULL AS icon,banner IS NOT NULL AS banner FROM unit_branding WHERE unit_id=?",
+            "SELECT * FROM unit_branding WHERE unit_id=?",
             (unit_id,),
         ).fetchone()
-        return dict(row) if row else dict(description="", icon=False, banner=False)
+        values = dict(row) if row else {}
+        token = hashlib.sha256(
+            json.dumps(
+                {
+                    key: (
+                        hashlib.sha256(value).hexdigest()
+                        if isinstance(value, bytes)
+                        else value
+                    )
+                    for key, value in values.items()
+                },
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        return dict(
+            description=values.get("description", ""),
+            icon=bool(values.get("icon")),
+            banner=bool(values.get("banner")),
+            token=token,
+        )
 
     @api.app.get("/api/units/<int:unit_id>/branding/<kind>")
     def unit_branding_image(unit_id, kind):
@@ -1582,7 +1656,18 @@ def install(api):
                     version = int(request.form.get("revision", ""))
                 except ValueError:
                     raise ValueError("Reload the unit before saving")
-                revision(conn, unit_id, dict(revision=version))
+                token = request.form.get("branding_token")
+                if token:
+                    if not hmac.compare_digest(token, branding(conn, unit_id)["token"]):
+                        abort(
+                            409,
+                            description="Branding was changed by another editor. Your selected images and crop are preserved. Review the latest branding before replacing it.",
+                        )
+                    conn.execute(
+                        "UPDATE units SET revision=revision+1 WHERE id=?", (unit_id,)
+                    )
+                else:
+                    revision(conn, unit_id, dict(revision=version))
                 description = text(
                     request.form.get("description", ""), "Description", 160
                 )
