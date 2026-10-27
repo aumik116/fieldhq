@@ -177,8 +177,7 @@ update_panel_with_recovery() (
         if python3 "$SCRIPT_DIR/update_recovery.py" restore "$snapshot"; then
             systemctl daemon-reload
             systemctl restart arma-panel
-            sleep 2
-            if systemctl is-active --quiet arma-panel; then
+            if python3 "$SCRIPT_DIR/update_recovery.py" ready "$panel_dir" && systemctl is-active --quiet arma-panel; then
                 echo "Previous panel restored. Recovery snapshot: $snapshot" >&2
             else
                 echo "ERROR: Files restored but panel is offline. Inspect journalctl -u arma-panel." >&2
@@ -201,7 +200,7 @@ update_panel_with_recovery() (
     fi
     configure_instance_control "$panel_dir" "$panel_user"
     systemctl restart arma-panel
-    sleep 2
+    python3 "$SCRIPT_DIR/update_recovery.py" ready "$panel_dir"
     systemctl is-active --quiet arma-panel
     trap - ERR
 )

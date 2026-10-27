@@ -160,7 +160,18 @@ Back up the installed panel directory, including `config.env`, `.panel-secret`, 
 
 Configuration backups are created before panel-managed JSON changes. Review/restore them in **Administration → Maintenance**. The default library is `.panel-config-backups` beside the server JSON; restoring also backs up the current JSON.
 
-Panel update snapshots live under `/var/backups/arma-panel/update-*`. Copy/service/restart failures trigger attempted file/service rollback. The live database is not automatically rewound; restoring the saved database is a separate manual recovery step. This recovery checks panel service activity, not game connectivity.
+Panel update snapshots live under `/var/backups/arma-panel/update-*`. Each existing database is copied consistently with SQLite's backup API, including committed WAL data, and the saved copy must pass an integrity check before installation proceeds. `database.json` records its configured path and whether a database was present. Copy/service/restart/readiness failures trigger attempted file/service rollback. Update success requires the local sign-in page to respond within 30 seconds and the panel service to remain active. Game connectivity is a separate check.
+
+The live database is not automatically rewound during code rollback. If a schema change requires restoring the saved database, stop the panel first. Restoring replaces records with their snapshot versions, including accounts and audit data. Use the exact database path in `database.json`; custom installations may not use the default below.
+
+```bash
+sudo systemctl stop arma-panel
+sudo python3 /home/arma/panel/update_recovery.py restore-database /var/backups/arma-panel/update-EXAMPLE /home/arma/panel/.panel-data.sqlite3
+sudo systemctl start arma-panel
+sudo python3 /home/arma/panel/update_recovery.py ready /home/arma/panel
+```
+
+Replace `update-EXAMPLE` and installation/database paths with the actual paths before running. The restore command verifies the saved database, retains a consistent `before-database-restore-*.sqlite3` copy of the replaced database inside the private snapshot directory, then restores through SQLite. Existing database ownership is preserved. If the saved database is corrupt, restoration is rejected before replacing the target. Keep the panel stopped throughout database recovery and inspect `journalctl -u arma-panel` if startup fails.
 
 To update game software manually, stop that server and open **Administration → Maintenance → Server software**. SteamCMD leaves it stopped; inspect the result before starting it. The service account needs write access to the game and SteamCMD directories. Custom beta installations require updates outside the panel.
 
