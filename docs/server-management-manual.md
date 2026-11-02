@@ -393,7 +393,7 @@ Server administrators can configure notifications under Administration → Notif
 
 ### Owner panel-data download
 
-The panel Owner can open **Panel users → Download panel-data backup**. Other panel administrators cannot download this complete archive. The ZIP includes a consistent SQLite snapshot, `config.env`, `.panel-secret` and available managed-server JSON configuration files, plus a manifest and recovery instructions. It contains private records and credentials; keep it private. Game installations, Workshop files, profiles/world saves and logs are excluded and need separate backups. Configuration files are read individually after the database snapshot. The manifest lists missing files and the configured database path. Restore with the panel stopped, preserve service-user ownership/private permissions, and review paths before restoring on another host. The archive includes step-by-step recovery guidance.
+The panel Owner can open **Platform Admin → Backups → Download panel-data backup**. Other panel administrators cannot download this complete archive. The ZIP includes a consistent SQLite snapshot, `config.env`, `.panel-secret` and available managed-server JSON configuration files, plus a manifest and recovery instructions. It contains private records and credentials; keep it private. Game installations, Workshop files, profiles/world saves and logs are excluded and need separate backups. Configuration files are read individually after the database snapshot. The manifest lists missing files and the configured database path. Restore with the panel stopped, preserve service-user ownership/private permissions, and review paths before restoring on another host. The archive includes step-by-step recovery guidance.
 
 ### Files
 

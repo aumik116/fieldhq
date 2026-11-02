@@ -105,6 +105,7 @@
   try {
     window.unitAccount = await readJson(await fetch('/api/me'));
     el('panel-backup-owner').hidden = !window.unitAccount.is_owner;
+    el('platform-backup-restricted').hidden = window.unitAccount.is_owner;
     el('panel-backup-download').onclick = (event) => {
       if (
         !confirm(

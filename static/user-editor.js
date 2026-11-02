@@ -11,7 +11,7 @@ function userEditorSignature() {
 }
 const userAccountLabels = {
   owner: 'Owner',
-  admin: 'Panel administrator',
+  admin: 'Platform administrator',
   hosting: 'Hosting access',
   unitadmin: 'Unit administrator',
   unitstaff: 'Unit staff',
@@ -229,6 +229,9 @@ async function openUserEditor(userId) {
     userEditorEl('user-delete-account')?.classList.add('btn-danger');
     form.elements.panel_admin.options[0].textContent =
       'Standard account — unit and hosting access below';
+    form.elements.panel_admin.options[1].textContent = 'Platform administrator';
+    form.elements.panel_admin.closest('label').firstChild.textContent =
+      'Platform role';
     userEditorEl('user-pane-Account').querySelector(
       '.feature-note',
     ).textContent =
@@ -288,7 +291,7 @@ async function openUserEditor(userId) {
         values.get('server:' + s.id),
       );
       userEditorEl('user-editor-summary').textContent =
-        `${user?.is_owner ? 'Owner' : values.get('panel_admin') === 'admin' ? 'Panel administrator' : 'Standard account'} · ${units.length} units · ${values.has('access_all') || user?.is_owner ? 'all servers' : servers.length + ' server assignments'}`;
+        `${user?.is_owner ? 'Owner' : values.get('panel_admin') === 'admin' ? 'Platform administrator' : 'Standard account'} · ${units.length} units · ${values.has('access_all') || user?.is_owner ? 'all servers' : servers.length + ' server assignments'}`;
     };
     form.onsubmit = async (e) => {
       e.preventDefault();

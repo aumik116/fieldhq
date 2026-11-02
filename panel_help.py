@@ -6,6 +6,7 @@ from flask import abort, jsonify, redirect, render_template_string, send_from_di
 MANUALS={'full':'user-manual','staff':'unit-staff-manual','server':'server-management-manual'}
 # Manual heading prefixes keep topic mapping stable when titles are edited.
 TOPICS={
+    'platform':('full','platform-admin-workspace'),
     'servers':('server','3-'), 'dashboard':('server','5-'), 'console':('server','use-the-console'),
     'startup':('server','startup-and-resources'), 'configuration':('server','6-'), 'network':('server','network-readings'),
     'mods':('server','7-'), 'mods-workshop':('server','add-one-mod-now'),

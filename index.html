@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="/static/themes.css?v=themes-8" />
     <link rel="stylesheet" href="/static/manager-layout.css" />
     <link rel="stylesheet" href="/static/workshop.css" />
-    <link rel="stylesheet" href="/static/panel.css?v=ui-components-1" />
+    <link rel="stylesheet" href="/static/panel.css?v=platform-1" />
 
     <link rel="stylesheet" href="/static/server-experience.css" /><link
       rel="stylesheet"
@@ -2520,7 +2520,7 @@
             tabindex="0"
             data-section-group="admin"
             data-section-key="accounts"
-            >Accounts</button
+            >My account</button
           >
           <button
             type="button"
@@ -2577,32 +2577,13 @@
               settings.</p
             ><a class="manager-link" href="/account">Account settings →</a></div
           >
-          <div class="card clip">
-            <div class="card-label">User accounts</div>
-            <p class="feature-note" id="users-restricted"
-              >Panel administrator access required. Personal settings are
-              available on the Account settings page.</p
-            >
-            <p class="feature-note"
-              >Server roles control actions on an assigned server: Viewer can
-              check status and players; Operator can also start/stop/restart and
-              read logs; Manager can also edit configuration and mods; Server
-              administrator can also manage player moderation, startup,
-              scheduling, files and RCON. Panel administrators manage accounts
-              and access across the panel. The Owner always has full access.</p
-            >
-            <fieldset
-              class="account-controls"
-              id="users-controls"
-              aria-describedby="users-restricted"
-              disabled
-            >
-              <div id="users-list"></div>
-              <button type="button" class="btn-save" onclick="openUserEditor()"
-                >New account</button
-              >
-            </fieldset>
-          </div>
+          <div class="card" id="server-platform-link" hidden
+            ><div class="card-label">Platform administration</div
+            ><p class="feature-note"
+              >Accounts, unit creation, panel backups and global activity are
+              managed in Platform Admin.</p
+            ><a class="manager-link" href="/admin">Open Platform Admin</a></div
+          >
         </div>
         <div
           id="section-admin-activity"
@@ -3358,7 +3339,7 @@
 
     <script src="/static/api.js?v=release-tools-1"></script
     ><script src="/static/server-operations.js?v=release-tools-1"></script
-    ><script src="/static/ui.js?v=ui-components-1"></script>
+    ><script src="/static/ui.js?v=platform-1"></script>
     <script src="/static/dashboard.js"></script>
     <script src="/static/log_stream.js?v=cleanup-1"></script>
     <script src="/static/status.js?v=cleanup-1"></script>
@@ -3367,8 +3348,7 @@
     <script src="/static/persistence.js?v=cleanup-1"></script>
     <script src="/static/mods.js?v=release-tools-1"></script>
     <script src="/static/mod-inventory.js"></script>
-    <script src="/static/user-editor.js?v=ui-components-1"></script>
-    <script src="/static/features.js?v=cleanup-1"></script>
+    <script src="/static/features.js?v=platform-1"></script>
     <script src="/static/notifications.js"></script>
     <script src="/static/workshop.js?v=cleanup-1"></script>
     <script src="/static/console.js"></script>
@@ -3390,6 +3370,6 @@
     <script src="/static/mod-staging.js?v=cleanup-1"></script
     ><script src="/static/mod-workspace.js?v=release-tools-1"></script
     ><script src="/static/server-experience.js?v=cleanup-1"></script
-    ><script src="/static/help.js?v=manuals-3"></script
+    ><script src="/static/help.js?v=platform-1"></script
   ></body>
 </html>

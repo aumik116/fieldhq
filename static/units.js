@@ -129,48 +129,12 @@
         !!form.querySelector('.record-note-editor') ||
         !form.elements.record_note?.value.trim();
   });
-  function unitSettings(create = false) {
-    const unit = create ? {} : detail.unit,
-      selected = create
-        ? []
-        : listing.units.find((u) => u.id === unitId).servers;
-    openDialog(
-      create ? 'Create unit' : 'Unit settings',
-      `<div class="unit-form-grid">${field('Unit name', 'name', unit.name || '')}${field('Short tag', 'tag', unit.tag || '')}</div><h3>Linked servers</h3><p class="feature-note">Linking a server provides basic health visibility. Server control roles are assigned separately.</p>${checks(
-        'servers',
-        listing.servers.map((s) => s.id),
-        selected,
-      )}`,
-      async () => {
-        const data = values();
-        const result = await write('/api/units', {
-          name: data.name,
-          tag: data.tag,
-          servers: checked('servers'),
-          ...(create ? {} : { id: unitId, revision: detail.unit.revision }),
-        });
-        unitId = result.id;
-      },
-    );
-    // Use friendly server names while keeping stable IDs in submitted values.
-    form
-      .querySelectorAll('[name="servers"]')
-      .forEach(
-        (input) =>
-          (input.parentNode.lastChild.textContent = listing.servers.find(
-            (s) => s.id === input.value,
-          ).name),
-      );
-  }
   async function loadListing(preferred = unitId) {
     if (loading || !UnitUX.canLeave()) return;
     loading = true;
     try {
       listing = await read('/api/units');
       el('units-server-navigation').hidden = listing.hosting_access === false;
-      el('unit-new').hidden = !listing.panel_admin;
-      el('unit-demo').hidden = !listing.panel_admin;
-      el('unit-users').hidden = !listing.panel_admin;
       el('unit-select').replaceChildren();
       for (const unit of listing.units) {
         const option = document.createElement('option');
@@ -195,7 +159,7 @@
         el('unit-access-description').hidden = true;
         feedback(
           listing.panel_admin
-            ? 'Create your first unit to start building its roster.'
+            ? 'Create your first unit in Platform Admin → Units to start building its roster.'
             : 'No units assigned. Ask a panel administrator or unit administrator to add your account.',
         );
         return;
@@ -229,7 +193,6 @@
           : detail.role === 'member'
             ? 'Member · Read-only roster, personal profile and published resources'
             : 'Unit staff · Roster, events, attendance and resources';
-      el('unit-settings').hidden = !detail.can_settings;
       el('roster-add').hidden = !detail.can_edit;
       el('position-rename').hidden = true;
       el('unit-tab-staff').hidden = !detail.can_staff;
@@ -2266,26 +2229,6 @@
       brandSaving || Object.values(brandCrops).some((crop) => crop.busy()),
     discard: () => applyBranding(),
   });
-  el('unit-demo').onclick = () => {
-    if (!UnitUX.canLeave()) return;
-    openDialog(
-      'Create or open demo unit',
-      '<p>Creates an editable fictional company with 48 members, company/platoon/squad/team leadership, three vacant billets, qualification records, staff notes, six SOPs and six sample loadouts.</p><p>It creates no login credentials or server links. Existing units stay separate. If the demo already exists, this opens it and preserves your edits.</p>',
-      async () => {
-        const result = await write('/api/units/demo', {});
-        unitId = result.id;
-        activeTab = 'roster';
-        rosterUnit = null;
-        const params = new URLSearchParams(location.search);
-        params.set('unit', unitId);
-        params.set('tab', 'roster');
-        history.replaceState(null, '', '/units?' + params);
-      },
-    );
-    form.querySelector('[type="submit"]').textContent = 'Create / open demo';
-  };
-  el('unit-new').onclick = () => unitSettings(true);
-  el('unit-settings').onclick = () => unitSettings();
   el('roster-add').onclick = () => memberEditor();
   el('staff-add').onclick = () => staffEditor();
   for (const id of ['roster-search', 'roster-status', 'roster-sort'])

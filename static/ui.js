@@ -45,3 +45,14 @@ window.PanelUI = {
     if(!rows.length)holder.textContent='No pending mod changes.';
   }
 };
+
+// Shared workspace destination; /admin also enforces authorization on the server.
+(() => {
+  const areas = document.querySelector('.fieldhq-areas');
+  if (!areas) return;
+  const link = document.createElement('a'); link.href = '/admin'; link.textContent = 'Platform Admin'; link.hidden = true;
+  if (location.pathname === '/admin' || location.pathname === '/admin/users') link.setAttribute('aria-current','page');
+  fetch('/api/me').then(response => response.ok ? response.json() : null).then(account => {
+    if ((account?.panel_permissions || []).includes('users')) { link.hidden = false; areas.append(link); }
+  }).catch(() => {});
+})();

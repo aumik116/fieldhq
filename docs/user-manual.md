@@ -104,7 +104,7 @@ Inside a unit, **Administration → Accounts & access → Add account** lets pan
 
 ### Workspace navigation
 
-Unit pages use the same grouped sidebar pattern as server workspaces. Choose a unit at the top of the sidebar; permitted pages are always visible under group headings. On phones, use **Menu** to open navigation. **Hosting** and **Units** switch workspaces in the top bar; Help and account controls are on the right. All Servers is a full-width landing page without a server sidebar. Its attention strip shows confirmed server errors, unavailable status and low panel-disk space, with links to the affected server or Storage; it is hidden when clear. Panel administrators can open **Panel users** directly from the landing page.
+Unit pages use the same grouped sidebar pattern as server workspaces. Choose a unit at the top of the sidebar; permitted pages are always visible under group headings. On phones, use **Menu** to open navigation. **Hosting** and **Units** switch workspaces in the top bar; Help and account controls are on the right. All Servers is a full-width landing page without a server sidebar. Its attention strip shows confirmed server errors, unavailable status and low panel-disk space, with links to the affected server or Storage; it is hidden when clear. Panel administrators can open **Platform Admin → Accounts** directly from the landing page.
 
 ### Member home and self-service
 
@@ -120,13 +120,23 @@ Members use the same `/login` page as staff. A unit administrator creates the ac
 Published reading and announcements work without a roster link. Personal profiles, targeted reading and RSVPs require the login-to-member link. Unit and hosting permissions remain separate.
 
 
-Panel-wide login administration opens on its own **Panel users** page at `/admin/users`, accessible from the header to panel administrators. It is independent of the selected unit and never appears below a roster. Unit administrators continue using their unit’s **Accounts & access** page for local role management.
+### Platform Admin workspace
 
-Panel users can be searched by username or unit name, filtered by unit, server, account access type and enabled status, and sorted by username, access type, unit name or enabled status. Select **No unit membership**, **No hosting access** or **No access assigned** to find accounts needing review. Access labels can overlap: one account may be a unit member and also have hosting permissions. When filtering a specific unit, unit-role filters apply to that unit. Account entries show unit names and roles, rather than calling every non-administrator “Staff.” Filters remain selected when refreshing or editing accounts. Pending signup invitations belong to roster records and are not accounts until accepted.
+**Platform Admin** is a separate top-bar workspace at `/admin`, visible to the Owner and existing platform/panel administrators. Unit administrators do not gain access to it. Opening an old `/admin/users` link redirects to **Platform Admin → Accounts**. The same accounts, unit IDs and permissions are retained.
+
+- **Accounts:** global login accounts, hosting permissions, unit memberships and pending signup invitations. Unit administrators continue using their unit’s **Accounts & access** page for local role management.
+- **Units:** create units, create/open the demo unit, and edit unit names, short tags and linked servers. Open a unit to manage its roster, structure, resources, branding and local access. Unit creation and installation-level unit settings no longer appear in unit headers.
+- **Backups:** the Owner can download the complete panel-data backup. The existing Owner-only restriction remains in effect.
+- **Global activity:** paginated activity across the installation. Server-specific administration and activity remain in Hosting.
+- **Settings:** current installation mode, panel address, listening port, Owner and account/unit/server totals. These are read-only installation details; host configuration changes remain a host administration task. Personal appearance/password settings stay under Account settings.
+
+On phones, use **Menu · Platform Admin** to open its sidebar. Platform administration does not automatically grant game-server control roles; hosting and unit permissions remain separate.
+
+Accounts can be searched by username or unit name, filtered by unit, server, account access type and enabled status, and sorted by username, access type, unit name or enabled status. Select **No unit membership**, **No hosting access** or **No access assigned** to find accounts needing review. Access labels can overlap: one account may be a unit member and also have hosting permissions. When filtering a specific unit, unit-role filters apply to that unit. Account entries show unit names and roles, rather than calling every non-administrator “Staff.” Filters remain selected when refreshing or editing accounts. Pending signup invitations belong to roster records and are not accounts until accepted.
 
 Each account shows its **Last login**, with newest/oldest login sorting available. Dates are recorded for successful sign-ins and automatic sign-in after accepting an invitation or password reset. **No login recorded** does not mean an older account has never been used: historical dates are not inferred from usernames.
 
-Expand **Pending signup invitations** on Panel users to review unclaimed invitations across units. Search by member/unit name or filter by unit. Entries show who sent the invitation, when it was created and when it expires. **Revoke** invalidates the link; **Open unit roster** takes you to the unit where you can generate a replacement. Secret links cannot be recovered from this overview. Used, expired or revoked invitations are excluded. The list shows at most 500 matching invitations, ordered by expiry; narrow the search if more are available. Only panel administrators can access this panel-wide overview.
+Expand **Pending signup invitations** under Platform Admin → Accounts to review unclaimed invitations across units. Search by member/unit name or filter by unit. Entries show who sent the invitation, when it was created and when it expires. **Revoke** invalidates the link; **Open unit roster** takes you to the unit where you can generate a replacement. Secret links cannot be recovered from this overview. Used, expired or revoked invitations are excluded. The list shows at most 500 matching invitations, ordered by expiry; narrow the search if more are available. Only panel administrators can access this panel-wide overview.
 
 ## 3. All servers
 
@@ -437,7 +447,7 @@ Server administrators can configure notifications under Administration → Notif
 
 ### Owner panel-data download
 
-The panel Owner can open **Panel users → Download panel-data backup**. Other panel administrators cannot download this complete archive. The ZIP includes a consistent SQLite snapshot, `config.env`, `.panel-secret` and available managed-server JSON configuration files, plus a manifest and recovery instructions. It contains private records and credentials; keep it private. Game installations, Workshop files, profiles/world saves and logs are excluded and need separate backups. Configuration files are read individually after the database snapshot. The manifest lists missing files and the configured database path. Restore with the panel stopped, preserve service-user ownership/private permissions, and review paths before restoring on another host. The archive includes step-by-step recovery guidance.
+The panel Owner can open **Platform Admin → Backups → Download panel-data backup**. Other panel administrators cannot download this complete archive. The ZIP includes a consistent SQLite snapshot, `config.env`, `.panel-secret` and available managed-server JSON configuration files, plus a manifest and recovery instructions. It contains private records and credentials; keep it private. Game installations, Workshop files, profiles/world saves and logs are excluded and need separate backups. Configuration files are read individually after the database snapshot. The manifest lists missing files and the configured database path. Restore with the panel stopped, preserve service-user ownership/private permissions, and review paths before restoring on another host. The archive includes step-by-step recovery guidance.
 
 ### Files
 
@@ -559,7 +569,7 @@ In **Structure**, select a formation in the navigator to edit or move it, add sm
 
 Unit Staff can use **Create signup link** beside an active roster member or inside the record’s **Access** tab. Generate the link, copy it and DM it to that member. The member chooses a username and password, or signs in to an existing account to accept. Acceptance links that account to the existing roster record with **Member** access only; no duplicate roster entry is created. Links are single-use and expire after seven days. Revoke or regenerate them from the record. Regenerating invalidates the old link. Links are shown only when generated; if you lose one, generate a replacement. The roster shows No login, Invite pending, Login active or Login disabled.
 
-These are ordinary panel accounts in the same users database. Passwords use the existing bcrypt hashing; invite secrets are stored only as hashes. Unit roles and server permissions remain separate. Unit administrators use **Change unit role** to promote members to staff; panel administrators use **Panel users → Edit** to grant hosting permissions or panel administration to the same login. Existing accounts retain their other memberships and privileges when accepting an invitation. No DNS or email service changes are required: links use the panel address where staff generate them. Generate links from the public HTTPS address your members can reach.
+These are ordinary panel accounts in the same users database. Passwords use the existing bcrypt hashing; invite secrets are stored only as hashes. Unit roles and server permissions remain separate. Unit administrators use **Change unit role** to promote members to staff; panel administrators use **Platform Admin → Accounts → Edit** to grant hosting permissions or panel administration to the same login. Existing accounts retain their other memberships and privileges when accepting an invitation. No DNS or email service changes are required: links use the panel address where staff generate them. Generate links from the public HTTPS address your members can reach.
 
 ### Member access, dated LOA and reusable billets
 
@@ -577,7 +587,7 @@ Unit administrators can generate a **password reset link**, disable access to th
 
 ### Editable demo company
 
-Panel administrators can choose **Create demo unit** at the top of Units. Confirm **Create / open demo** to create **Demo Company — Training Sandbox**. Reopening the action preserves existing demo edits rather than making another copy.
+Platform administrators can choose **Platform Admin → Units → Create / open demo unit** to create **Demo Company — Training Sandbox**. Reopening the action preserves existing demo edits rather than making another copy.
 
 The demo contains 48 fictional members: company HQ, two platoons, four squads and eight teams. Leadership/support personnel hold 24 named billets; 24 troops belong directly to teams, and three billets are vacant. Six published SOPs, six sample kit references, qualification awards, promotion examples, staff notes, callsigns and Active/Reserve/LOA examples are included.
 

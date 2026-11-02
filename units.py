@@ -463,7 +463,7 @@ def install(api):
             abort(
                 403, description="Only panel administrators can manage panel accounts"
             )
-        return send_from_directory(api._BASE_DIR, "users.html")
+        return redirect("/admin?tab=accounts")
 
     @api.app.get("/api/units")
     def units_list():
@@ -2700,6 +2700,9 @@ def install(api):
     from unit_invitations import install as install_invitations
 
     install_invitations(api, db, access, endpoints, find_member)
+    from platform_admin import install as install_platform_admin
+
+    install_platform_admin(api, db, panel_admin, endpoints)
     install_demo(api, db, panel_admin, endpoints, record_roster_change, record_strength)
     personnel_coverage = install_personnel(
         api,

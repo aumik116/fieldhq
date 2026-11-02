@@ -3462,10 +3462,13 @@ html[data-theme] .fieldhq-areas {
   display: flex;
   height: 54px;
   gap: 25px;
-  flex-shrink: 0;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow-x: auto;
 }
 html[data-theme] .fieldhq-areas a {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
   padding: 0 5px;
@@ -6031,6 +6034,80 @@ html[data-theme] #unit-sidebar [hidden] {
   border: 1px solid var(--border);
   font-size: 20px;
   color: var(--accent);
+}
+
+html[data-theme] .platform-admin-page .platform-main {
+  margin-left: 184px;
+  max-width: none;
+  padding: 78px 24px 24px;
+}
+html[data-theme] #platform-sidebar {
+  display: flex;
+  top: 54px;
+  width: 184px;
+  padding: 14px 10px;
+}
+#platform-sidebar .panel-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#platform-sidebar .panel-tab {
+  display: block;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 9px 10px;
+}
+#platform-sidebar .panel-tab[aria-current='page'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent2);
+}
+#platform-menu {
+  display: none;
+}
+.platform-facts {
+  margin: 0;
+}
+.platform-facts > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 2fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.platform-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#platform-unit-body .unit-checks label {
+  display: block;
+  padding: 8px 0;
+}
+@media (max-width: 700px) {
+  html[data-theme] .platform-admin-page .platform-main {
+    margin-left: 0;
+    padding: 112px 12px 24px;
+  }
+  html[data-theme] #platform-sidebar {
+    display: none;
+    top: 106px;
+    width: 230px;
+    background: var(--chrome);
+  }
+  html[data-theme] .platform-navigation-open #platform-sidebar {
+    display: flex;
+  }
+  #platform-menu {
+    display: block;
+    position: fixed;
+    top: 62px;
+    left: 12px;
+    right: 12px;
+    width: calc(100% - 24px);
+    z-index: 41;
+    text-align: left;
+  }
 }
 
 /* Shared component contract. Feature layouts and theme palettes stay above. */

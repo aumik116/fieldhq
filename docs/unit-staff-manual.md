@@ -436,7 +436,7 @@ In **Structure**, select a formation in the navigator to edit or move it, add sm
 
 Unit Staff can use **Create signup link** beside an active roster member or in the record’s **Access** tab. Generate the link, copy it and DM it to that person. They choose a username and password or sign in to an existing account to accept. The panel links their login to this roster record with Member access only. Invitations work once and expire after seven days. The record offers revoke and regenerate controls; a replacement invalidates the previous link. Links cannot be retrieved later, so generate a replacement if lost. The roster shows each member’s login status. Use your public HTTPS panel address when generating links; no DNS or email setup is required.
 
-Invited accounts use the same account storage and login page as panel administrators. Unit and hosting permissions are separate. Promote the existing account through **Change unit role** or **Accounts & access** when a member becomes staff. A panel administrator can grant hosting permissions or panel administration through **Panel users → Edit**, using the same login. Invitations never grant these elevated permissions themselves.
+Invited accounts use the same account storage and login page as panel administrators. Unit and hosting permissions are separate. Promote the existing account through **Change unit role** or **Accounts & access** when a member becomes staff. A panel administrator can grant hosting permissions or panel administration through **Platform Admin → Accounts → Edit**, using the same login. Invitations never grant these elevated permissions themselves.
 
 The roster opens on **All formations** when a structure exists. Group tabs filter the formation tables. Click a member’s name to open their record or click **— Open —** to fill an empty billet. Members assigned directly appear after the named billets with a dash in the Billet column. Use **Manage structure** for layout changes, occupied-billet swaps and direct formation assignments.
 
@@ -456,7 +456,7 @@ Unit administrators can generate a single-use **password reset link**, disable a
 
 ### Editable demo company
 
-Panel administrators can choose **Create demo unit** at the top of Units. Confirm **Create / open demo** to create **Demo Company — Training Sandbox**. Reopening the action preserves existing demo edits rather than making another copy.
+Platform administrators can choose **Platform Admin → Units → Create / open demo unit** to create **Demo Company — Training Sandbox**. Reopening the action preserves existing demo edits rather than making another copy.
 
 The demo contains 48 fictional members: company HQ, two platoons, four squads and eight teams. Leadership/support personnel hold 24 named billets; 24 troops belong directly to teams, and three billets are vacant. Six published SOPs, six sample kit references, qualification awards, promotion examples, staff notes, callsigns and Active/Reserve/LOA examples are included.
 

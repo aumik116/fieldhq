@@ -5,7 +5,7 @@
       name="viewport"
       content="width=device-width,initial-scale=1"
     />
-    <title>Panel users — FIELDHQ</title>
+    <title>Platform Admin — FIELDHQ</title>
     <script src="/static/theme.js?v=themes-8"></script>
     <link rel="stylesheet" href="/static/base.css" /><link
       rel="stylesheet"
@@ -15,10 +15,10 @@
       href="/static/themes.css?v=themes-8"
     /><link rel="stylesheet" href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=ui-components-1"
+      href="/static/panel.css?v=platform-1"
     /><link rel="stylesheet" href="/static/help.css?v=manuals-3" />
   </head>
-  <body class="manager-page panel-users-page">
+  <body class="manager-page panel-users-page platform-admin-page">
     <header class="manager-header">
       <a class="fieldhq-brand" href="/servers" aria-label="FIELDHQ hosting"
         >FIELD<span>HQ</span></a
@@ -35,8 +35,6 @@
         ></nav
       >
       <div class="fieldhq-account"
-        ><a class="workspace-back" href="/admin/users" aria-current="page"
-          >Panel users</a
         ><a class="workspace-back" href="/account"
           ><span id="users-account-name"></span> · Account settings</a
         ><button type="button" class="btn-logout" id="users-logout"
@@ -44,74 +42,230 @@
         ></div
       >
     </header>
-    <main class="manager-main">
+    <button
+      type="button"
+      id="platform-menu"
+      class="mobile-nav-toggle"
+      aria-controls="platform-sidebar"
+      aria-expanded="false"
+      >Menu · Platform Admin</button
+    >
+    <aside
+      id="platform-sidebar"
+      class="sidebar"
+      aria-label="Platform administration"
+      ><nav class="panel-tabs"
+        ><span class="nav-label">Platform administration</span
+        ><a
+          class="panel-tab"
+          href="/admin?tab=accounts"
+          data-platform-tab="accounts"
+          >Accounts</a
+        ><a class="panel-tab" href="/admin?tab=units" data-platform-tab="units"
+          >Units</a
+        ><a
+          class="panel-tab"
+          href="/admin?tab=backups"
+          data-platform-tab="backups"
+          >Backups</a
+        ><a
+          class="panel-tab"
+          href="/admin?tab=activity"
+          data-platform-tab="activity"
+          >Global activity</a
+        ><a
+          class="panel-tab"
+          href="/admin?tab=settings"
+          data-platform-tab="settings"
+          >Settings</a
+        ></nav
+      ></aside
+    >
+    <main class="manager-main platform-main">
       <div class="manager-heading"
         ><div
-          ><div class="eyebrow">Panel administration</div><h1>Panel users</h1
+          ><div class="eyebrow">Platform workspace</div><h1>Platform Admin</h1
           ><p class="feature-note"
-            >Manage login accounts, panel permissions, server access and unit
-            memberships across FIELDHQ.</p
+            >Manage the installation, accounts and units. Unit staff tools and
+            hosting controls remain in their own workspaces.</p
           ></div
-        ><button type="button" class="btn-save" id="users-new" disabled
-          >New account</button
         ></div
       >
-      <p id="panel-backup-owner" class="feature-note" hidden
-        ><a
-          id="panel-backup-download"
-          class="manager-link"
-          href="/api/panel/backup"
-          download
-          >Download panel-data backup</a
-        >
-        Includes private records and credentials. Game files and world saves
-        need separate backups. Recovery instructions are inside the ZIP.</p
+      <p id="platform-status" role="alert"></p>
+      <section
+        id="platform-accounts"
+        data-platform-section="accounts"
+        aria-labelledby="platform-accounts-heading"
       >
-      <p class="feature-note"
-        >For a person’s rank, billet, qualifications or notes, open their unit
-        roster. Unit administrators manage their own unit’s roles through
-        Accounts &amp; access.</p
-      >
-      <div class="unit-toolbar"
-        ><button type="button" id="users-refresh">Refresh accounts</button></div
-      >
-      <p id="users-restricted" role="alert" hidden></p
-      ><div id="users-list" aria-live="polite">Loading accounts…</div>
-      <details class="unit-block" id="users-invitations">
-        <summary
-          >Pending signup invitations ·
-          <span id="users-invite-count">…</span></summary
+        <div class="manager-heading"
+          ><div
+            ><h2 id="platform-accounts-heading">Accounts</h2
+            ><p class="feature-note"
+              >Manage login accounts, panel permissions, server access and unit
+              memberships across FIELDHQ.</p
+            ></div
+          ><button type="button" class="btn-save" id="users-new" disabled
+            >New account</button
+          ></div
         >
         <p class="feature-note"
-          >These members have not claimed their accounts yet. Links are private
-          and cannot be retrieved; open the unit roster to generate a
-          replacement.</p
+          >For a person’s rank, billet, qualifications or notes, open their unit
+          roster. Unit administrators manage their own unit’s roles through
+          Accounts &amp; access.</p
         >
-        <div class="unit-toolbar account-filters">
-          <label
-            >Search invitations<input
-              type="search"
-              id="users-invite-search"
-              maxlength="120"
-              placeholder="Member or unit name"
-          /></label>
-          <label
-            >Unit<select id="users-invite-unit"
-              ><option value="">All units</option></select
-            ></label
+        <div class="unit-toolbar"
+          ><button type="button" id="users-refresh"
+            >Refresh accounts</button
+          ></div
+        >
+        <p id="users-restricted" role="alert" hidden></p
+        ><div id="users-list" aria-live="polite">Loading accounts…</div>
+        <details class="unit-block" id="users-invitations">
+          <summary
+            >Pending signup invitations ·
+            <span id="users-invite-count">…</span></summary
           >
-          <button type="button" id="users-invite-refresh"
-            >Refresh invitations</button
+          <p class="feature-note"
+            >These members have not claimed their accounts yet. Links are
+            private and cannot be retrieved; open the unit roster to generate a
+            replacement.</p
           >
-        </div>
-        <p id="users-invite-status" role="status"></p>
-        <div id="users-invite-results"></div>
-      </details>
+          <div class="unit-toolbar account-filters">
+            <label
+              >Search invitations<input
+                type="search"
+                id="users-invite-search"
+                maxlength="120"
+                placeholder="Member or unit name"
+            /></label>
+            <label
+              >Unit<select id="users-invite-unit"
+                ><option value="">All units</option></select
+              ></label
+            >
+            <button type="button" id="users-invite-refresh"
+              >Refresh invitations</button
+            >
+          </div>
+          <p id="users-invite-status" role="status"></p>
+          <div id="users-invite-results"></div>
+        </details>
+      </section>
+      <section
+        id="platform-units"
+        data-platform-section="units"
+        aria-labelledby="platform-units-heading"
+        hidden
+      >
+        <div class="manager-heading"
+          ><div
+            ><h2 id="platform-units-heading">Units</h2
+            ><p class="feature-note"
+              >Create units and manage their names and linked servers. Existing
+              rosters, resources and unit roles stay inside Units.</p
+            ></div
+          ><div class="formation-actions"
+            ><button type="button" id="platform-demo"
+              >Create / open demo unit</button
+            ><button type="button" id="platform-new-unit" class="btn-save"
+              >New unit</button
+            ></div
+          ></div
+        >
+        <div class="unit-toolbar"
+          ><button type="button" id="platform-units-refresh"
+            >Refresh units</button
+          ></div
+        ><p id="platform-units-status" role="status"></p
+        ><div id="platform-units-list"></div>
+      </section>
+      <section
+        id="platform-backups"
+        data-platform-section="backups"
+        aria-labelledby="platform-backups-heading"
+        hidden
+      >
+        <h2 id="platform-backups-heading">Panel backups</h2
+        ><p class="feature-note"
+          >A panel-data backup contains accounts, private unit records and
+          installation configuration. Game files and world saves need separate
+          backups.</p
+        >
+        <p id="panel-backup-owner" hidden
+          ><a
+            id="panel-backup-download"
+            class="manager-link"
+            href="/api/panel/backup"
+            download
+            >Download panel-data backup</a
+          ></p
+        >
+        <p id="platform-backup-restricted" class="feature-note"
+          >Only the Owner can download the complete panel-data backup.</p
+        >
+        <p class="feature-note"
+          >Recovery instructions are inside the ZIP. Unit administrators can
+          export their own unit backup from its unit workspace.</p
+        >
+      </section>
+      <section
+        id="platform-activity"
+        data-platform-section="activity"
+        aria-labelledby="platform-activity-heading"
+        hidden
+      >
+        <h2 id="platform-activity-heading">Global activity</h2
+        ><p class="feature-note"
+          >Activity across the panel, units and hosting. Server-specific history
+          remains available in Hosting.</p
+        >
+        <div class="unit-toolbar"
+          ><button type="button" id="platform-activity-refresh"
+            >Refresh activity</button
+          ></div
+        ><p id="platform-activity-status" role="status"></p
+        ><div id="platform-activity-list"></div
+        ><button type="button" id="platform-activity-more" hidden
+          >Load older activity</button
+        >
+      </section>
+      <section
+        id="platform-settings"
+        data-platform-section="settings"
+        aria-labelledby="platform-settings-heading"
+        hidden
+      >
+        <h2 id="platform-settings-heading">Installation settings</h2
+        ><div id="platform-settings-values" class="unit-block"></div
+        ><p class="feature-note"
+          >Installation settings are configured on the host. Server startup and
+          gameplay settings remain in Hosting. Personal appearance and password
+          settings are under Account settings.</p
+        ><a class="manager-link" href="/account"
+          >Open personal account settings</a
+        >
+      </section>
     </main>
+    <dialog
+      id="platform-unit-dialog"
+      class="unit-dialog"
+      aria-labelledby="platform-unit-title"
+      ><form id="platform-unit-form"
+        ><div class="unit-dialog-heading"
+          ><h2 id="platform-unit-title"></h2
+          ><button type="button" id="platform-unit-close">Close</button></div
+        ><div id="platform-unit-body"></div
+        ><p id="platform-unit-error" role="alert"></p
+        ><div class="unit-dialog-footer"
+          ><button type="submit" class="btn-save">Save unit</button></div
+        ></form
+      ></dialog
+    >
     <script src="/static/api.js?v=release-tools-1"></script
-    ><script src="/static/ui.js?v=ui-components-1"></script
-    ><script src="/static/user-editor.js?v=ui-components-1"></script
-    ><script src="/static/panel-users.js?v=account-overview-1"></script
-    ><script src="/static/help.js?v=users-page-1"></script>
+    ><script src="/static/ui.js?v=platform-1"></script
+    ><script src="/static/user-editor.js?v=platform-1"></script
+    ><script src="/static/platform-admin.js?v=platform-1"></script
+    ><script src="/static/panel-users.js?v=platform-1"></script
+    ><script src="/static/help.js?v=platform-1"></script>
   </body>
 </html>

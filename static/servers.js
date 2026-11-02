@@ -514,23 +514,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     document.dispatchEvent(new Event('fleet-rows-rendered'));
     const alerts = document.getElementById('overview-alerts');
-    const notices = servers
-      .filter(attention)
-      .map((server) => ({
-        label:
-          server.name +
-          ': ' +
-          (server.error ||
-            (server.status === 'unavailable'
-              ? 'Status unavailable'
-              : 'Installation failed')),
-        href:
-          server.state === 'ready'
-            ? workspace(server)
-            : '/setup?server=' + encodeURIComponent(server.id),
-        action: server.state === 'ready' ? 'Open server' : 'View progress',
-        severity: 'error',
-      }));
+    const notices = servers.filter(attention).map((server) => ({
+      label:
+        server.name +
+        ': ' +
+        (server.error ||
+          (server.status === 'unavailable'
+            ? 'Status unavailable'
+            : 'Installation failed')),
+      href:
+        server.state === 'ready'
+          ? workspace(server)
+          : '/setup?server=' + encodeURIComponent(server.id),
+      action: server.state === 'ready' ? 'Open server' : 'View progress',
+      severity: 'error',
+    }));
     if (
       host?.disk_total > 0 &&
       Number.isFinite(host.disk_free) &&
@@ -795,8 +793,6 @@ document.addEventListener('DOMContentLoaded', () => {
       permissions = account.panel_permissions || account.permissions || [];
       document.getElementById('overview-account').textContent =
         account.username;
-      document.getElementById('fleet-panel-users').hidden =
-        !permissions.includes('users');
       document.getElementById('overview-create').hidden =
         !permissions.includes('admin_config');
       document.getElementById('server-cleanup-open').hidden =

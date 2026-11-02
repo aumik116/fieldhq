@@ -531,8 +531,14 @@ def install(api):
             before = int(request.args.get("before", "0"))
         except ValueError:
             return jsonify(ok=False, error="Invalid activity cursor"), 400
+        server_scope = request.args.get('scope') == 'server'
+        instance = api.selected_instance() if server_scope else None
+        if server_scope and api.manager_mode and instance is None:
+            return jsonify(ok=False, error='Select a server to view its activity'), 400
         with db() as conn:
-            if g.user['id'] == owner_id or 'users' in g.panel_permissions:
+            if server_scope:
+                rows = conn.execute("SELECT * FROM activity WHERE (?=0 OR id<?) AND coalesce(json_extract(details,'$.server_id'),'')=? AND json_extract(details,'$.unit_id') IS NULL AND action NOT IN ('login','users_save','users_delete','account_password','account_preferences_save') ORDER BY id DESC LIMIT 51", (before,before,instance.id if instance else '')).fetchall()
+            elif g.user['id'] == owner_id or 'users' in g.panel_permissions:
                 rows = conn.execute("SELECT * FROM activity WHERE (?=0 OR id<?) ORDER BY id DESC LIMIT 51", (before, before)).fetchall()
             else:
                 visible = [server.id for server in api.server_registry.list() if server_permissions(g.user,server.id)]

@@ -103,8 +103,7 @@ function applyPermissions() {
   document.querySelectorAll('[data-permission]').forEach(el => {
     el.hidden = !can(el.dataset.permission);
   });
-  byId('users-controls').disabled = !can('users');
-  byId('users-restricted').hidden = can('users');
+  byId('server-platform-link').hidden = !(currentAccount.panel_permissions || []).includes('users');
   byId('configuration-readonly').hidden = can('configure');
   byId('mods-readonly').hidden = can('mods');
   ['btn-start', 'btn-stop', 'btn-reset'].forEach(id => {
@@ -166,7 +165,7 @@ function loadPresets() { return window.loadUnifiedPresets?.() || Promise.resolve
 
 async function loadActivity(older = false) {
   try {
-    const data = await getFeature('/api/activity' + (older && activityCursor ? `?before=${activityCursor}` : ''));
+    const data = await getFeature('/api/activity?scope=server' + (older && activityCursor ? `&before=${activityCursor}` : ''));
     if (!older) byId('activity-list').replaceChildren();
     for (const event of data.events) {
       const row = document.createElement('div'); row.className = 'activity-entry';
@@ -192,7 +191,7 @@ async function initFeatures() {
     byId('account-label').textContent = `${currentAccount.username} · ${currentAccount.is_owner ? 'Owner' : currentAccount.role}`;
     applyPermissions();
     document.dispatchEvent(new Event('panel-ready'));
-    await Promise.all([loadPlayers(), loadPresets(), can('users') ? loadUsers() : Promise.resolve(), can('activity') ? loadActivity() : Promise.resolve()]);
+    await Promise.all([loadPlayers(), loadPresets(), can('activity') ? loadActivity() : Promise.resolve()]);
     setInterval(()=>{if(!document.hidden&&!byId('panel-dashboard').hidden&&byId('player-details-disclosure').open)loadPlayers();},10000);
   } catch(e) { setLog(e.message, 'error'); }
 }
