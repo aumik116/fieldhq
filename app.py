@@ -12,7 +12,7 @@ Developed with AI assistance using OpenAI Codex. Fork modifications:
   - Auto-discovery of scenarios from addon metadata and resource databases
 """
 
-from flask import Flask, Request, request, jsonify, session, redirect, Response, send_from_directory, g
+from flask import Flask, Request, request, jsonify, session, redirect, Response, send_from_directory, g, abort
 import bcrypt
 from pathlib import Path
 from mod_validation import normalize_mod_entry
@@ -882,17 +882,20 @@ def index():
     if not session.get("logged_in"):
         return redirect("/login")
     _ensure_csrf()
-    if not request.args.get('server') and unit_only_user():
-        return redirect('/units')
-    if not request.args.get('server') and (manager_mode or request.args.get('legacy') != '1'):
-        return redirect('/servers')
+    navigation = workspace_access(g.user)
+    if request.args.get('server') or (not manager_mode and request.args.get('legacy') == '1'):
+        if not navigation['hosting'] or not server_permissions(g.user, request.args.get('server', '')):
+            abort(403, description='You do not have access to this server')
+    else:
+        return redirect(navigation['landing'])
     with open(os.path.join(os.path.dirname(__file__), "index.html"), encoding="utf-8") as f:
         return f.read()
 
 @app.get('/servers')
 def servers_page():
-    if unit_only_user():
-        return redirect('/units')
+    navigation = workspace_access(g.user)
+    if not navigation['hosting']:
+        return redirect(navigation['landing'])
     _ensure_csrf()
     with open(os.path.join(_BASE_DIR, 'servers.html'), encoding='utf-8') as stream:
         return stream.read()
@@ -905,6 +908,8 @@ def account_page():
 
 @app.get('/setup')
 def setup_page():
+    if 'users' not in g.panel_permissions:
+        abort(403, description='Only platform administrators can create servers')
     _ensure_csrf()
     with open(os.path.join(_BASE_DIR,'setup.html'),encoding='utf-8') as stream:
         return stream.read()
@@ -931,7 +936,7 @@ def login():
             session["login_at"] = int(time.time())
             _ensure_csrf()
             audit_event(user["username"], "login", "success")
-            return jsonify({"ok": True, "csrf": session["csrf"]})
+            return jsonify({"ok": True, "csrf": session["csrf"], "redirect": workspace_access(user)['landing']})
         return jsonify({"ok": False, "error": "Invalid username or password"}), 401
     with open(os.path.join(os.path.dirname(__file__), "login.html"), encoding="utf-8") as f:
         return f.read()

@@ -12,6 +12,8 @@ Use `btn-save` for the main action, ordinary buttons for secondary actions and `
 
 Workspace headers use `fieldhq-brand`, `fieldhq-areas` and `fieldhq-account`. Help, account controls and Logout belong in the account group. Public login/signup and initial setup retain their focused layouts.
 
+`workspace_access` in `units.py` supplies navigation availability and the default landing path to login and `/api/me`. `static/ui.js` applies that same result to all header links, unit sidebar shortcuts and the brand destination. Do not add separate page-specific access rules to show/hide these links. Availability does not assign permissions; pages and APIs keep their server-side guards. No-access accounts retain Account settings.
+
 Use `unit-toolbar` or `ui-toolbar` for a wrapping toolbar. When a page has search/filters and actions, put them in `ui-toolbar-filters` and `ui-toolbar-actions`. Keep DOM order consistent with visual order. On phones, filters and actions wrap into separate rows. Existing server toolbars retain their current arrangements and use the same control sizing.
 
 ## Dialogs

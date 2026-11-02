@@ -134,7 +134,6 @@
     loading = true;
     try {
       listing = await read('/api/units');
-      el('units-server-navigation').hidden = listing.hosting_access === false;
       el('unit-select').replaceChildren();
       for (const unit of listing.units) {
         const option = document.createElement('option');

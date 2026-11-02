@@ -3606,6 +3606,10 @@ html[data-theme] .fieldhq-areas a {
   border-bottom: 2px solid transparent;
   font-size: 13px;
 }
+html[data-theme] .fieldhq-areas a[hidden],
+html[data-theme] .workspace-unit-link[hidden] {
+  display: none;
+}
 html[data-theme] .fieldhq-areas a[aria-current] {
   color: var(--accent);
   border-color: var(--accent);

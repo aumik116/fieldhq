@@ -29,7 +29,7 @@ loginForm.addEventListener('submit', async event => {
     });
     let data;
     try { data = await response.json(); } catch (_) {}
-    if (response.ok && data?.ok === true) { window.location.href = '/'; return; }
+    if (response.ok && data?.ok === true) { window.location.href = data.redirect || '/'; return; }
     if (response.status === 401) {
       for (const input of [loginUsername, loginPassword]) input.setAttribute('aria-invalid', 'true');
       loginPassword.focus();

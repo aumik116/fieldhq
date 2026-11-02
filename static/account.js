@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const account = await response.json();
     field('account-name').textContent = account.username;
     field('account-avatar').textContent = account.username.slice(0, 1).toUpperCase();
-    field('account-access').textContent = account.is_owner ? 'Owner · Full panel and server access' : (account.panel_permissions || []).includes('users') ? 'Panel administrator · Manages users and server access' : 'Staff · Server access and actions depend on your assigned server roles';
+    const navigation = account.navigation || {};
+    field('account-access').textContent = account.is_owner ? 'Owner · Full platform access' : navigation.platform ? 'Platform administrator · Hosting control depends on server assignments' : navigation.hosting && navigation.units ? 'Hosting and unit access · Permissions depend on your assignments' : navigation.hosting ? 'Hosting access · Permissions depend on your server assignments' : navigation.units ? 'Unit access · Permissions depend on your unit role' : 'No workspace access assigned. Ask an administrator to add you to a unit or assign hosting access.';
     field('account-password-save').disabled = false;
   } catch (error) { field('account-feedback').textContent = error.message; }
   field('account-password-form').onsubmit = async event => {

@@ -46,13 +46,25 @@ window.PanelUI = {
   }
 };
 
-// Shared workspace destination; /admin also enforces authorization on the server.
+// Navigation and login use the same server-calculated workspace access.
 (() => {
   const areas = document.querySelector('.fieldhq-areas');
   if (!areas) return;
   const link = document.createElement('a'); link.href = '/admin'; link.textContent = 'Platform Admin'; link.hidden = true;
   if (location.pathname === '/admin' || location.pathname === '/admin/users') link.setAttribute('aria-current','page');
+  areas.append(link);
+  const links = [...areas.querySelectorAll('a')];
+  links.forEach(item => { item.hidden = true; });
+  const unitLinks = [...document.querySelectorAll('.workspace-unit-link')];
+  unitLinks.forEach(item => { item.hidden = true; });
+  areas.setAttribute('aria-busy','true');
+  document.querySelectorAll('.fieldhq-brand').forEach(brand => { brand.href = '/'; brand.setAttribute('aria-label','FieldHQ home'); });
   fetch('/api/me').then(response => response.ok ? response.json() : null).then(account => {
-    if ((account?.panel_permissions || []).includes('users')) { link.hidden = false; areas.append(link); }
-  }).catch(() => {});
+    if (!account?.navigation) return;
+    const navigation = account.navigation;
+    const allowed = {'/servers':navigation.hosting, '/units':navigation.units, '/admin':navigation.platform};
+    links.forEach(item => { item.hidden = !allowed[new URL(item.href,location.origin).pathname]; });
+    unitLinks.forEach(item => { item.hidden = !navigation.units; });
+    document.querySelectorAll('.fieldhq-brand').forEach(brand => { brand.href = navigation.landing; });
+  }).catch(() => {}).finally(() => areas.removeAttribute('aria-busy'));
 })();

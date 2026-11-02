@@ -323,7 +323,7 @@ def install(api):
         if not request.headers.get('X-Server-ID') and not api.manager_mode:
             g.permissions = server_permissions(g.user, '') | (g.panel_permissions & {'users'})
         return jsonify(id=g.user['id'], username=g.user["username"], role=g.user["role"],
-                       is_owner=g.user['id'] == owner_id, permissions=sorted(g.permissions), panel_permissions=sorted(g.panel_permissions))
+                       is_owner=g.user['id'] == owner_id, permissions=sorted(g.permissions), panel_permissions=sorted(g.panel_permissions), navigation=api.workspace_access(g.user))
 
     @app.get('/api/preferences')
     def account_preferences():

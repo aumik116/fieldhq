@@ -242,27 +242,40 @@ def install(api):
     def panel_admin():
         return g.user["id"] == owner_id or bool(g.user["panel_admin"])
 
-    def hosting_access(conn):
-        return (
-            panel_admin()
-            or bool(g.user["access_all"])
-            or bool(
+    def workspace_access(user):
+        platform = user["id"] == owner_id or bool(user["panel_admin"])
+        with db() as conn:
+            hosting = (
+                platform
+                or bool(user["access_all"])
+                or bool(
+                    conn.execute(
+                        "SELECT 1 FROM user_server_roles WHERE user_id=? LIMIT 1",
+                        (user["id"],),
+                    ).fetchone()
+                )
+            )
+            unit_access = platform or bool(
                 conn.execute(
-                    "SELECT 1 FROM user_server_roles WHERE user_id=? LIMIT 1",
-                    (g.user["id"],),
+                    """
+                SELECT 1 FROM unit_staff s JOIN units u ON u.id=s.unit_id
+                WHERE s.user_id=? AND NOT EXISTS(SELECT 1 FROM unit_account_suspensions x
+                    WHERE x.unit_id=s.unit_id AND x.user_id=s.user_id) LIMIT 1""",
+                    (user["id"],),
                 ).fetchone()
             )
+        return dict(
+            hosting=hosting,
+            units=unit_access,
+            platform=platform,
+            landing=(
+                "/admin"
+                if platform
+                else "/servers" if hosting else "/units" if unit_access else "/account"
+            ),
         )
 
-    def unit_only_user():
-        with db() as conn:
-            return not hosting_access(conn) and bool(
-                conn.execute(
-                    "SELECT 1 FROM unit_staff WHERE user_id=? LIMIT 1", (g.user["id"],)
-                ).fetchone()
-            )
-
-    api.unit_only_user = unit_only_user
+    api.workspace_access = workspace_access
 
     def access(conn, unit_id, capability=None):
         unit = conn.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
@@ -453,6 +466,9 @@ def install(api):
 
     @api.app.get("/units")
     def units_page():
+        navigation = workspace_access(g.user)
+        if not navigation["units"]:
+            return redirect(navigation["landing"])
         if request.args.get("admin") == "users" or "users" in request.args:
             return redirect("/admin/users")
         return send_from_directory(api._BASE_DIR, "units.html")
@@ -520,7 +536,7 @@ def install(api):
                 panel_admin() or "" in visible or api.server_permissions(g.user, "")
             ):
                 servers.insert(0, dict(id="", name="Existing server"))
-            has_hosting_access = hosting_access(conn)
+            has_hosting_access = workspace_access(g.user)["hosting"]
         return jsonify(
             units=result,
             servers=servers,

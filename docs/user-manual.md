@@ -104,6 +104,10 @@ Inside a unit, **Administration → Accounts & access → Add account** lets pan
 
 ### Workspace navigation
 
+The top bar shows only available workspaces. Unit-only accounts see **Units**; hosting-only accounts see **Hosting**; accounts assigned both see both. The Owner and platform administrators also see **Platform Admin**, and retain their existing global unit/hosting administration visibility. Individual server control still requires the existing server role. Suspended unit memberships do not make Units available.
+
+After normal login, platform administrators land in Platform Admin, hosting accounts in All Servers, and unit-only accounts in Units. An account with no available workspace lands in Account settings with an access explanation. The FieldHQ logo returns to this same role-appropriate home. Explicit signup invitations still open the unit being joined. A personal default-unit preference is separate and is not configured by this navigation behavior. Typing a workspace URL does not bypass server-side access checks.
+
 Unit pages use the same grouped sidebar pattern as server workspaces. Choose a unit at the top of the sidebar; permitted pages are always visible under group headings. On phones, use **Menu** to open navigation. **Hosting** and **Units** switch workspaces in the top bar; Help and account controls are on the right. All Servers is a full-width landing page without a server sidebar. Its attention strip shows confirmed server errors, unavailable status and low panel-disk space, with links to the affected server or Storage; it is hidden when clear. Panel administrators can open **Platform Admin → Accounts** directly from the landing page.
 
 ### Member home and self-service
