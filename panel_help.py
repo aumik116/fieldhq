@@ -20,7 +20,7 @@ TOPICS={
     'unit-meeting':('staff','meeting-agenda'),
     'unit-qualifications':('staff','grant-or-correct-a-qualification'), 'unit-promotions':('staff','review-a-promotion'),
     'unit-events':('staff','create-an-event'), 'unit-attendance':('staff','review-correct-and-finalize'),
-    'unit-references':('staff','sops-and-loadouts'), 'unit-awards':('staff','awards'),
+    'unit-references':('staff','sops-and-loadouts'), 'unit-comms':('staff','communications-cards'), 'unit-awards':('staff','awards'),
     'unit-campaigns':('staff','campaigns'), 'unit-analytics':('staff','analytics'),
     'unit-catalog':('staff','set-up-rank-structures-and-qualifications'), 'unit-staff':('staff','accounts--access'),
     'unit-customization':('staff','branding'), 'unit-servers':('staff','2-'), 'units':('staff','1-'),

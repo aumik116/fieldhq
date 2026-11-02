@@ -34,6 +34,7 @@
     servers:
       'Basic health for this unit’s linked servers. Server control access is separate.',
     references: 'Unit SOPs and role-specific kit references.',
+    comms: 'Unit communications cards. Members can view; staff can edit.',
     catalog:
       'Create qualifications, build ordered promotion ladders and preview eligibility.',
     structure:
@@ -258,7 +259,7 @@
       document.querySelectorAll('[data-unit-tab]').forEach((b) => {
         if (detail.role === 'member')
           b.dataset.restricted = String(
-            !['home', 'profile', 'roster', 'references'].includes(
+            !['home', 'profile', 'roster', 'references', 'comms'].includes(
               b.dataset.unitTab,
             ),
           );

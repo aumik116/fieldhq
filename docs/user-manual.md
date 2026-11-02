@@ -689,6 +689,8 @@ Normal attendance percentages use finalized, expected Present/Absent decisions. 
 
 Use **SOPs & loadouts** to search references by category, role or text. Permitted staff can create SOP text/external links and loadouts with image URLs, kit slots, alternatives and notes. Archive obsolete references rather than losing their editing history.
 
+Under **Resources → Commo cards**, maintain multiple full-width unit communications cards. Members can view them; staff can create, edit or delete them. Each card contains a title, optional effective date, circuit rows and optional radio notes. Circuits require a name, frequency/channel and radio type, with optional grouping, crypto and password fields. Empty crypto/password columns are hidden; populated values have Show/Hide controls. All unit members can reveal those game values. The card editor supports adding, removing and reordering circuits. Saves check each card independently and preserve drafts on conflicts. Card contents are excluded from activity logs; private backups include them. These are panel-only cards, without printable/PDF views.
+
 New loadouts use a standard 24-slot layout: Helmet, Jacket, ArmoredVest, Pants, Boots, Back, Vest, HandWear, Head, Eyes, Ears, Face, Neck, Extra, Extra 2–6, Waist, NVS_NVGSLOT, Primary Weapon, Secondary Weapon and Sidearm. Expand each slot to enter its main item, inventory contents and attachments, including quantities and notes. Staff can add, rename or remove slots, or select **Slot layout → Custom · start empty**. Save a custom layout as a **Reusable template** to copy into future loadouts; templates remain staff-only. Publish completed loadouts for members. Existing loadouts retain their slots when edited, and template changes do not update existing copies.
 
 

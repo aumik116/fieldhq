@@ -293,6 +293,7 @@ def install(api):
             "unit_self_profile",
             "unit_reading_acknowledge",
             "unit_rsvp_save",
+            "unit_comms_list",
         }:
             abort(
                 403,
@@ -2680,6 +2681,9 @@ def install(api):
         api, db, access, revision, panel_admin, endpoints
     )
     install_sops(api, db, access, revision, panel_admin, endpoints, required_reading)
+    from unit_comms import install as install_comms
+
+    install_comms(api, db, access, panel_admin, endpoints)
     install_structure(
         api,
         db,

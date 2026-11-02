@@ -305,6 +305,14 @@ Member records show recent attendance, but the Attendance page is the place to i
 
 ## 8. SOPs, loadouts, awards and campaigns
 
+### Communications cards
+
+Open **Resources → Commo cards** for the unit communications plan. A unit can have multiple full-width cards, such as company circuits, command nets or a separate radio system. Members can view cards; Staff and Unit administrators can create, edit and delete them.
+
+Choose **New commo card**, enter a title and optional effective date, then add circuits. Each circuit requires its name, frequency/channel and radio type. Set an optional **Group** to collect related circuits under a heading. Add game crypto/passwords only when needed; these columns are hidden when empty. Members can reveal populated values using **Show**. Optional radio notes appear below the card. Cards are viewed in the panel, without print or PDF controls.
+
+In the editor, expand a circuit to change it, move circuits up/down or remove them. Saving checks the individual card version: unrelated unit changes or edits to another card do not block your save. If another editor changed the same card, your draft stays open; copy your non-secret draft details and reopen the current card before reapplying changes. Crypto/password fields are excluded from draft copying and activity logs. They are stored with the card and included in private unit/panel backups. Hiding a value is a display convenience, not a restriction on unit members. Use Refresh cards to fetch the latest plan.
+
 ### SOPs and loadouts
 
 Under **Resources → SOPs & loadouts**, search by category, role or text. Permitted staff can maintain SOP text and external links, or loadouts with an image URL, kit slots, alternatives and notes. Archive obsolete references to retain editing history.

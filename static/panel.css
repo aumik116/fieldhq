@@ -5022,6 +5022,65 @@ html[data-theme='original'] .fieldhq-search {
 .resource-dialog:has(#sop-editor-tools) {
   width: min(1100px, 95vw);
 }
+.comms-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+.comms-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.comms-heading h3 {
+  margin: 0;
+}
+.comms-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.comms-group {
+  margin-top: 18px;
+}
+.comms-group h4 {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-left: 3px solid var(--accent);
+}
+.comms-group table {
+  width: 100%;
+  min-width: 600px;
+  table-layout: fixed;
+}
+.comms-group :is(th, td) {
+  text-align: left;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+.comms-frequency {
+  color: var(--accent2);
+  font-weight: 600;
+}
+.comms-secret {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 6px;
+}
+.comms-secret[hidden] {
+  display: none;
+}
+.comms-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.comms-dialog {
+  width: min(1200px, calc(100vw - 32px));
+}
 .resource-dialog textarea[name='body'] {
   min-height: 320px;
   font-family: inherit;

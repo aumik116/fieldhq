@@ -16,7 +16,7 @@
       rel="stylesheet"
       href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=account-controls-1" /><link
+      href="/static/panel.css?v=comms-1" /><link
       rel="stylesheet"
       href="/static/help.css?v=manuals-3"
   /></head>
@@ -243,6 +243,18 @@
             ><svg class="ui-icon" aria-hidden="true">
               <use href="/static/icons.svg#files"></use></svg
             >SOPs & loadouts</button
+          ><button
+            class="panel-tab"
+            role="tab"
+            aria-selected="false"
+            tabindex="-1"
+            aria-controls="unit-comms"
+            id="unit-tab-comms"
+            data-unit-tab="comms"
+            hidden
+            ><svg class="ui-icon" aria-hidden="true">
+              <use href="/static/icons.svg#network"></use></svg
+            >Commo cards</button
           ><button
             class="panel-tab"
             role="tab"
@@ -669,6 +681,21 @@
           ><div id="unit-analytics-content" aria-live="polite"></div
         ></section>
         <section
+          id="unit-comms"
+          role="tabpanel"
+          aria-labelledby="unit-tab-comms"
+          hidden
+        >
+          <div class="unit-toolbar"
+            ><button type="button" id="comms-new" class="btn-save" hidden
+              >New commo card</button
+            ><button type="button" id="comms-refresh"
+              >Refresh cards</button
+            ></div
+          >
+          <p id="comms-status" role="status"></p><div id="comms-cards"></div>
+        </section>
+        <section
           id="unit-references"
           role="tabpanel"
           aria-labelledby="unit-tab-references"
@@ -883,6 +910,20 @@
         ></form
       ></dialog
     >
+    <dialog
+      id="comms-dialog"
+      class="unit-dialog comms-dialog"
+      aria-labelledby="comms-title"
+      ><form id="comms-form"
+        ><div class="unit-dialog-heading"
+          ><h2 id="comms-title"></h2
+          ><button type="button" id="comms-close">Close</button></div
+        ><div id="comms-body"></div><p id="comms-error" role="alert"></p
+        ><div class="unit-dialog-footer"
+          ><button type="submit" class="btn-save">Save card</button></div
+        ></form
+      ></dialog
+    >
     <script src="/static/api.js?v=release-tools-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script
     ><script src="/static/unit-ux.js?v=collaboration-ui-1"></script
@@ -890,6 +931,7 @@
     ><script src="/static/roster-tools.js?v=release-tools-1"></script
     ><script src="/static/unit-loadouts.js?v=loadout-slots-1"></script
     ><script src="/static/unit-resources.js?v=loadout-slots-1"></script
+    ><script src="/static/unit-comms.js?v=comms-1"></script
     ><script src="/static/unit-members.js?v=personnel-tools-1"></script
     ><script src="/static/unit-structure.js?v=member-invites-1"></script
     ><script src="/static/unit-catalog.js?v=release-tools-1"></script
@@ -898,6 +940,6 @@
     ><script src="/static/unit-brand-crop.js?v=branding-crop-1"></script
     ><script src="/static/unit-roster-print.js?v=roster-polish-1"></script
     ><script src="/static/unit-presence.js?v=collaboration-ui-1"></script
-    ><script src="/static/units.js?v=member-invites-1"></script
+    ><script src="/static/units.js?v=comms-1"></script
     ><script src="/static/help.js?v=manuals-3"></script></body
 ></html>
