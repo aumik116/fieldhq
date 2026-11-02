@@ -2,6 +2,8 @@
 let userEditorData,
   userEditorDialog,
   userEditorBaseline = '';
+let userAccountBrowse = false,
+  userAccountPage = 0;
 const userEditorEl = (id) => document.getElementById(id);
 const userEditorRead = async (url) => readJson(await fetch(url));
 const userEditorWrite = async (url, data) =>
@@ -52,14 +54,15 @@ async function loadUsers() {
   const previous = Object.fromEntries(
     filterIds.map((id) => [id, userEditorEl(id)?.value || '']),
   );
+  const filtersOpen = userEditorEl('users-extra-filters')?.open || false;
   userEditorData = await userEditorRead('/api/users');
   const list = userEditorEl('users-list');
   list.innerHTML =
-    '<div class="unit-toolbar account-filters"><label>Search accounts<input type="search" id="users-search" placeholder="Username or unit name"></label><label>Unit<select id="users-unit-filter"><option value="">All units</option><option value="none">No unit membership</option>' +
+    '<div class="account-findbar"><label class="unit-field">Find an account<input type="search" id="users-search" placeholder="Username or unit name"></label><label class="unit-field">Unit<select id="users-unit-filter"><option value="">All units</option><option value="none">No unit membership</option>' +
     userEditorData.units
       .map((u) => `<option value="${u.id}">${escHtml(u.name)}</option>`)
       .join('') +
-    '</select></label><label>Server<select id="users-server-filter"><option value="">All servers</option><option value="none">No hosting access</option>' +
+    '</select></label><button type="button" id="users-browse">Browse accounts</button></div><details id="users-extra-filters" class="account-extra-filters"><summary>More filters</summary><div class="account-filters unit-toolbar"><label>Server<select id="users-server-filter"><option value="">All servers</option><option value="none">No hosting access</option>' +
     userEditorData.servers
       .map(
         (s) => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`,
@@ -69,7 +72,8 @@ async function loadUsers() {
     Object.entries(userAccountLabels)
       .map(([value, label]) => `<option value="${value}">${label}</option>`)
       .join('') +
-    '</select></label><label>Status<select id="users-enabled-filter"><option value="">All accounts</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label><label>Sort by<select id="users-sort"><option value="name">Username</option><option value="type">Account type</option><option value="unit">Unit name</option><option value="status">Enabled first</option></select></label><button type="button" id="users-clear-filters">Clear filters</button></div><p class="feature-note">Accounts can have several access types. When a unit is selected, unit-role filters apply within that unit.</p><p id="users-result-count" role="status"></p><div id="users-results"></div>';
+    '</select></label><label>Status<select id="users-enabled-filter"><option value="">All accounts</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label><label>Sort by<select id="users-sort"><option value="name">Username</option><option value="type">Account type</option><option value="unit">Unit name</option><option value="status">Enabled first</option></select></label></div></details><div class="account-results-heading"><p id="users-result-count" role="status"></p><button type="button" id="users-clear-filters">Reset view</button></div><div id="users-results"></div><nav id="users-pagination" class="account-pagination" aria-label="Account pages" hidden><button type="button" id="users-previous">Previous</button><span id="users-page-label"></span><button type="button" id="users-next">Next</button></nav>';
+  userEditorEl('users-extra-filters').open = filtersOpen;
   userEditorEl('users-sort').add(
     new Option('Last login — newest first', 'login-newest'),
   );
@@ -136,13 +140,35 @@ async function loadUsers() {
                   ? Number(b.enabled) - Number(a.enabled)
                   : 0) || compare(a.username, b.username),
     );
-    userEditorEl('users-result-count').textContent =
-      `${rows.length} of ${userEditorData.users.length} accounts`;
+    const showing = !!(
+      userAccountBrowse ||
+      query ||
+      unit ||
+      server ||
+      role ||
+      enabled
+    );
+    const pageSize = 10;
+    userAccountPage = Math.max(
+      0,
+      Math.min(userAccountPage, Math.ceil(rows.length / pageSize) - 1),
+    );
+    const start = userAccountPage * pageSize;
+    const visible = showing ? rows.slice(start, start + pageSize) : [];
+    userEditorEl('users-result-count').textContent = showing
+      ? `${rows.length ? start + 1 : 0}–${start + visible.length} of ${rows.length} matching accounts`
+      : `${userEditorData.users.length} accounts · Search, choose a unit or browse to view them.`;
+    userEditorEl('users-pagination').hidden =
+      !showing || rows.length <= pageSize;
+    userEditorEl('users-previous').disabled = userAccountPage === 0;
+    userEditorEl('users-next').disabled = start + pageSize >= rows.length;
+    userEditorEl('users-page-label').textContent =
+      `Page ${userAccountPage + 1} of ${Math.max(1, Math.ceil(rows.length / pageSize))}`;
     userEditorEl('users-results').innerHTML =
-      rows
+      visible
         .map(
           (u) =>
-            `<div class="unit-block feature-row"><div class="account-list-identity"><strong>${escHtml(u.username)}</strong>${u.enabled ? '' : ' · Disabled'}<div class="account-access-tags">${userAccountTypes(
+            `<details class="account-row"><summary><span class="account-row-summary"><strong>${escHtml(u.username)}</strong><span>${escHtml(userAccountLabels[userAccountTypes(u)[0]])}</span><span>${u.units.length} unit${u.units.length === 1 ? '' : 's'}${u.enabled ? '' : ' · Disabled'}</span></span></summary><div class="account-row-details"><div class="account-list-identity"><div class="account-access-tags">${userAccountTypes(
               u,
             )
               .map(
@@ -151,9 +177,15 @@ async function loadUsers() {
               )
               .join(
                 '',
-              )}</div><small class="unit-meta">${escHtml(unitSummary(u) || 'No unit memberships')}</small></div><button type="button" data-edit-user="${u.id}">Edit</button></div>`,
+              )}</div><small class="unit-meta">${escHtml(unitSummary(u) || 'No unit memberships')}</small></div><button type="button" data-edit-user="${u.id}">Edit account</button></div></details>`,
         )
-        .join('') || '<p>No matching accounts.</p>';
+        .join('') ||
+      (showing ? '<p class="unit-empty">No matching accounts.</p>' : '');
+    userEditorEl('users-results')
+      .querySelectorAll('.account-row-summary strong')
+      .forEach((name) => {
+        name.title = name.textContent;
+      });
     userEditorEl('users-results')
       .querySelectorAll('[data-edit-user]')
       .forEach((b) => {
@@ -172,11 +204,31 @@ async function loadUsers() {
   for (const id of filterIds)
     userEditorEl(id).addEventListener(
       id === 'users-search' ? 'input' : 'change',
-      render,
+      () => {
+        userAccountPage = 0;
+        if (id === 'users-sort') userAccountBrowse = true;
+        render();
+      },
     );
   userEditorEl('users-clear-filters').onclick = () => {
+    userAccountBrowse = false;
+    userAccountPage = 0;
+    userEditorEl('users-extra-filters').open = false;
     for (const id of filterIds)
       userEditorEl(id).value = id === 'users-sort' ? 'name' : '';
+    render();
+  };
+  userEditorEl('users-browse').onclick = () => {
+    userAccountBrowse = true;
+    userAccountPage = 0;
+    render();
+  };
+  userEditorEl('users-previous').onclick = () => {
+    userAccountPage--;
+    render();
+  };
+  userEditorEl('users-next').onclick = () => {
+    userAccountPage++;
     render();
   };
   render();

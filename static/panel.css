@@ -3258,6 +3258,135 @@ html:where([data-theme])
   gap: 6px;
   margin-top: 6px;
 }
+.account-access-tags .unit-badge {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 8px;
+  white-space: nowrap;
+  border-radius: var(--ui-radius);
+}
+.account-findbar {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(160px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0 8px;
+}
+.account-findbar > label {
+  min-width: 0;
+}
+html[data-theme]
+  #platform-accounts
+  :is(
+    .account-findbar input,
+    .account-findbar select,
+    .account-filters select,
+    button
+  ) {
+  box-sizing: border-box;
+  min-height: var(--ui-control-height);
+  border-radius: var(--ui-radius);
+  padding: var(--ui-control-padding);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.account-findbar :is(input, select) {
+  width: 100%;
+}
+.account-extra-filters > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--muted);
+}
+.account-extra-filters .account-filters {
+  margin: 8px 0;
+}
+.account-results-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.account-results-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+.account-row {
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius);
+  background: var(--surface);
+  margin: 6px 0;
+}
+.account-row > summary {
+  cursor: pointer;
+  padding: 10px 12px;
+}
+.account-row-summary {
+  display: inline-grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(140px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: calc(100% - 22px);
+  vertical-align: middle;
+}
+.account-row-summary strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-row-summary > span {
+  color: var(--muted);
+}
+.account-row-details {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+.account-row-details .account-access-tags {
+  margin-top: 0;
+}
+.account-row-details > button {
+  flex: 0 0 auto;
+}
+.account-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 12px 0;
+}
+.account-pagination[hidden] {
+  display: none;
+}
+@media (max-width: 700px) {
+  .account-findbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .account-findbar > label:first-child {
+    grid-column: 1 / -1;
+  }
+  .account-row-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+  .account-row-summary > span:nth-child(2) {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .account-row-details {
+    flex-wrap: wrap;
+  }
+  .account-access-tags .unit-badge {
+    white-space: normal;
+  }
+}
 /* Low-specificity defaults give every action a usable button, while component styles win. */
 html:where([data-theme])
   :where(
