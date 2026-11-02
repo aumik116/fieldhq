@@ -1798,11 +1798,23 @@ html[data-theme] .dashboard-player-column {
   margin: auto;
   padding: 88px 28px 32px;
 }
-.unit-toolbar {
+:root {
+  --ui-gap: 12px;
+  --ui-control-height: 34px;
+  --ui-control-padding: 8px 12px;
+  --ui-field-padding: 8px 10px;
+  --ui-radius: 4px;
+  --ui-dialog-padding: 24px;
+}
+html[data-theme='original'] {
+  --ui-radius: 0px;
+}
+.unit-toolbar,
+.ui-toolbar {
   display: flex;
   align-items: end;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--ui-gap);
   margin: 18px 0;
 }
 .unit-toolbar label,
@@ -1827,7 +1839,8 @@ html[data-theme] .dashboard-player-column {
 .units-page button,
 .unit-dialog button,
 .user-editor button {
-  padding: 9px 14px;
+  min-height: var(--ui-control-height);
+  padding: var(--ui-control-padding);
   cursor: pointer;
   border: 1px solid var(--border);
   background: var(--surface2);
@@ -1852,7 +1865,7 @@ html[data-theme] .dashboard-player-column {
 .unit-table {
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--ui-radius);
 }
 .unit-table table {
   border-collapse: collapse;
@@ -1883,11 +1896,11 @@ html[data-theme] .dashboard-player-column {
 .user-editor {
   width: min(900px, 94vw);
   max-height: 90vh;
-  padding: 24px;
+  padding: var(--ui-dialog-padding);
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ui-radius);
 }
 .unit-dialog::backdrop,
 .user-editor::backdrop {
@@ -1900,12 +1913,12 @@ html[data-theme] .dashboard-player-column {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--ui-gap);
 }
 .unit-dialog-footer,
 .user-editor-footer {
   position: sticky;
-  bottom: -24px;
+  bottom: calc(-1 * var(--ui-dialog-padding));
   padding: 16px 0;
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -3213,7 +3226,7 @@ html:where([data-theme])
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  padding: 8px 10px;
+  padding: var(--ui-field-padding, 8px 10px);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--console-bg);
@@ -3256,8 +3269,8 @@ html:where([data-theme])
   ) {
   appearance: none;
   box-sizing: border-box;
-  min-height: 34px;
-  padding: 8px 12px;
+  min-height: var(--ui-control-height);
+  padding: var(--ui-control-padding);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface2);
@@ -4712,7 +4725,7 @@ html[data-theme] :where(dialog) {
   max-width: calc(100vw - 32px);
   max-height: 88dvh;
   overflow: auto;
-  padding: 24px;
+  padding: var(--ui-dialog-padding);
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -6018,4 +6031,224 @@ html[data-theme] #unit-sidebar [hidden] {
   border: 1px solid var(--border);
   font-size: 20px;
   color: var(--accent);
+}
+
+/* Shared component contract. Feature layouts and theme palettes stay above. */
+.ui-toolbar-filters,
+.ui-toolbar-actions,
+.ui-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+}
+.ui-toolbar-filters {
+  flex: 1 1 320px;
+}
+.ui-toolbar-actions {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.ui-toolbar-filters > input[type='search'] {
+  flex: 1 1 240px;
+}
+.ui-toolbar-filters > label {
+  min-width: 0;
+}
+.ui-toolbar-filters select {
+  max-width: 100%;
+}
+.ui-toolbar :is(.ui-toolbar-filters, .ui-toolbar-actions) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.ui-action-group + .ui-action-group {
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+html[data-theme]
+  :is(
+    .unit-toolbar,
+    .ui-toolbar,
+    .fleet-filters,
+    .operator-toolbar,
+    .config-toolbar,
+    .workshop-toolbar
+  )
+  :where(
+    button:not([role='tab']),
+    select,
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      )
+  ) {
+  min-height: var(--ui-control-height);
+  box-sizing: border-box;
+  padding: var(--ui-control-padding);
+  font-size: 12px;
+  line-height: 1.3;
+}
+html[data-theme]
+  :is(.unit-field, .field, .field-group)
+  > :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='color']
+      ):not([type='file']),
+    select
+  ) {
+  min-height: var(--ui-control-height);
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+html[data-theme] :is(.unit-field, .field, .field-group) > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+html[data-theme]
+  :is(
+    .unit-toolbar,
+    .ui-toolbar,
+    .unit-dialog-heading,
+    .user-editor-heading,
+    .fleet-dialog-heading,
+    .mods-dialog-heading
+  )
+  button {
+  padding: var(--ui-control-padding);
+  font-size: 12px;
+  line-height: 1.3;
+}
+html[data-theme]
+  :is(
+    .unit-dialog,
+    .user-editor,
+    .mods-dialog,
+    .instances-dialog,
+    .fleet-update-dialog,
+    .panel-confirm
+  ) {
+  padding: var(--ui-dialog-padding);
+  border-radius: var(--ui-radius);
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  scrollbar-gutter: stable;
+}
+:is(
+  .unit-dialog-heading,
+  .user-editor-heading,
+  .fleet-dialog-heading,
+  .mods-dialog-heading,
+  .instances-dialog-heading
+) {
+  gap: var(--ui-gap);
+  align-items: center;
+  flex-wrap: wrap;
+}
+:is(
+    .unit-dialog-heading,
+    .user-editor-heading,
+    .fleet-dialog-heading,
+    .mods-dialog-heading,
+    .instances-dialog-heading
+  )
+  :is(h2, h3) {
+  margin: 0;
+  overflow-wrap: anywhere;
+  flex: 1 1 200px;
+}
+:is(
+  .panel-dialog-footer,
+  .fleet-dialog-footer,
+  .mods-dialog-footer,
+  .user-editor-footer
+) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ui-gap);
+}
+.user-editor-footer > .feature-note {
+  margin-right: auto;
+}
+html[data-theme]
+  :is([role='alert']:not(:empty):not([hidden]), .unit-inline-error, .ui-error) {
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--offline);
+  border-radius: var(--ui-radius);
+  background: var(--surface2);
+  color: var(--text);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+:is(.unit-inline-error, .ui-error) p {
+  margin: 0 0 8px;
+}
+:is(.unit-empty, .ui-empty) {
+  color: var(--muted);
+  padding: 20px 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+html[data-theme] :is(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--offline);
+}
+.unit-table :is(button, select, input) {
+  max-width: 100%;
+}
+.unit-table :is(th, td) {
+  overflow-wrap: anywhere;
+}
+html[data-theme] :is(input, select, textarea):disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.comms-actions .btn-danger {
+  margin-left: 8px;
+}
+@media (max-width: 700px) {
+  :root {
+    --ui-dialog-padding: 16px;
+    --ui-control-height: 40px;
+  }
+  .ui-toolbar-filters,
+  .ui-toolbar-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .ui-toolbar-actions {
+    justify-content: flex-start;
+  }
+  .ui-toolbar-filters > input[type='search'] {
+    flex-basis: 100%;
+  }
+  .ui-toolbar-filters > :is(label, select) {
+    flex: 1 1 140px;
+  }
+  .ui-action-group + .ui-action-group {
+    border-left: 0;
+    padding-left: 0;
+  }
+  :is(
+      .unit-dialog,
+      .user-editor,
+      .mods-dialog,
+      .instances-dialog,
+      .fleet-update-dialog,
+      .panel-confirm
+    )
+    :is(
+      button,
+      select,
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='color']
+        ):not([type='file'])
+    ) {
+    min-height: var(--ui-control-height);
+  }
 }

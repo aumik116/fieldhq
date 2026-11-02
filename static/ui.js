@@ -6,7 +6,7 @@ window.PanelUI = {
     const heading=dialog.querySelector('h2,h3');
     if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
   },
-  confirm(message, title='Confirm action') {
+  confirm(message, title='Confirm action', destructive=false) {
     if(document.querySelector('.panel-confirm[open]'))return Promise.resolve(false);
     return new Promise(resolve=>{
       const dialog=document.createElement('dialog');dialog.className='panel-confirm';dialog.setAttribute('aria-labelledby','panel-confirm-title');
@@ -14,7 +14,7 @@ window.PanelUI = {
       const text=document.createElement('p');text.textContent=message;
       const footer=document.createElement('div');footer.className='panel-dialog-footer';
       const cancel=document.createElement('button');cancel.type='button';cancel.className='btn-logout';cancel.textContent='Cancel';
-      const accept=document.createElement('button');accept.type='button';accept.className='btn-save';accept.textContent='Confirm';
+      const accept=document.createElement('button');accept.type='button';accept.className=destructive?'btn-danger':'btn-save';accept.textContent=destructive?'Delete':'Confirm';
       let finished=false;const finish=value=>{if(finished)return;finished=true;dialog.close();dialog.remove();resolve(value);};
       cancel.onclick=()=>finish(false);accept.onclick=()=>finish(true);dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false);});
       footer.append(cancel,accept);dialog.append(heading,text,footer);document.body.append(dialog);dialog.showModal();cancel.focus();

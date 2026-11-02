@@ -16,7 +16,7 @@
       rel="stylesheet"
       href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=comms-1" /><link
+      href="/static/panel.css?v=ui-components-1" /><link
       rel="stylesheet"
       href="/static/help.css?v=manuals-3"
   /></head>
@@ -489,40 +489,45 @@
             role="group"
             aria-label="Roster groups"
           ></div
-          ><div class="unit-toolbar"
-            ><input
-              type="search"
-              id="roster-search"
-              placeholder="Search name, rank, formation, billet, Discord or UUID"
-              aria-label="Search roster"
-            /><select id="roster-status" aria-label="Membership status"
-              ><option value="">All current members</option
-              ><option value="active">Active</option
-              ><option value="reserve">Reserve</option
-              ><option value="loa">LOA</option
-              ><option value="archived">Former members</option></select
-            ><select id="roster-sort" aria-label="Sort roster"
-              ><option value="name">Name A–Z</option
-              ><option value="promotion">Next promotion date</option
-              ><option value="joined">Join date</option></select
-            ><button id="roster-add" class="btn-save" hidden>Add member</button
-            ><details id="roster-bulk-menu" class="roster-action-menu" hidden
-              ><summary>Bulk actions</summary
-              ><div class="roster-action-items"
-                ><button type="button" id="roster-bulk" hidden
-                  >Award qualifications…</button
-                ><button type="button" data-bulk-action="revoke"
-                  >Revoke qualifications…</button
-                ><button type="button" data-bulk-action="status"
-                  >Change status…</button
-                ><button type="button" data-bulk-action="section"
-                  >Move into open billets…</button
-                ><button type="button" data-bulk-action="unassign"
-                  >Remove primary placement…</button
-                ></div
-              ></details
-            ><button type="button" id="roster-print">Print roster</button
-            ><a id="roster-export" class="manager-link">Export CSV</a></div
+          ><div class="unit-toolbar ui-toolbar"
+            ><div class="ui-toolbar-filters"
+              ><input
+                type="search"
+                id="roster-search"
+                placeholder="Search name, rank, formation, billet, Discord or UUID"
+                aria-label="Search roster"
+              /><select id="roster-status" aria-label="Membership status"
+                ><option value="">All current members</option
+                ><option value="active">Active</option
+                ><option value="reserve">Reserve</option
+                ><option value="loa">LOA</option
+                ><option value="archived">Former members</option></select
+              ><select id="roster-sort" aria-label="Sort roster"
+                ><option value="name">Name A–Z</option
+                ><option value="promotion">Next promotion date</option
+                ><option value="joined">Join date</option></select
+              ></div
+            ><div class="ui-toolbar-actions"
+              ><button id="roster-add" class="btn-save" hidden
+                >Add member</button
+              ><details id="roster-bulk-menu" class="roster-action-menu" hidden
+                ><summary>Bulk actions</summary
+                ><div class="roster-action-items"
+                  ><button type="button" id="roster-bulk" hidden
+                    >Award qualifications…</button
+                  ><button type="button" data-bulk-action="revoke"
+                    >Revoke qualifications…</button
+                  ><button type="button" data-bulk-action="status"
+                    >Change status…</button
+                  ><button type="button" data-bulk-action="section"
+                    >Move into open billets…</button
+                  ><button type="button" data-bulk-action="unassign"
+                    >Remove primary placement…</button
+                  ></div
+                ></details
+              ><button type="button" id="roster-print">Print roster</button
+              ><a id="roster-export" class="manager-link">Export CSV</a></div
+            ></div
           ><div id="roster-management" class="roster-management" hidden
             ><span>Management</span
             ><button id="roster-structure" hidden>Manage structure</button
@@ -704,40 +709,47 @@
             >Your unit’s SOP repository. Write procedures, add images, upload
             PDF / Word documents or link existing documents; archive older
             guidance without losing its history.</p
-          ><div class="unit-toolbar"
-            ><button type="button" id="reference-sops" aria-pressed="true"
-              >SOPs</button
-            ><button type="button" id="reference-loadouts" aria-pressed="false"
-              >Gear / loadouts</button
-            ><input
-              type="search"
-              id="reference-search"
-              aria-label="Search references"
-              placeholder="Search title, content, category or role"
-            /><label
-              >Category<select id="reference-category"
-                ><option value="">All categories</option></select
-              ></label
-            ><label id="reference-publication-label"
-              >State<select id="reference-publication"
-                ><option value="">Documents</option
-                ><option value="draft">Drafts</option
-                ><option value="published">Published</option
-                ><option value="template">Templates</option></select
-              ></label
-            ><label
-              >Sort<select id="reference-sort"
-                ><option value="title">Title A–Z</option
-                ><option value="updated">Recently updated</option
-                ><option value="oldest">Oldest updated</option></select
-              ></label
-            ><label
-              >Show<select id="reference-archived"
-                ><option value="0">Current</option
-                ><option value="1">Archived</option></select
-              ></label
-            ><button id="reference-new" class="btn-save" hidden
-              >New SOP</button
+          ><div class="unit-toolbar ui-toolbar"
+            ><div class="ui-toolbar-filters"
+              ><button type="button" id="reference-sops" aria-pressed="true"
+                >SOPs</button
+              ><button
+                type="button"
+                id="reference-loadouts"
+                aria-pressed="false"
+                >Gear / loadouts</button
+              ><input
+                type="search"
+                id="reference-search"
+                aria-label="Search references"
+                placeholder="Search title, content, category or role"
+              /><label
+                >Category<select id="reference-category"
+                  ><option value="">All categories</option></select
+                ></label
+              ><label id="reference-publication-label"
+                >State<select id="reference-publication"
+                  ><option value="">Documents</option
+                  ><option value="draft">Drafts</option
+                  ><option value="published">Published</option
+                  ><option value="template">Templates</option></select
+                ></label
+              ><label
+                >Sort<select id="reference-sort"
+                  ><option value="title">Title A–Z</option
+                  ><option value="updated">Recently updated</option
+                  ><option value="oldest">Oldest updated</option></select
+                ></label
+              ><label
+                >Show<select id="reference-archived"
+                  ><option value="0">Current</option
+                  ><option value="1">Archived</option></select
+                ></label
+              ></div
+            ><div class="ui-toolbar-actions"
+              ><button id="reference-new" class="btn-save" hidden
+                >New SOP</button
+              ></div
             ></div
           ><div class="sop-library-layout"
             ><nav
@@ -925,13 +937,13 @@
       ></dialog
     >
     <script src="/static/api.js?v=release-tools-1"></script
-    ><script src="/static/ui.js?v=cleanup-1"></script
+    ><script src="/static/ui.js?v=ui-components-1"></script
     ><script src="/static/unit-ux.js?v=collaboration-ui-1"></script
     ><script src="/static/unit-events.js?v=release-tools-1"></script
     ><script src="/static/roster-tools.js?v=release-tools-1"></script
     ><script src="/static/unit-loadouts.js?v=loadout-slots-1"></script
     ><script src="/static/unit-resources.js?v=loadout-slots-1"></script
-    ><script src="/static/unit-comms.js?v=comms-1"></script
+    ><script src="/static/unit-comms.js?v=ui-components-1"></script
     ><script src="/static/unit-members.js?v=personnel-tools-1"></script
     ><script src="/static/unit-structure.js?v=member-invites-1"></script
     ><script src="/static/unit-catalog.js?v=release-tools-1"></script

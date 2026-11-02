@@ -88,14 +88,22 @@
         notes.textContent = card.notes;
         article.append(notes);
       }
+      article.querySelector('[data-delete]')?.classList.add('btn-danger');
       article
         .querySelector('[data-edit]')
         ?.addEventListener('click', () => edit(card));
       article
         .querySelector('[data-delete]')
         ?.addEventListener('click', async (event) => {
-          if (!confirm(`Delete communications card “${card.title}”?`)) return;
           const unitId = context.unitId;
+          if (
+            !(await PanelUI.confirm(
+              `Delete communications card “${card.title}”?`,
+              'Delete commo card',
+              true,
+            ))
+          )
+            return;
           event.target.disabled = true;
           try {
             await write(`/api/units/${unitId}/comms/${card.id}/delete`, {

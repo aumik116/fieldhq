@@ -44,6 +44,8 @@ python3 -m black unit_common.py unit_sops.py units.py unit_resources.py unit_mem
 
 New Python runtime modules must be added to `PANEL_PY_FILES` in `install.sh`, so fresh installations and updates deploy the same files. When shared JavaScript interfaces change, update the relevant script cache versions together.
 
+Shared UI conventions are documented in [UI components](ui-components.md). Keep common sizing, spacing, dialog and feedback styles in `static/panel.css`; preserve feature layouts, theme palettes and permission checks. Use the existing `PanelUI` confirmation dialog for destructive actions and retain native forms and unsaved-draft protection.
+
 `static/unit-roster.js` handles saved-change refresh, the roster feed and unassigned-member selection. `UnitStructure` stores per-browser display/disclosure preferences. Member edit tokens cover record fields, awards/history and primary placement; legacy requests retain unit-wide revision checks.
 
 

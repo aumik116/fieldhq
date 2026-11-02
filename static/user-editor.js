@@ -226,6 +226,7 @@ async function openUserEditor(userId) {
           .join('') || '<p>Create a unit first.</p>'
       }<p class="feature-note">Staff manage day-to-day unit records, events, attendance and resources. Unit administrators also manage staff, rank rules, structure, branding and permanent member deletion. Server access stays separate.</p></section><p id="user-editor-error" role="alert"></p><div class="user-editor-footer"><span id="user-editor-summary" class="feature-note"></span><button type="submit" class="btn-save">Save changes</button></div></form>`;
     const form = userEditorEl('user-editor-form');
+    userEditorEl('user-delete-account')?.classList.add('btn-danger');
     form.elements.panel_admin.options[0].textContent =
       'Standard account — unit and hosting access below';
     userEditorEl('user-pane-Account').querySelector(
@@ -263,9 +264,11 @@ async function openUserEditor(userId) {
     });
     userEditorEl('user-delete-account')?.addEventListener('click', async () => {
       if (
-        !confirm(
+        !(await PanelUI.confirm(
           `Delete account "${user.username}"? Remove its unit memberships first. Its activity history will remain.`,
-        )
+          'Delete account',
+          true,
+        ))
       )
         return;
       try {
