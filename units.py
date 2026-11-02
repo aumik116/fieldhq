@@ -442,6 +442,8 @@ def install(api):
     @api.app.errorhandler(403)
     @api.app.errorhandler(404)
     @api.app.errorhandler(409)
+    @api.app.errorhandler(410)
+    @api.app.errorhandler(429)
     @api.app.errorhandler(413)
     def unit_error(error):
         if request.endpoint in endpoints or request.endpoint == "users_save":
@@ -1750,6 +1752,7 @@ def install(api):
                     (unit_id,),
                 )
             ]
+            api.decorate_member_invitations(conn, roster)
             membership = conn.execute(
                 "SELECT role,capabilities FROM unit_staff WHERE unit_id=? AND user_id=?",
                 (unit_id, g.user["id"]),
@@ -1908,6 +1911,7 @@ def install(api):
         with db() as conn:
             unit = access(conn, unit_id)
             member = dict(find_member(conn, unit_id, member_id))
+            api.decorate_member_invitations(conn, [member])
             decorate_slots(conn, unit_id, [member])
             rows = [
                 dict(r)
@@ -2317,6 +2321,12 @@ def install(api):
                         ),
                     )
                 if data.get("archived", False):
+                    if account_id is not None:
+                        # Archive the unit membership, never disable a shared account.
+                        conn.execute(
+                            "INSERT OR IGNORE INTO unit_account_suspensions(unit_id,user_id) SELECT ?,user_id FROM unit_staff WHERE unit_id=? AND user_id=? AND role='member'",
+                            (unit_id, unit_id, account_id),
+                        )
                     conn.execute(
                         "UPDATE unit_temporary_assignments SET cancelled=1 WHERE unit_id=? AND member_id=?",
                         (unit_id, member_id),
@@ -2683,6 +2693,9 @@ def install(api):
     install_login_management(
         api, db, access, revision, endpoints, find_member, panel_admin
     )
+    from unit_invitations import install as install_invitations
+
+    install_invitations(api, db, access, endpoints, find_member)
     install_demo(api, db, panel_admin, endpoints, record_roster_change, record_strength)
     personnel_coverage = install_personnel(
         api,

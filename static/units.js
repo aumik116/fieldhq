@@ -393,6 +393,32 @@
         (b) => (b.onclick = () => memberRecord(Number(b.dataset.record))),
       );
     el('roster-rows')
+      .querySelectorAll('[data-record]')
+      .forEach((button) => {
+        const member = detail.roster.find(
+          (m) => m.id === Number(button.dataset.record),
+        );
+        if (
+          !member ||
+          button.closest('td') !== button.closest('tr')?.firstElementChild
+        )
+          return;
+        const status = document.createElement('small');
+        status.textContent =
+          {
+            none: 'No login',
+            pending: 'Invite pending',
+            active: 'Login active',
+            disabled: 'Login disabled',
+          }[member.login_status] || 'No login';
+        button.after(status);
+      });
+    el('roster-rows')
+      .querySelectorAll('[data-member-login]')
+      .forEach((button) => {
+        button.textContent = 'Create signup link';
+      });
+    el('roster-rows')
       .querySelectorAll('[data-member]')
       .forEach(
         (b) =>
@@ -603,24 +629,58 @@
   }
   function memberLoginEditor(member) {
     if (!member || !UnitUX.canLeave()) return;
-    const suggested = member.game_name
-      .toLowerCase()
-      .replace(/[^a-z0-9_.-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 32);
     openDialog(
-      `Create login for ${member.game_name}`,
-      `<p>This creates and links a <strong>Member</strong> account for this unit. Members can view published resources and events; staff and hosting permissions are not granted.</p><label class="unit-field">Username<input name="username" required minlength="3" maxlength="32" value="${esc(suggested)}" autocomplete="off"></label><label class="unit-field">Initial password<input name="password" type="password" required minlength="10" maxlength="72" autocomplete="new-password"></label><p class="feature-note">Give the member these credentials and the panel address: ${esc(location.origin)}/login. Save the password before closing; it is not shown again.</p>`,
+      `Invite ${member.game_name}`,
+      '<p>Generate a private signup link and DM it to this member. They choose their own username and password, or sign in with an existing account. This grants Member access to this unit only.</p><p>The link works once and expires in 7 days. Generating a new link invalidates any previous link.</p>',
       async () => {
-        const data = values();
-        await write(`/api/units/${unitId}/roster/${member.id}/login`, {
-          username: data.username,
-          password: data.password,
-          revision: detail.unit.revision,
-        });
+        await generateMemberLink(member, 'signup');
+        return false;
       },
     );
-    form.querySelector('[type="submit"]').textContent = 'Create Member login';
+    form.querySelector('[type="submit"]').textContent = member.invite_expires_at
+      ? 'Generate replacement link'
+      : 'Generate signup link';
+  }
+  async function generateMemberLink(member, action) {
+    const currentUnit = unitId;
+    const result = await write(
+      `/api/units/${currentUnit}/roster/${member.id}/invite`,
+      { action },
+    );
+    const body = el('unit-dialog-body');
+    body.innerHTML = `<p>DM this private link to <strong>${esc(member.game_name)}</strong>. It works once and expires ${esc(new Date(result.expires_at * 1000).toLocaleString())}.</p><label class="unit-field">${action === 'reset' ? 'Password reset' : 'Signup'} link<input id="member-private-link" readonly></label><button type="button" id="member-link-copy">Copy link</button> <button type="button" id="member-link-revoke">Revoke link</button><p id="member-link-status" role="status">The link is shown only here. If you lose it, generate a new one.</p>`;
+    const link = el('member-private-link');
+    link.value = new URL(result.path, location.origin).href;
+    link.onclick = () => link.select();
+    el('member-link-copy').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(link.value);
+        el('member-link-status').textContent =
+          'Copied. Send it directly to the member.';
+      } catch (_) {
+        link.focus();
+        link.select();
+        el('member-link-status').textContent =
+          'Press Ctrl+C or use your device’s Copy action.';
+      }
+    };
+    el('member-link-revoke').onclick = async () => {
+      const button = el('member-link-revoke');
+      button.disabled = true;
+      try {
+        await write(`/api/units/${currentUnit}/roster/${member.id}/invite`, {
+          action: 'revoke',
+        });
+        link.value = '';
+        el('member-link-copy').disabled = true;
+        el('member-link-status').textContent =
+          'Link revoked. It can no longer be used.';
+      } catch (error) {
+        el('member-link-status').textContent = error.message;
+        button.disabled = false;
+      }
+    };
+    form.querySelector('[type="submit"]').hidden = true;
   }
   function structureEditor(kind, parentId = null, node = null) {
     const excluded = new Set();
@@ -1517,6 +1577,46 @@
             button.onclick = () => loginManagementEditor(member, action);
             access.append(button);
           }
+        if (membership && membership.role !== 'member' && detail.can_settings) {
+          const reset = document.createElement('button');
+          reset.type = 'button';
+          reset.textContent = 'Generate password reset link';
+          reset.onclick = () => loginManagementEditor(member, 'reset');
+          access.append(reset);
+        }
+      }
+    } else if (!member.archived && detail.can_edit) {
+      access.replaceChildren();
+      const status = document.createElement('p');
+      status.textContent = member.invite_expires_at
+        ? `Invite pending · expires ${new Date(member.invite_expires_at * 1000).toLocaleString()}`
+        : 'No login yet.';
+      const invite = document.createElement('button');
+      invite.type = 'button';
+      invite.textContent = member.invite_expires_at
+        ? 'Regenerate signup link'
+        : 'Create signup link';
+      invite.onclick = () => memberLoginEditor(member);
+      access.append(status, invite);
+      if (member.invite_expires_at) {
+        const revoke = document.createElement('button');
+        revoke.type = 'button';
+        revoke.textContent = 'Revoke signup link';
+        revoke.onclick = async () => {
+          revoke.disabled = true;
+          try {
+            await write(`/api/units/${unitId}/roster/${member.id}/invite`, {
+              action: 'revoke',
+            });
+            status.textContent = 'Invitation revoked.';
+            invite.textContent = 'Create signup link';
+            revoke.remove();
+          } catch (error) {
+            status.textContent = error.message;
+            revoke.disabled = false;
+          }
+        };
+        access.append(revoke);
       }
     } else if (!access.children.length) access.textContent = 'No linked login.';
     const identity = document.createElement('div');
@@ -1530,16 +1630,21 @@
     openDialog(
       `${action === 'reset' ? 'Reset password' : action === 'disable' ? 'Disable unit access' : 'Restore unit access'} — ${member.game_name}`,
       action === 'reset'
-        ? '<p>A reset signs out existing sessions. Shared or hosting accounts require a panel administrator.</p><label class="unit-field">New password<input type="password" name="password" required minlength="10" maxlength="72" autocomplete="new-password"></label>'
+        ? '<p>Generate a private, single-use reset link and DM it to the member. They choose their new password. The link expires in 24 hours; accepting it signs out existing sessions. Shared, staff or hosting accounts require a panel administrator.</p>'
         : `<p>${action === 'disable' ? 'Stops access to this unit only. Other unit memberships and hosting access remain available.' : 'Restores this Member’s access to this unit.'}</p><label><input type="checkbox" required> Confirm this access change.</label>`,
       async () => {
+        if (action === 'reset') {
+          await generateMemberLink(member, 'reset');
+          return false;
+        }
         await write(`/api/units/${unitId}/roster/${member.id}/login/manage`, {
           action,
-          ...(action === 'reset' ? { password: values().password } : {}),
           revision: detail.unit.revision,
         });
       },
     );
+    if (action === 'reset')
+      form.querySelector('[type="submit"]').textContent = 'Generate reset link';
   }
 
   function memberEditor(member = {}) {

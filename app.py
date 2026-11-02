@@ -922,6 +922,7 @@ def login():
         # which is also a natural defense against brute force.
         user = authenticate_user(data.get("username", ""), data.get("password", ""))
         if user:
+            record_login(user["id"])
             session.clear()
             session.permanent = True
             session["logged_in"] = True

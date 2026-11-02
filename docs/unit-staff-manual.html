@@ -133,12 +133,11 @@ Storage; it is hidden when clear. Panel administrators can open
 <strong>Panel users</strong> directly from the landing page.</p>
 <h3 id="member-home-and-self-service">Member home and self-service</h3>
 <p>Members use the same <code>/login</code> page as staff. Unit Staff
-can create a linked Member account using <strong>Create login</strong>
-on an active roster record. Unit administrators can also create accounts
-under <strong>Administration → Accounts &amp; access</strong>. Members
-land on <strong>Overview → My unit</strong>. Staff can open the same
-page to manage announcements, see document review reminders, and inspect
-event RSVPs.</p>
+can generate a personal signup link from an active roster record and DM
+it to the member. The member sets their own credentials, or signs in to
+an existing account to accept. Members land on <strong>Overview → My
+unit</strong>. Staff can open the same page to manage announcements, see
+document review reminders, and inspect event RSVPs.</p>
 <ul>
 <li><strong>Required reading:</strong> staff open an SOP and choose
 <strong>Reading &amp; review</strong>. Assign everyone with a unit
@@ -872,13 +871,25 @@ duplicates the structure without its member assignments. Removing a
 branch leaves its members unassigned and retains their records. The
 <strong>All members</strong> roster remains available for units that do
 not use formations.</p>
-<p>Unit Staff can use <strong>Create login</strong> beside an active
-roster member or inside their record. Enter a username and initial
-password; the panel creates and links a <strong>Member</strong> account
-for this unit only. Hand the credentials and the panel’s
-<code>/login</code> address to the member. This action cannot grant
-Staff, administrator or hosting permissions. Existing linked accounts
-are managed through Accounts &amp; access by administrators.</p>
+<p>Unit Staff can use <strong>Create signup link</strong> beside an
+active roster member or in the record’s <strong>Access</strong> tab.
+Generate the link, copy it and DM it to that person. They choose a
+username and password or sign in to an existing account to accept. The
+panel links their login to this roster record with Member access only.
+Invitations work once and expire after seven days. The record offers
+revoke and regenerate controls; a replacement invalidates the previous
+link. Links cannot be retrieved later, so generate a replacement if
+lost. The roster shows each member’s login status. Use your public HTTPS
+panel address when generating links; no DNS or email setup is
+required.</p>
+<p>Invited accounts use the same account storage and login page as panel
+administrators. Unit and hosting permissions are separate. Promote the
+existing account through <strong>Change unit role</strong> or
+<strong>Accounts &amp; access</strong> when a member becomes staff. A
+panel administrator can grant hosting permissions or panel
+administration through <strong>Panel users → Edit</strong>, using the
+same login. Invitations never grant these elevated permissions
+themselves.</p>
 <p>The roster opens on <strong>All formations</strong> when a structure
 exists. Group tabs filter the formation tables. Click a member’s name to
 open their record or click <strong>— Open —</strong> to fill an empty
@@ -921,14 +932,18 @@ a personal override. Moving or unassigning the member updates the
 inherited callsign. Empty layout copies omit callsigns to avoid
 duplicating radio identifiers. Removing a saved type preserves existing
 slots and occupants.</p>
-<p>Unit administrators can reset a Member login’s password, disable
-access to this unit, or restore it through the record’s Access tab.
-Disabling unit access does not disable other units or hosting
-permissions. Password resets invalidate existing login sessions.
-Accounts shared between units, linked to hosting, or holding panel
-authority require a panel administrator for password resets. Staff/admin
-memberships are managed through Change unit role or Accounts &amp;
-access.</p>
+<p>Unit administrators can generate a single-use <strong>password reset
+link</strong>, disable access to this unit, or restore it through the
+record’s Access tab. DM reset links to members; members choose the
+password themselves. Reset links expire after 24 hours and accepting one
+signs out existing sessions. Accounts shared between units, linked to
+hosting, or holding staff/panel authority require a panel administrator
+for resets. Only the Owner can authorize an Owner reset. Disabling unit
+access leaves other units and hosting permissions available and
+invalidates pending links. Archiving a roster member invalidates
+invitations and suspends Member access to this unit; restoring the
+record does not automatically restore access. Staff/admin memberships
+are managed through Change unit role or Accounts &amp; access.</p>
 <h3 id="editable-demo-company">Editable demo company</h3>
 <p>Panel administrators can choose <strong>Create demo unit</strong> at
 the top of Units. Confirm <strong>Create / open demo</strong> to create

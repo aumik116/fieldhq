@@ -87,6 +87,8 @@ def install(api):
         if 'panel_admin' not in {row['name'] for row in conn.execute('PRAGMA table_info(users)')}:
             conn.execute('ALTER TABLE users ADD COLUMN panel_admin INTEGER NOT NULL DEFAULT 0')
             conn.execute("UPDATE users SET panel_admin=1 WHERE role='admin'")
+        if 'last_login_at' not in {row['name'] for row in conn.execute('PRAGMA table_info(users)')}:
+            conn.execute('ALTER TABLE users ADD COLUMN last_login_at REAL')
         conn.execute("CREATE TABLE IF NOT EXISTS user_server_roles (user_id INTEGER NOT NULL, server_id TEXT NOT NULL, role TEXT NOT NULL, PRIMARY KEY(user_id,server_id))")
         conn.execute("UPDATE user_preferences SET theme='slate' WHERE theme='ocean'")
         if 'scenario_id' not in {row['name'] for row in conn.execute('PRAGMA table_info(presets)')}:
@@ -132,6 +134,10 @@ def install(api):
         return dict(user) if valid and user and user["enabled"] else None
 
     api.authenticate_user = authenticate
+    def record_login(user_id):
+        with db() as conn:
+            conn.execute('UPDATE users SET last_login_at=? WHERE id=?', (time.time(), user_id))
+    api.record_login = record_login
     api.audit_event = audit
     from panel_backup import install as install_panel_backup
     install_panel_backup(api, owner_id, path)
@@ -168,7 +174,7 @@ def install(api):
 
     @app.before_request
     def authorize():
-        if request.endpoint in {"login", "static", "manifest", "service_worker"}:
+        if request.endpoint in {"login", "static", "manifest", "service_worker", "member_signup_page", "member_signup_info", "member_signup_accept"}:
             return
         with db() as conn:
             user = conn.execute("SELECT * FROM users WHERE id=?", (session.get("user_id"),)).fetchone()
@@ -378,7 +384,7 @@ def install(api):
     def users_list():
         from units import unit_role_capabilities
         with db() as conn:
-            rows = conn.execute("SELECT id,username,role,enabled,access_all,panel_admin,version FROM users ORDER BY username").fetchall()
+            rows = conn.execute("SELECT id,username,role,enabled,access_all,panel_admin,version,last_login_at FROM users ORDER BY username").fetchall()
         with db() as conn:
             unit_assignments = [dict(row,capabilities=list(unit_role_capabilities(row['role']))) for row in conn.execute('SELECT * FROM unit_staff')]
             unit_choices = [dict(row) for row in conn.execute('SELECT id,name,revision FROM units ORDER BY name')]

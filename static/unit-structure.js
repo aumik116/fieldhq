@@ -246,7 +246,7 @@ window.UnitStructure = {
                 .join(', '),
             )}</small>`
           : ''
-      }${display.status && member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}`;
+      }${display.status && member.status !== 'active' ? `<small>${member.status === 'loa' ? 'LOA' : 'Reserve'}</small>` : ''}${detail.can_edit ? `<small>${{ none: 'No login', pending: 'Invite pending', active: 'Login active', disabled: 'Login disabled' }[member.login_status] || 'No login'}</small>` : ''}`;
     const counts = (node) => {
       const value = totals.get(node.id);
       return `${value.members} member${value.members === 1 ? '' : 's'}${value.slots ? ` · ${value.filled}/${value.slots} billets filled${value.slots > value.filled ? ` · ${value.slots - value.filled} open` : ''}` : ''}`;

@@ -122,6 +122,12 @@ Published reading and announcements work without a roster link. Personal profile
 
 Panel-wide login administration opens on its own **Panel users** page at `/admin/users`, accessible from the header to panel administrators. It is independent of the selected unit and never appears below a roster. Unit administrators continue using their unit’s **Accounts & access** page for local role management.
 
+Panel users can be searched by username or unit name, filtered by unit, server, account access type and enabled status, and sorted by username, access type, unit name or enabled status. Select **No unit membership**, **No hosting access** or **No access assigned** to find accounts needing review. Access labels can overlap: one account may be a unit member and also have hosting permissions. When filtering a specific unit, unit-role filters apply to that unit. Account entries show unit names and roles, rather than calling every non-administrator “Staff.” Filters remain selected when refreshing or editing accounts. Pending signup invitations belong to roster records and are not accounts until accepted.
+
+Each account shows its **Last login**, with newest/oldest login sorting available. Dates are recorded for successful sign-ins and automatic sign-in after accepting an invitation or password reset. **No login recorded** does not mean an older account has never been used: historical dates are not inferred from usernames.
+
+Expand **Pending signup invitations** on Panel users to review unclaimed invitations across units. Search by member/unit name or filter by unit. Entries show who sent the invitation, when it was created and when it expires. **Revoke** invalidates the link; **Open unit roster** takes you to the unit where you can generate a replacement. Secret links cannot be recovered from this overview. Used, expired or revoked invitations are excluded. The list shows at most 500 matching invitations, ordered by expiry; narrow the search if more are available. Only panel administrators can access this panel-wide overview.
+
 ## 3. All servers
 
 **All servers** is the hosting overview. Its counters summarize the fleet and host; rows show individual servers. Use search, unit and status filters to narrow the list.
@@ -551,7 +557,9 @@ Review the consequences before removing a group, section or billet. These tools 
 
 In **Structure**, select a formation in the navigator to edit or move it, add smaller formations, or add several billets using `Name | count` lines. **Copy empty layout** duplicates the structure without its member assignments. Removing a branch leaves its members unassigned and retains their records. The **All members** roster remains available for units that do not use formations.
 
-Unit Staff can use **Create login** beside an active roster member or inside their record. Enter a username and initial password; the panel creates and links a **Member** account for this unit only. Hand the credentials and the panel’s `/login` address to the member. This action cannot grant Staff, administrator or hosting permissions. Existing linked accounts are managed through Accounts & access by administrators.
+Unit Staff can use **Create signup link** beside an active roster member or inside the record’s **Access** tab. Generate the link, copy it and DM it to that member. The member chooses a username and password, or signs in to an existing account to accept. Acceptance links that account to the existing roster record with **Member** access only; no duplicate roster entry is created. Links are single-use and expire after seven days. Revoke or regenerate them from the record. Regenerating invalidates the old link. Links are shown only when generated; if you lose one, generate a replacement. The roster shows No login, Invite pending, Login active or Login disabled.
+
+These are ordinary panel accounts in the same users database. Passwords use the existing bcrypt hashing; invite secrets are stored only as hashes. Unit roles and server permissions remain separate. Unit administrators use **Change unit role** to promote members to staff; panel administrators use **Panel users → Edit** to grant hosting permissions or panel administration to the same login. Existing accounts retain their other memberships and privileges when accepting an invitation. No DNS or email service changes are required: links use the panel address where staff generate them. Generate links from the public HTTPS address your members can reach.
 
 ### Member access, dated LOA and reusable billets
 
@@ -565,7 +573,7 @@ Select LOA and enter optional start/end dates in Edit member. Dates are inclusiv
 
 Administrators manage saved billet titles through **Manage structure → Billet types**. Existing slot titles and legacy position labels are carried over. Select a saved title and quantity when adding slots. Set callsigns on individual slots, not on the saved type. An occupant inherits the slot’s callsign unless their member record has a personal override. Moving or unassigning the member updates the inherited callsign. Empty layout copies omit callsigns to avoid duplicating radio identifiers. Removing a saved type preserves existing slots and occupants.
 
-Unit administrators can reset a Member login’s password, disable access to this unit, or restore it through the record’s Access tab. Disabling unit access does not disable other units or hosting permissions. Password resets invalidate existing login sessions. Accounts shared between units, linked to hosting, or holding panel authority require a panel administrator for password resets. Staff/admin memberships are managed through Change unit role or Accounts & access.
+Unit administrators can generate a **password reset link**, disable access to this unit, or restore it through the record’s Access tab. DM the reset link to the member; they choose the password. Reset links work once and expire after 24 hours. Accepting one signs out existing sessions. Accounts shared between units, linked to hosting, or holding staff/panel authority require a panel administrator for password resets; only the Owner can authorize an Owner reset. Disabling unit access does not disable other units or hosting permissions. Pending links are invalidated when access is removed or suspended. Archiving a roster member invalidates invitations and suspends their Member access to that unit; restoring the roster record does not automatically restore access. Staff/admin memberships are managed through Change unit role or Accounts & access.
 
 ### Editable demo company
 

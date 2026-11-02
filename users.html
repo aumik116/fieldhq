@@ -15,7 +15,7 @@
       href="/static/themes.css?v=themes-8"
     /><link rel="stylesheet" href="/static/manager-layout.css" /><link
       rel="stylesheet"
-      href="/static/panel.css?v=release-tools-1"
+      href="/static/panel.css?v=account-controls-1"
     /><link rel="stylesheet" href="/static/help.css?v=manuals-3" />
   </head>
   <body class="manager-page panel-users-page">
@@ -77,11 +77,41 @@
       >
       <p id="users-restricted" role="alert" hidden></p
       ><div id="users-list" aria-live="polite">Loading accounts…</div>
+      <details class="unit-block" id="users-invitations">
+        <summary
+          >Pending signup invitations ·
+          <span id="users-invite-count">…</span></summary
+        >
+        <p class="feature-note"
+          >These members have not claimed their accounts yet. Links are private
+          and cannot be retrieved; open the unit roster to generate a
+          replacement.</p
+        >
+        <div class="unit-toolbar account-filters">
+          <label
+            >Search invitations<input
+              type="search"
+              id="users-invite-search"
+              maxlength="120"
+              placeholder="Member or unit name"
+          /></label>
+          <label
+            >Unit<select id="users-invite-unit"
+              ><option value="">All units</option></select
+            ></label
+          >
+          <button type="button" id="users-invite-refresh"
+            >Refresh invitations</button
+          >
+        </div>
+        <p id="users-invite-status" role="status"></p>
+        <div id="users-invite-results"></div>
+      </details>
     </main>
     <script src="/static/api.js?v=release-tools-1"></script
     ><script src="/static/ui.js?v=cleanup-1"></script
-    ><script src="/static/user-editor.js?v=formations-1"></script
-    ><script src="/static/panel-users.js?v=release-tools-1"></script
+    ><script src="/static/user-editor.js?v=account-overview-1"></script
+    ><script src="/static/panel-users.js?v=account-overview-1"></script
     ><script src="/static/help.js?v=users-page-1"></script>
   </body>
 </html>
